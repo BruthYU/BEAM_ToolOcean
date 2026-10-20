@@ -1,0 +1,77 @@
+[
+  {
+    "type": "DynamicPackageDiscovery",
+    "name": "dynamic_package_discovery",
+    "description": "Dynamically searches PyPI and evaluates packages based on requirements",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "requirements": {
+          "type": "string",
+          "description": "Description of what the package should do"
+        },
+        "functionality": {
+          "type": "string",
+          "description": "Specific functionality needed"
+        },
+        "constraints": {
+          "type": "object",
+          "description": "Constraints (python version, license, etc.)"
+        }
+      },
+      "required": [
+        "requirements"
+      ]
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "candidates": {
+              "type": "array"
+            },
+            "recommendation": {
+              "type": "null"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "requirements": "data analysis and visualization",
+        "functionality": "create charts and graphs"
+      }
+    ],
+    "metadata": {
+      "tags": [
+        "package-discovery",
+        "pypi",
+        "dynamic"
+      ],
+      "difficulty_level": "intermediate",
+      "estimated_execution_time": "5-15 seconds"
+    }
+  }
+]

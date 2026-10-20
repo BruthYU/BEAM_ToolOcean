@@ -1,0 +1,380 @@
+[
+  {
+    "name": "SAbDab_search_structures",
+    "description": "Search SAbDab structural antibody database. Returns a direct browse URL to matching antibody structures \u2014 SAbDab's search endpoint does not expose a JSON API, so use SAbDab_get_structure with a known PDB ID for structured data. Tip: retrieve the full SAbDab summary TSV from https://opig.stats.ox.ac.uk/webapps/sabdab-sabpred/sabdab/summary/?all=true for bulk filtering.",
+    "type": "SAbDabTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "search_structures",
+          "default": "search_structures"
+        },
+        "query": {
+          "type": "string",
+          "description": "Search query - antigen name, species, or keywords (e.g., 'HER2', 'anti-CD20')"
+        },
+        "antigen": {
+          "type": "string",
+          "description": "Alias for query. Antigen name to search (e.g., 'EGFR', 'HER2')."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results (default: 50)",
+          "default": 50
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "query": "anti-CD20"
+      }
+    ],
+    "fields": {
+      "operation": "search_structures"
+    }
+  },
+  {
+    "name": "SAbDab_get_structure",
+    "description": "Get antibody structure details from SAbDab by PDB ID. Returns CDR annotations, chain information, and antigen binding data. Useful for structural analysis of antibody-antigen complexes.",
+    "type": "SAbDabTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_structure",
+          "default": "get_structure"
+        },
+        "pdb_id": {
+          "type": "string",
+          "description": "4-character PDB ID (e.g., 1IGT, 6W41). Alias: pdb_code."
+        },
+        "pdb_code": {
+          "type": "string",
+          "description": "Alias for pdb_id. 4-character PDB ID (e.g., 1IGT, 6W41)."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "pdb_id": "1AHW"
+      }
+    ],
+    "fields": {
+      "operation": "get_structure"
+    }
+  },
+  {
+    "name": "SAbDab_get_structure_summary",
+    "description": "Get per-structure curated antibody annotations from SAbDab for a PDB ID. Returns the SAbDab summary TSV row(s): antigen name/type/species, heavy/light chain species and IMGT V-gene subclass, resolution, experimental method, R-free / R-factor, scFv and engineered flags, and (when curated) binding affinity Kd, delta_G, affinity method, temperature and PMID. Use for antibody-antigen complex characterization. Pass a 4-character PDB ID (e.g., 7d6i, 3hfm). No authentication required.",
+    "type": "SAbDabTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_structure_summary",
+          "default": "get_structure_summary"
+        },
+        "pdb_id": {
+          "type": "string",
+          "description": "4-character PDB ID of an antibody structure (e.g., '7d6i', '3hfm'). Aliases: pdb_code, pdb."
+        },
+        "pdb_code": {
+          "type": "string",
+          "description": "Alias for pdb_id."
+        },
+        "pdb": {
+          "type": "string",
+          "description": "Alias for pdb_id."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "Curated SAbDab annotations for one PDB entry. Flat rather than a oneOf of success and error: `data` has to sit at the schema's top level for the validator to recognise the {status,data} envelope and check the whole result.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "'success', or 'error' with an 'error' message and no 'data'"
+        },
+        "error": {
+          "type": "string",
+          "description": "Present only when status is 'error'. A PDB entry SAbDab does not hold -- it keeps antibody and nanobody structures only -- is an error rather than an empty answer."
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "pdb_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "SAbDab's extended PDB ID, e.g. 'pdb_00003hfm'"
+            },
+            "query_pdb_id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The id as asked for, e.g. '3hfm'"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resolution": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Angstroms; null for methods that do not report one"
+            },
+            "structure_method": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "e.g. 'X-ray diffraction'"
+            },
+            "r_work": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "r_free": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "deposition_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "release_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "journal_references": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Free-text citation as SAbDab stores it. The API carries no PMID field, so this is the only citation available."
+            },
+            "antibody_type": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Distinct SAbDab types of the antibodies present, e.g. ['FAB']"
+            },
+            "antibody_count": {
+              "type": "integer",
+              "description": "Paired antibodies in the entry; 1AHW has two copies"
+            },
+            "heavy_chains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Chain identifiers typed H"
+            },
+            "light_chains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Chain identifiers typed K (kappa) or L (lambda). Testing for 'L' alone drops every kappa chain."
+            },
+            "single_chain_constructs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Chain identifiers typed M, such as an scFv"
+            },
+            "heavy_chain_species": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "light_chain_species": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "antigen_chains": {
+              "type": "array",
+              "description": "Chains typed N: the antigen side of the complex.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "chain": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "e.g. 'HEN EGG WHITE LYSOZYME'"
+                  },
+                  "organism_scientific": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "unclassified_chains": {
+              "type": "array",
+              "description": "Chains whose SAbDab type is none of H/K/L/M/N. Reported rather than folded into the antigen list, so a type added upstream is visible instead of mislabelled.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "chain": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "chain_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "all_cdr_coords_resolved": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "True when every antibody in the entry has all CDR coordinates resolved; null when the entry has no paired antibody."
+            }
+          },
+          "required": [
+            "pdb_id",
+            "antibody_count",
+            "heavy_chains",
+            "light_chains",
+            "antigen_chains"
+          ]
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string",
+              "description": "Records that this comes from the SAbDab 2 JSON entry, and that IMGT V-gene subclass is absent from it rather than guessed."
+            }
+          }
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "test_examples": [
+      {
+        "pdb_id": "7d6i"
+      },
+      {
+        "pdb_id": "3hfm"
+      }
+    ],
+    "fields": {
+      "operation": "get_structure_summary"
+    }
+  },
+  {
+    "name": "SAbDab_get_summary",
+    "description": "Get SAbDab database summary and statistics. Returns information about database content, features, and access URLs. Good starting point for exploring antibody structural data.",
+    "type": "SAbDabTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_summary",
+          "default": "get_summary"
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "test_examples": [
+      {}
+    ],
+    "fields": {
+      "operation": "get_summary"
+    }
+  }
+]

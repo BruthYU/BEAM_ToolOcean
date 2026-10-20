@@ -1,0 +1,245 @@
+---
+name: tooluniverse-cancer-variant-interpretation
+description: "Clinical interpretation of somatic cancer mutations for precision oncology. Transforms a gene + variant + cancer-type input into an actionable report: clinical evidence tier (CIViC, OncoKB), therapeutic options (FDA-approved + investigational), resistance mechanisms, prognosis, and matching clinical trials. Use for tumor-board variant calls, somatic-mutation actionability assessment, and treatment selection. Always cancer-type-specific."
+disable-model-invocation: true
+---
+
+# Cancer Variant Interpretation for Precision Oncology
+
+Comprehensive clinical interpretation of somatic mutations in cancer. Transforms a gene + variant input into an actionable precision oncology report covering clinical evidence, therapeutic options, resistance mechanisms, clinical trials, and prognostic implications.
+
+**KEY PRINCIPLES**:
+1. **Report-first approach** - Create report file FIRST, then populate progressively
+2. **Evidence-graded** - Every recommendation has an evidence tier (T1-T4)
+3. **Actionable output** - Prioritized treatment options, not data dumps
+4. **Clinical focus** - Answer "what should we treat with?" not "what databases exist?"
+5. **Resistance-aware** - Always check for known resistance mechanisms
+6. **Cancer-type specific** - Tailor all recommendations to the patient's cancer type when provided
+7. **Source-referenced** - Every statement must cite the tool/database source
+8. **English-first queries** - Always use English terms in tool calls (gene names, drug names, cancer types), even if the user writes in another language. Respond in the user's language
+
+---
+
+## LOOK UP, DON'T GUESS
+When uncertain about any scientific fact, SEARCH databases first (PubMed, UniProt, ChEMBL, ClinVar, etc.) rather than reasoning from memory. A database-verified answer is always more reliable than a guess.
+
+---
+
+## COMPUTE, DON'T DESCRIBE
+When analysis requires computation (statistics, data processing, scoring, enrichment), write and run Python code via Bash. Don't describe what you would do — execute it and report actual results. Use ToolUniverse tools to retrieve data, then Python (pandas, scipy, statsmodels, matplotlib) to analyze it.
+
+## When to Use
+
+Apply when user asks:
+- "What treatments exist for EGFR L858R in lung cancer?"
+- "Patient has BRAF V600E melanoma - what are the options?"
+- "Is KRAS G12C targetable?"
+- "Patient progressed on osimertinib - what's next?"
+- "What clinical trials are available for PIK3CA E545K?"
+- "Interpret this somatic mutation: TP53 R273H"
+
+---
+
+## Input Parsing
+
+**Required**: Gene symbol + variant notation (e.g., "EGFR L858R", "BRAF p.V600E", "EML4-ALK fusion", "HER2 amplification")
+**Optional**: Cancer type (improves specificity)
+
+Parse the gene symbol and variant separately. For fusions, use the kinase partner as the primary gene. For amplifications/deletions, use the gene name directly. Normalize common aliases: HER2 -> ERBB2, PD-L1 -> CD274, VEGF -> VEGFA.
+
+---
+
+## Phase 0: Tool Parameter Verification (CRITICAL)
+
+**BEFORE calling ANY tool for the first time**, verify its parameters.
+
+| Tool | WRONG Parameter | CORRECT Parameter |
+|------|-----------------|-------------------|
+| `OpenTargets_get_associated_drugs_by_target_ensemblID` | `ensemblID` | `ensemblId` (camelCase) |
+| `OpenTargets_get_drug_chembId_by_generic_name` | `genericName` | `drugName` |
+| `OpenTargets_target_disease_evidence` | `ensemblID` | `ensemblId` + `efoId` |
+| `MyGene_query_genes` | `q` | `query` |
+| `search_clinical_trials` | `disease`, `biomarker` | `condition`, `query_term` (required) |
+| `civic_get_variants_by_gene` | `gene_symbol` | `gene_id` (CIViC numeric ID) |
+| `drugbank_*` | any 3 params | ALL 4 required: `query`, `case_sensitive`, `exact_match`, `limit` |
+| `ChEMBL_get_drug_mechanisms` | `chembl_id` | `drug_chembl_id__exact` |
+| `ensembl_lookup_gene` | no species | `species='homo_sapiens'` is REQUIRED |
+
+---
+
+## Workflow Overview
+
+```
+Input: Gene symbol + Variant notation + Optional cancer type
+
+Phase 1: Gene Disambiguation & ID Resolution
+  - Resolve gene to Ensembl ID, UniProt accession, Entrez ID
+  - Get gene function, pathways, protein domains
+  - Identify cancer type EFO ID (if cancer type provided)
+
+Phase 2: Clinical Variant Evidence (CIViC)
+  - Find gene in CIViC (via Entrez ID matching)
+  - Get all variants for the gene, match specific variant
+  - Retrieve evidence items (predictive, prognostic, diagnostic)
+
+Phase 3: Mutation Prevalence (cBioPortal)
+  - Frequency across cancer studies
+  - Co-occurring mutations, cancer type distribution
+
+Phase 4: Therapeutic Associations (OpenTargets + ChEMBL + FDA + DrugBank)
+  - FDA-approved targeted therapies
+  - Clinical trial drugs (phase 2-3), drug mechanisms
+  - Combination therapies
+
+Phase 5: Resistance Mechanisms
+  - Known resistance variants (CIViC, literature)
+  - Bypass pathway analysis (Reactome)
+
+Phase 6: Clinical Trials
+  - Active trials recruiting for this mutation
+  - Trial phase, status, eligibility
+
+Phase 7: Prognostic Impact & Pathway Context
+  - Survival associations (literature)
+  - Pathway context (Reactome), Expression data (GTEx)
+
+Phase 8: Report Synthesis
+  - Executive summary, clinical actionability score
+  - Treatment recommendations (prioritized), completeness checklist
+```
+
+For detailed code snippets and API call patterns for each phase, see `ANALYSIS_DETAILS.md`.
+
+---
+
+## Clinical Reasoning Strategies
+
+### Driver vs Passenger Reasoning
+
+Not every mutation in a tumor is driving the cancer. Before querying databases, form a hypothesis:
+
+- **Is this gene a known oncogene or tumor suppressor?** Genes like EGFR, BRAF, KRAS, TP53, PIK3CA are well-established cancer drivers. A mutation in one of these warrants deep investigation. A mutation in a gene with no known cancer role is likely a passenger.
+- **Is this specific mutation recurrent across tumors (hotspot)?** Use cBioPortal to check prevalence across specific studies, or `GenomeNexus_get_cancer_hotspots` for a direct `is_hotspot` boolean plus tumor counts from the Chang et al. hotspot database (e.g., BRAF V600E: `is_hotspot: true`, 897 tumors as a single-residue hotspot, 545 as a 3D-cluster hotspot). A mutation seen in hundreds of independent tumors is almost certainly a driver. A unique, never-before-seen missense in the same gene is less certain.
+- **What is the predicted functional impact?** Truncating mutations (nonsense, frameshift) in tumor suppressors are likely loss-of-function drivers. Missense mutations in oncogenes at known hotspot residues are likely gain-of-function drivers.
+- **For unique (non-hotspot) missense in driver genes, look at mechanism, not just pathogenicity.** AlphaMissense gives a score; the ESMC-6B SAE composite `ESM_explain_variant_mechanism(sequence=wt_protein_seq, position=..., ref_aa=..., alt_aa=..., top_k_features=5)` answers *how* the substitution disrupts function — catalytic / ligand-binding / PTM / structural-stability loss. A unique missense that disrupts the same SAE feature category as a known driver hotspot in the same gene is more likely a driver than a missense that disrupts unrelated features. Requires `ESM_API_KEY`; missense only.
+- **Conclusion pattern**: A recurrent mutation in a known driver gene is likely actionable. A unique mutation in a gene not associated with cancer is likely a passenger. State your assessment and the reasoning behind it.
+
+### Actionability Reasoning
+
+Actionable means a therapy exists that targets this alteration. Think in tiers based on evidence strength:
+
+- **Tier 1**: FDA-approved drug for this mutation in this cancer type. The standard of care — recommend confidently. Example reasoning: "CIViC returns Level A evidence, FDA label confirms indication."
+- **Tier 2**: FDA-approved for this mutation in a different cancer type, or strong clinical trial evidence (phase 2-3) in this cancer type. Reasonable to consider, especially under tumor-agnostic approvals or with molecular tumor board discussion.
+- **Tier 3**: Preclinical evidence only — cell line data, animal models, or case reports. May justify clinical trial enrollment but not off-label use.
+- **Tier 4**: Biological rationale but no direct evidence — the mutation is in a druggable pathway, or a structurally similar mutation responds to therapy. Hypothesis-generating only.
+
+When synthesizing, state the tier and explain WHY you assigned it based on the evidence you found, not just which database returned a hit.
+
+### Resistance Reasoning
+
+If the patient has already been treated, ask: could this mutation be a resistance mechanism?
+
+- **On-target resistance**: Mutations in the drug target gene itself that restore signaling despite drug binding. These typically emerge at the drug-binding site (e.g., EGFR T790M after erlotinib, EGFR C797S after osimertinib, ABL T315I after imatinib).
+- **Bypass pathway activation**: Mutations in parallel signaling pathways that render the target irrelevant (e.g., MET amplification bypassing EGFR inhibition, BRAF activation bypassing MEK inhibition).
+- **Phenotypic transformation**: Lineage changes (e.g., small cell transformation in EGFR-mutant lung cancer) that eliminate dependence on the original driver.
+- **Timing matters**: If the mutation was detected AFTER treatment, it is more likely a resistance mechanism than if it was present at diagnosis.
+
+### When to Use Which Tool
+
+Form your clinical hypothesis FIRST based on gene function and mutation type, THEN use tools to validate:
+
+- **CIViC** (`civic_search_genes`, `civic_get_variants_by_gene`): Your primary source for clinical evidence. Returns curated evidence items with evidence levels, clinical significance, and associated therapies. Start here for any variant with potential clinical relevance.
+- **cBioPortal** (`cBioPortal_get_mutations`): Use to assess mutation prevalence — is this a hotspot? How common is it across cancer types? This informs your driver vs passenger assessment.
+- **OpenTargets** (`OpenTargets_get_associated_drugs_by_target_ensemblID`): Use for actionability — what drugs target this gene? Cross-reference with CIViC evidence to assign tiers.
+- **PubMed** (`PubMed_search_articles`): Use when CIViC lacks entries for your variant, or to find resistance mechanism reports and recent clinical trial results.
+- **ClinicalTrials.gov** (`search_clinical_trials`): Use after establishing the variant is potentially actionable, to find enrollment opportunities.
+
+---
+
+## Tool Reference (Verified Parameters)
+
+### Gene Resolution
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `MyGene_query_genes` | `query`, `species` | `hits[].ensembl.gene`, `.entrezgene`, `.symbol` |
+| `UniProt_search` | `query`, `organism`, `limit` | `results[].accession` |
+| `OpenTargets_get_target_id_description_by_name` | `targetName` | `data.search.hits[].id` |
+| `ensembl_lookup_gene` | `gene_id`, `species` (REQUIRED) | `data.id`, `.version` |
+
+### Clinical Evidence
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `civic_search_genes` | `query`, `limit` | `data.genes.nodes[].id`, `.entrezId` |
+| `civic_get_variants_by_gene` | `gene_id` (CIViC numeric) | `data.gene.variants.nodes[]` |
+| `civic_get_variant` | `variant_id` | `data.variant` |
+
+### Drug Information
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `OpenTargets_get_associated_drugs_by_target_ensemblID` | `ensemblId`, `size` | `data.target.drugAndClinicalCandidates.rows[]` |
+| `FDA_get_indications_by_drug_name` | `drug_name`, `limit` | `results[].indications_and_usage` |
+| `drugbank_get_drug_basic_info_by_drug_name_or_id` | `query`, `case_sensitive`, `exact_match`, `limit` (ALL required) | `results[]` |
+
+### Mutation Prevalence
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `cBioPortal_get_mutations` | `study_id`, `gene_list` | `data[].proteinChange` |
+| `cBioPortal_get_cancer_studies` | `limit` | `[].studyId`, `.cancerTypeId` |
+
+### Clinical Trials & Literature
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `search_clinical_trials` | `query_term` (required), `condition` | `studies[]` |
+| `PubMed_search_articles` | `query`, `limit`, `include_abstract` | Returns **list** of dicts (NOT wrapped) |
+| `Reactome_map_uniprot_to_pathways` | `id` (UniProt accession) | Pathway mappings |
+| `GTEx_get_median_gene_expression` | `gencode_id`, `operation="median"` | Expression by tissue |
+
+### Variant Annotation & Cancer Hotspots (Genome Nexus)
+
+Complements CIViC/cBioPortal with structured, computed consequence prediction (VEP/SIFT/PolyPhen/AlphaMissense) plus a dedicated cancer-hotspot lookup — use it to establish *in silico* pathogenicity and hotspot status before or alongside the curated clinical-evidence search, not instead of it. Requires **GRCh37/hg19** coordinates (convert first if you only have GRCh38, e.g. via NCBI Variation Services in `tooluniverse-variant-analysis`).
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `GenomeNexus_annotate_variant` | `hgvsg` (GRCh37, e.g. `"7:g.140453136A>T"`) | `most_severe_consequence`, `transcript_consequences[].{hgvsp, sift_prediction, polyphen_prediction, alphaMissense}`, `hotspots.annotation`, `colocated_variants[].dbSnpId` |
+| `GenomeNexus_annotate_mutation` | `chromosome`, `start`, `end`, `reference_allele`, `variant_allele` (GRCh37) | Same shape as `annotate_variant` — use when you have separate coordinate fields instead of an HGVS string |
+| `GenomeNexus_annotate_dbsnp` | `rsid` (e.g. `"rs121913529"`) | Same shape; resolves the rsID to coordinates first |
+| `GenomeNexus_get_cancer_hotspots` | `hgvsg` (GRCh37) | `is_hotspot` (bool), `hotspots[].{residue, tumorCount, type}` — `type` is `"single residue"` or `"3d"` (structural cluster) |
+| `GenomeNexus_get_canonical_transcript` | `gene_symbol` | `transcriptId`, `proteinId`, `proteinLength`, `refseqMrnaId`, `pfamDomains[]` |
+
+### Cancer Driver Gene Classification (IntOGen)
+
+Genome Nexus's `is_hotspot` (above) answers "is this exact *variant* recurrent?" IntOGen answers a different, gene-level question: "is this whole *gene* a statistically established cancer driver in this cancer type?", derived from applying 7 independent driver-detection methods (dNdScv, OncodriveFML, OncodriveCLUSTL, HotMAPS, smRegions, CBaSE, MutPanning) to thousands of tumors across 271 cohorts (TCGA, ICGC, Hartwig, and others). Use it to establish gene-level driver status BEFORE or ALONGSIDE the hotspot check — a variant in a gene that isn't a driver in this cancer type is far less likely to be actionable regardless of its hotspot status, and a gene that IS a driver but where your specific variant ISN'T a known hotspot may still warrant the mechanism-based reasoning in "Driver vs Passenger Reasoning" above.
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `IntOGen_list_cancer_types` | none | `data.cancer_types[].{cancer_type_id, cancer_name}` (87 codes, e.g. `BRCA`, `LUAD`, `SKCM`) |
+| `IntOGen_get_drivers` | `cancer_type` (IntOGen code, REQUIRED) | `data.driver_genes[].{gene, mutations, samples, cohorts}` |
+| `IntOGen_get_gene_info` | `gene` (HUGO symbol, REQUIRED) | `data.cancer_types[].{cancer_type, cancer_name, methods[], mutated_samples, total_samples}` |
+| `IntOGen_list_cohorts` | `cancer_type` (optional filter) | `data.cohorts[].{cohort_id, name, samples, source, tumor_type, age_group}` |
+
+**Combined workflow**: given gene + cancer type, call `IntOGen_get_drivers(cancer_type=...)` and check whether the gene appears in `driver_genes[]` — if yes, it's a statistically established driver in this exact cancer type (report `mutations`/`samples`/`cohorts` as supporting evidence). For the inverse question ("which cancer types is this gene a driver in overall?"), use `IntOGen_get_gene_info(gene=...)` instead, which also reports which of the 7 detection `methods` flagged it per cancer type — a gene flagged by multiple independent methods is stronger evidence than one flagged by a single method. **Operational note**: the IntOGen backend is occasionally slow and can time out (~45s) on a cold request — retry once before reporting "no data found."
+
+### Somatic Classification Tiers (CancerVar)
+
+Everything above (Genome Nexus, IntOGen, CIViC, cBioPortal) is evidence you assemble and weigh yourself. `CancerVar_classify_variant` instead runs the full AMP/ASCO/CAP 2017 rubric server-side and returns a ready-made Tier I-IV verdict — use it as a fast, automatable cross-check on your own manual assessment, not as a replacement for citing the underlying evidence above in a report.
+
+| Tool | Key Parameters | Response Key Fields |
+|------|---------------|-------------------|
+| `CancerVar_classify_variant` | `chrom`, `pos`, `ref`, `alt` (GRCh37/hg19 by default; pass `build="hg38"` for GRCh38), all REQUIRED | `data.tier` (`Tier_I_strong`\|`Tier_II_potential`\|`Tier_III_unknown`\|`Tier_IV_benign`), `data.opai` (Oncogenicity Pathogenicity Index, 0-1), `data.cbp_criteria` (12 named evidence scores, e.g. hotspot-database membership, FDA-approved-therapy association, population rarity) |
+
+Verified live on BRAF V600E (`chrom="7", pos=140453136, ref="A", alt="T", build="hg19"`): `tier="Tier_I_strong"`, `opai=0.99` — matches the FDA-approved-therapy-association tier this variant is known for, and matches the tool's own documented worked example exactly (unlike InterVar below, this example was accurate). Tier I requires CBP_1 or CBP_2 (FDA-approved association) to be active; Tier II is investigational/preclinical evidence without regulatory approval; Tier III is a true VUS-equivalent; Tier IV is benign. Report the tier alongside which specific `cbp_criteria` were active, the same way you'd cite ACMG criteria for a germline call — a bare tier number without its supporting criteria is not an audit-ready answer.
+
+---
+
+## Fallback Strategy
+
+When a primary tool returns no results, fall back rather than reporting "no data found":
+- **CIViC empty** -> search PubMed for "[gene] [variant] clinical evidence"
+- **OpenTargets no drugs** -> try ChEMBL drug search by target
+- **cBioPortal specific study empty** -> try pan-cancer study (msk_impact_2017 or similar)
+- **Reactome no pathways** -> use UniProt function annotation for pathway context

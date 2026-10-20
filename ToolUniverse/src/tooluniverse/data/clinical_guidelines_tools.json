@@ -1,0 +1,2594 @@
+[
+  {
+    "name": "MAGICapp_list_guidelines",
+    "description": "List all publicly available clinical guidelines from MAGICapp (Making GRADE the Irresistible Choice). MAGICapp hosts GRADE-based living guidelines from organizations like WHO, Stroke Foundation, American Dental Association, and others. Returns guideline metadata including name, owner organization, publication date, recommendation count, and guideline IDs for detailed lookups. Use this tool to discover available evidence-based clinical guidelines, then use MAGICapp_get_guideline or MAGICapp_get_recommendations for details.",
+    "parameter": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://api.magicapp.org/api/v1/guidelines"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "byName": {
+                "type": "string"
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "mainEditor": {
+                "type": "string"
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "lastEdit": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "countryFlag": {
+                "type": "string"
+              },
+              "sponsors": {
+                "type": "string"
+              },
+              "disclaimer": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "contactName": {
+                "type": "string"
+              },
+              "contactAddress": {
+                "type": "string"
+              },
+              "contactEmail": {
+                "type": "string"
+              },
+              "contactTelephone": {
+                "type": "string"
+              },
+              "institutionId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "institutionName": {
+                "type": "string"
+              },
+              "institutionUrl": {
+                "type": "string"
+              },
+              "institutionLogoUrl": {
+                "type": "string"
+              },
+              "institutionShortName": {
+                "type": "string"
+              },
+              "institutionGradeStrength": {
+                "type": "string"
+              },
+              "hasAltGrade": {
+                "type": "boolean"
+              },
+              "guidelineId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "currentDraftId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "publishedId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "editDraft": {
+                "type": "boolean"
+              },
+              "editPublish": {
+                "type": "boolean"
+              },
+              "permissionDraft": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "permissionPublish": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "isLatestPublished": {
+                "type": "boolean"
+              },
+              "isDraftEditable": {
+                "type": "boolean"
+              },
+              "isPublic": {
+                "type": "boolean"
+              },
+              "versionMajor": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "versionMinor": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "versionLabel": {
+                "type": "string"
+              },
+              "draftPicoCount": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "draftRecommendationCount": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "publishedPicoCount": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "publishedRecommendationCount": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "pdfPublishedPath": {
+                "type": "string"
+              },
+              "jsonPath": {
+                "type": "string"
+              },
+              "contentAdmin": {
+                "type": "boolean"
+              },
+              "status": {
+                "type": "string"
+              },
+              "commentsInPublished": {
+                "type": "boolean"
+              },
+              "publishCreationTime": {
+                "type": "string"
+              },
+              "publishDate": {
+                "type": "string"
+              },
+              "publishLastSearchDate": {
+                "type": "string"
+              },
+              "trackChanges": {
+                "type": "boolean"
+              },
+              "sectionNumbers": {
+                "type": "boolean"
+              },
+              "showRecByline": {
+                "type": "boolean"
+              },
+              "showRecNumbers": {
+                "type": "string"
+              },
+              "showConflicts": {
+                "type": "boolean"
+              },
+              "showCertaintyStrengthLabels": {
+                "type": "boolean"
+              },
+              "showSectionPreview": {
+                "type": "boolean"
+              },
+              "subscriptions": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MAGICapp_get_guideline",
+    "description": "Get detailed information about a specific clinical guideline from MAGICapp by its numeric guideline ID. Returns comprehensive guideline metadata including title, authoring organization, contact information, version details, GRADE methodology settings, and links to PDF/JSON exports. Use MAGICapp_list_guidelines first to find guideline IDs, then use this tool to get full details. For the guideline's clinical recommendations, use MAGICapp_get_recommendations instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "guideline_id": {
+          "type": "integer",
+          "description": "Numeric guideline ID (use the publishedId from MAGICapp_list_guidelines, e.g., 10962, 10258, 7594)"
+        }
+      },
+      "required": [
+        "guideline_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.magicapp.org/api/v1/guidelines/{guideline_id}"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "guideline_id": 10962
+      },
+      {
+        "guideline_id": 10258
+      },
+      {
+        "guideline_id": 7594
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "byName": {
+              "type": "string"
+            },
+            "shortCode": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "mainEditor": {
+              "type": "string"
+            },
+            "startDate": {
+              "type": "string"
+            },
+            "lastEdit": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "countryFlag": {
+              "type": "string"
+            },
+            "sponsors": {
+              "type": "string"
+            },
+            "disclaimer": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "isbn": {
+              "type": "string"
+            },
+            "issn": {
+              "type": "string"
+            },
+            "orgDocId": {
+              "type": "string"
+            },
+            "department": {
+              "type": "string"
+            },
+            "contactName": {
+              "type": "string"
+            },
+            "contactAddress": {
+              "type": "string"
+            },
+            "contactEmail": {
+              "type": "string"
+            },
+            "contactTelephone": {
+              "type": "string"
+            },
+            "contactWeb": {
+              "type": "string"
+            },
+            "institutionId": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "institutionName": {
+              "type": "string"
+            },
+            "institutionLogoUrl": {
+              "type": "string"
+            },
+            "institutionShortName": {
+              "type": "string"
+            },
+            "institutionGradeStrength": {
+              "type": "string"
+            },
+            "hasAltGrade": {
+              "type": "boolean"
+            },
+            "guidelineId": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "currentDraftId": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "publishedId": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "edit": {
+              "type": "boolean"
+            },
+            "permission": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "isLatestPublished": {
+              "type": "boolean"
+            },
+            "isDraftEditable": {
+              "type": "boolean"
+            },
+            "isPublic": {
+              "type": "boolean"
+            },
+            "versionMajor": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "versionMinor": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "draftPicoCount": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "draftRecommendationCount": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "publishedPicoCount": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "publishedRecommendationCount": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "pdfPublishedPath": {
+              "type": "string"
+            },
+            "jsonPath": {
+              "type": "string"
+            },
+            "contentAdmin": {
+              "type": "boolean"
+            },
+            "status": {
+              "type": "string"
+            },
+            "commentsInPublished": {
+              "type": "boolean"
+            },
+            "publishCreationTime": {
+              "type": "string"
+            },
+            "publishDate": {
+              "type": "string"
+            },
+            "publishLastSearchDate": {
+              "type": "string"
+            },
+            "trackChanges": {
+              "type": "boolean"
+            },
+            "sectionNumbers": {
+              "type": "boolean"
+            },
+            "showRecByline": {
+              "type": "boolean"
+            },
+            "showRecNumbers": {
+              "type": "string"
+            },
+            "showConflicts": {
+              "type": "boolean"
+            },
+            "showCertaintyStrengthLabels": {
+              "type": "boolean"
+            },
+            "showSectionPreview": {
+              "type": "boolean"
+            },
+            "subscriptions": {
+              "type": "boolean"
+            },
+            "defaultKeyInfoType": {
+              "type": "string"
+            },
+            "pdfSettings": {
+              "type": "object",
+              "properties": {
+                "pdfPageSize": {
+                  "type": "string"
+                },
+                "pdfCoverPage": {
+                  "type": "object",
+                  "properties": {
+                    "image": {
+                      "type": "null"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "fileType": {
+                      "type": "string"
+                    },
+                    "fileUrl": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "pdfLastPage": {
+                  "type": "object",
+                  "properties": {
+                    "image": {
+                      "type": "null"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "fileType": {
+                      "type": "string"
+                    },
+                    "fileUrl": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "pdfSectionTitleColor": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "pdfTabText": {
+                  "type": "string"
+                },
+                "pdfSectionText": {
+                  "type": "string"
+                },
+                "pdfPicoReferences": {
+                  "type": "boolean"
+                },
+                "pdfPageB": {
+                  "type": "boolean"
+                },
+                "pdfSubChpPageBreak": {
+                  "type": "boolean"
+                },
+                "pdfPage2": {
+                  "type": "boolean"
+                },
+                "pdfTOC": {
+                  "type": "boolean"
+                },
+                "pdfSOR": {
+                  "type": "boolean"
+                },
+                "pdfTrackChanges": {
+                  "type": "string"
+                },
+                "pdfWatermark": {
+                  "type": "boolean"
+                },
+                "pdfHideHiddenRecInDraft": {
+                  "type": "boolean"
+                },
+                "pdfHeadFont": {
+                  "type": "null"
+                },
+                "pdfHeadSize": {
+                  "type": "null"
+                },
+                "pdfHeadSub1Size": {
+                  "type": "null"
+                },
+                "pdfHeadSub2Size": {
+                  "type": "null"
+                },
+                "pdfHeadSub3Size": {
+                  "type": "null"
+                },
+                "pdfTextFont": {
+                  "type": "null"
+                },
+                "pdfTextSize": {
+                  "type": "null"
+                },
+                "pdfOnlySOR": {
+                  "type": "boolean"
+                },
+                "pdfPicoInAppendix": {
+                  "type": "boolean"
+                },
+                "pdfPicoFootNotes": {
+                  "type": "boolean"
+                },
+                "pdfHidePicos": {
+                  "type": "boolean"
+                },
+                "pdfCiteSquare": {
+                  "type": "boolean"
+                },
+                "saveSettings": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "gradeStrengthLabel": {
+              "type": "string"
+            },
+            "keyInfoJudgementType": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MAGICapp_get_recommendations",
+    "description": "Get all clinical recommendations from a specific MAGICapp guideline. Returns GRADE-rated recommendations with strength levels (STRONG, WEAK, PRACTICE, NO_STRENGTH), recommendation text (HTML), supporting remarks, rationale, and key information including evidence quality assessments. This is the core tool for accessing evidence-based clinical recommendations from living guidelines hosted on MAGICapp. Use MAGICapp_list_guidelines first to find guideline IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "guideline_id": {
+          "type": "integer",
+          "description": "Numeric guideline ID (use the publishedId from MAGICapp_list_guidelines, e.g., 10962 for oral cancer screening, 10258 for WHO mpox guidelines)"
+        }
+      },
+      "required": [
+        "guideline_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.magicapp.org/api/v1/guidelines/{guideline_id}/recommendations"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "guideline_id": 10962
+      },
+      {
+        "guideline_id": 10258
+      },
+      {
+        "guideline_id": 7594
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "recommendationId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "guidelineId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "sectionId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "order": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "strength": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "heading": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "remarks": {
+                "type": "string"
+              },
+              "advice": {
+                "type": "string"
+              },
+              "rational": {
+                "type": "string"
+              },
+              "adaptation": {
+                "type": "string"
+              },
+              "implementation": {
+                "type": "string"
+              },
+              "evaluation": {
+                "type": "string"
+              },
+              "research": {
+                "type": "string"
+              },
+              "keyInfoType": {
+                "type": "string"
+              },
+              "keyInfoDisplayMode": {
+                "type": "string"
+              },
+              "hideInPublish": {
+                "type": "boolean"
+              },
+              "picoIds": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                }
+              },
+              "keyInfo": {
+                "type": "object",
+                "properties": {
+                  "keyInfoType": {
+                    "type": "string"
+                  },
+                  "recommendationId": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "guidelineId": {
+                    "type": "null"
+                  },
+                  "sectionId": {
+                    "type": "null"
+                  },
+                  "benefits": {
+                    "type": "string"
+                  },
+                  "benefitsResearchEvidence": {
+                    "type": "string"
+                  },
+                  "benefitsResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "benefitsAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "benefitsAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  },
+                  "evidence": {
+                    "type": "string"
+                  },
+                  "evidenceResearchEvidence": {
+                    "type": "string"
+                  },
+                  "evidenceResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "evidenceAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "evidenceAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  },
+                  "preferences": {
+                    "type": "string"
+                  },
+                  "preferencesResearchEvidence": {
+                    "type": "string"
+                  },
+                  "preferencesResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "preferencesAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "preferencesAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  },
+                  "resources": {
+                    "type": "string"
+                  },
+                  "resourcesResearchEvidence": {
+                    "type": "string"
+                  },
+                  "resourcesResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "resourcesAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "resourcesAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  },
+                  "benefitsStrength": {
+                    "type": "string"
+                  },
+                  "evidenceStrength": {
+                    "type": "string"
+                  },
+                  "preferencesStrength": {
+                    "type": "string"
+                  },
+                  "resourcesStrength": {
+                    "type": "string"
+                  },
+                  "interventions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "recommendationId": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "picoId": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "picoElement": {
+                          "type": "string"
+                        },
+                        "intervention": {
+                          "type": "string"
+                        },
+                        "isComparator": {
+                          "type": "boolean"
+                        },
+                        "showComparator": {
+                          "type": "boolean"
+                        },
+                        "sortOrder": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "judgements": {
+                          "type": "object",
+                          "properties": {
+                            "BENEFITS_DESIRABLE": {
+                              "type": "string"
+                            },
+                            "BENEFITS_UNDESIRABLE": {
+                              "type": "string"
+                            },
+                            "EVIDENCE": {
+                              "type": "string"
+                            },
+                            "PREFERENCES": {
+                              "type": "string"
+                            },
+                            "RESOURCES": {
+                              "type": "string"
+                            },
+                            "EQUITY": {
+                              "type": "string"
+                            },
+                            "ACCEPTABILITY": {
+                              "type": "string"
+                            },
+                            "FEASIBILITY": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "comparator": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "isSummaryOfJudgementPublic": {
+                    "type": "boolean"
+                  },
+                  "acceptabilityStrength": {
+                    "type": "string"
+                  },
+                  "acceptability": {
+                    "type": "string"
+                  },
+                  "acceptabilityResearchEvidence": {
+                    "type": "string"
+                  },
+                  "acceptabilityResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "acceptabilityAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "acceptabilityAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  },
+                  "equityStrength": {
+                    "type": "string"
+                  },
+                  "equity": {
+                    "type": "string"
+                  },
+                  "equityResearchEvidence": {
+                    "type": "string"
+                  },
+                  "equityResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "equityAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "equityAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  },
+                  "feasibilityStrength": {
+                    "type": "string"
+                  },
+                  "feasibility": {
+                    "type": "string"
+                  },
+                  "feasibilityResearchEvidence": {
+                    "type": "string"
+                  },
+                  "feasibilityResearchEvidenceInPublic": {
+                    "type": "boolean"
+                  },
+                  "feasibilityAdditionalConsideration": {
+                    "type": "string"
+                  },
+                  "feasibilityAdditionalConsiderationInPublic": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "interventions": {
+                "type": "object",
+                "properties": {
+                  "recommendationId": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "shortCode": {
+                    "type": "string"
+                  },
+                  "guidelineId": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "sectionId": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "emrImplement": {
+                    "type": "string"
+                  },
+                  "emrResources": {
+                    "type": "string"
+                  },
+                  "targetPopulation": {
+                    "type": "string"
+                  },
+                  "recommendedInvention": {
+                    "type": "string"
+                  },
+                  "codes": {
+                    "type": "array"
+                  }
+                }
+              },
+              "emrCodes": {
+                "type": "array"
+              },
+              "picos": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "picoId": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "sectionId": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "order": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "population": {
+                      "type": "string"
+                    },
+                    "populationShortName": {
+                      "type": "string"
+                    },
+                    "intervention": {
+                      "type": "string"
+                    },
+                    "interventionShortName": {
+                      "type": "string"
+                    },
+                    "comparator": {
+                      "type": "string"
+                    },
+                    "comparatorShortName": {
+                      "type": "string"
+                    },
+                    "shortCode": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "outcomes": {
+                      "type": "object",
+                      "properties": {
+                        "picoId": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "sectionId": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "guidelineId": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "dichotomousOutcomes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "outcomeId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "picoId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "sectionId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "guidelineId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "isHidden": {
+                                "type": "boolean"
+                              },
+                              "sortOrder": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "shortCode": {
+                                "type": "string"
+                              },
+                              "outcome": {
+                                "type": "string"
+                              },
+                              "shortName": {
+                                "type": "string"
+                              },
+                              "importanceLevel": {
+                                "type": "string"
+                              },
+                              "interventionStudies": {
+                                "type": "string"
+                              },
+                              "interventionTotalParticipants": {
+                                "type": "number"
+                              },
+                              "interventionReferenceType": {
+                                "type": "string"
+                              },
+                              "interventionStudyType": {
+                                "type": "string"
+                              },
+                              "comparatorStudyType": {
+                                "type": "string"
+                              },
+                              "comparatorReferenceType": {
+                                "type": "string"
+                              },
+                              "comparatorComment": {
+                                "type": "string"
+                              },
+                              "qualityInterventionStudyType": {
+                                "type": "string"
+                              },
+                              "qualityOfEvidenceLevel": {
+                                "type": "string"
+                              },
+                              "qualityOfEvidenceComment": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBias": {
+                                "type": "string"
+                              },
+                              "qualityInconsistency": {
+                                "type": "string"
+                              },
+                              "qualityIndirectness": {
+                                "type": "string"
+                              },
+                              "qualityIndirectnessComment": {
+                                "type": "string"
+                              },
+                              "qualityImprecision": {
+                                "type": "string"
+                              },
+                              "qualityPublicationBias": {
+                                "type": "string"
+                              },
+                              "qualityUpgrade": {
+                                "type": "string"
+                              },
+                              "plainSummaryComment": {
+                                "type": "string"
+                              },
+                              "directionOfEffectType": {
+                                "type": "string"
+                              },
+                              "absoluteDifference": {
+                                "type": "number"
+                              },
+                              "absoluteDifferenceDirection": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceConfidenceType": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceLow": {
+                                "type": "number"
+                              },
+                              "absoluteDifferenceLowDirection": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceHigh": {
+                                "type": "number"
+                              },
+                              "absoluteDifferenceHighDirection": {
+                                "type": "string"
+                              },
+                              "relativeEffect": {
+                                "type": "number"
+                              },
+                              "relativeEffectType": {
+                                "type": "string"
+                              },
+                              "relativeEffectConfidenceType": {
+                                "type": "string"
+                              },
+                              "relativeEffectConfidenceLow": {
+                                "type": "number"
+                              },
+                              "relativeEffectConfidenceHigh": {
+                                "type": "number"
+                              },
+                              "comparatorEffect": {
+                                "type": "number"
+                              },
+                              "comparatorEffectType": {
+                                "type": "string"
+                              },
+                              "interventionEffect": {
+                                "type": "number"
+                              },
+                              "interventionEffectType": {
+                                "type": "string"
+                              },
+                              "autoCalcInterventions": {
+                                "type": "string"
+                              },
+                              "shadow_PARENT_ID_FOR_MERGING": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "qualityRiskOfBiasComment": {
+                                "type": "string"
+                              },
+                              "qualityImprecisionComment": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBiasIssues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "comparatorStudies": {
+                                "type": "string"
+                              },
+                              "comparatorTotalParticipants": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "comparatorTotalEvents": {
+                                "type": "number"
+                              },
+                              "qualityUpgradeComment": {
+                                "type": "string"
+                              },
+                              "timeFrame": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "interventionStudyFollowUp": {
+                                "type": "string"
+                              },
+                              "comparatorFollowUp": {
+                                "type": "string"
+                              },
+                              "qualityInconsistencyComment": {
+                                "type": "string"
+                              },
+                              "qualityPublicationBiasComment": {
+                                "type": "string"
+                              },
+                              "qualityInconsistencyIssues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "qualityPublicationBiasIssues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "continuousOutcomes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "outcomeId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "picoId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "sectionId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "guidelineId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "isHidden": {
+                                "type": "boolean"
+                              },
+                              "sortOrder": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "shortCode": {
+                                "type": "string"
+                              },
+                              "outcome": {
+                                "type": "string"
+                              },
+                              "shortName": {
+                                "type": "string"
+                              },
+                              "importanceLevel": {
+                                "type": "string"
+                              },
+                              "interventionStudies": {
+                                "type": "string"
+                              },
+                              "interventionReferenceType": {
+                                "type": "string"
+                              },
+                              "interventionStudyType": {
+                                "type": "string"
+                              },
+                              "comparatorStudyType": {
+                                "type": "string"
+                              },
+                              "comparatorReferenceType": {
+                                "type": "string"
+                              },
+                              "qualityInterventionStudyType": {
+                                "type": "string"
+                              },
+                              "qualityOfEvidenceLevel": {
+                                "type": "string"
+                              },
+                              "qualityOfEvidenceComment": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBias": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBiasComment": {
+                                "type": "string"
+                              },
+                              "qualityInconsistency": {
+                                "type": "string"
+                              },
+                              "qualityIndirectness": {
+                                "type": "string"
+                              },
+                              "qualityImprecision": {
+                                "type": "string"
+                              },
+                              "qualityPublicationBias": {
+                                "type": "string"
+                              },
+                              "qualityPublicationBiasComment": {
+                                "type": "string"
+                              },
+                              "qualityUpgrade": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBiasIssues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "qualityPublicationBiasIssues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "plainSummaryComment": {
+                                "type": "string"
+                              },
+                              "directionOfEffectType": {
+                                "type": "string"
+                              },
+                              "measurementLabel": {
+                                "type": "string"
+                              },
+                              "scaleLow": {
+                                "type": "string"
+                              },
+                              "scaleDirection": {
+                                "type": "string"
+                              },
+                              "unit": {
+                                "type": "string"
+                              },
+                              "interventionEffect": {
+                                "type": "string"
+                              },
+                              "interventionEffectType": {
+                                "type": "string"
+                              },
+                              "interventionEffectConfidenceType": {
+                                "type": "string"
+                              },
+                              "interventionEffectConfidenceLow": {
+                                "type": "string"
+                              },
+                              "interventionEffectConfidenceHigh": {
+                                "type": "string"
+                              },
+                              "comparatorEffect": {
+                                "type": "string"
+                              },
+                              "comparatorEffectType": {
+                                "type": "string"
+                              },
+                              "comparatorEffectConfidenceType": {
+                                "type": "string"
+                              },
+                              "comparatorEffectConfidenceLow": {
+                                "type": "string"
+                              },
+                              "comparatorEffectConfidenceHigh": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceType": {
+                                "type": "string"
+                              },
+                              "absoluteDifference": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceDirection": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceConfidenceType": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceLow": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceLowDirection": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceHigh": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceHighDirection": {
+                                "type": "string"
+                              },
+                              "absoluteDifferenceDirectionType": {
+                                "type": "string"
+                              },
+                              "shadow_PARENT_ID_FOR_MERGING": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "qualityInconsistencyComment": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "interventionTotalParticipants": {
+                                "type": "number"
+                              },
+                              "qualityInconsistencyIssues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "scaleHigh": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "nonPoolableOutcomes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "outcomeId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "picoId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "sectionId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "guidelineId": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "isHidden": {
+                                "type": "boolean"
+                              },
+                              "sortOrder": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              },
+                              "shortCode": {
+                                "type": "string"
+                              },
+                              "outcome": {
+                                "type": "string"
+                              },
+                              "shortName": {
+                                "type": "string"
+                              },
+                              "importanceLevel": {
+                                "type": "string"
+                              },
+                              "interventionStudies": {
+                                "type": "string"
+                              },
+                              "interventionTotalParticipants": {
+                                "type": "number"
+                              },
+                              "interventionReferenceType": {
+                                "type": "string"
+                              },
+                              "interventionStudyType": {
+                                "type": "string"
+                              },
+                              "comparatorStudyType": {
+                                "type": "string"
+                              },
+                              "comparatorReferenceType": {
+                                "type": "string"
+                              },
+                              "extraReferences": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "referenceId": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "referenceNumber": {
+                                      "type": [
+                                        "integer",
+                                        "number"
+                                      ]
+                                    },
+                                    "authors": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": [
+                                              "integer",
+                                              "number"
+                                            ]
+                                          },
+                                          "firstName": {
+                                            "type": "string"
+                                          },
+                                          "lastName": {
+                                            "type": "string"
+                                          },
+                                          "formattedName": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "titleText": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    },
+                                    "doi": {
+                                      "type": "string"
+                                    },
+                                    "pmid": {
+                                      "type": "string"
+                                    },
+                                    "journal": {
+                                      "type": "string"
+                                    },
+                                    "year": {
+                                      "type": "string"
+                                    },
+                                    "volume": {
+                                      "type": "string"
+                                    },
+                                    "issue": {
+                                      "type": "string"
+                                    },
+                                    "pageStart": {
+                                      "type": "string"
+                                    },
+                                    "pageEnd": {
+                                      "type": "string"
+                                    },
+                                    "creationType": {
+                                      "type": "string"
+                                    },
+                                    "comment": {
+                                      "type": "string"
+                                    },
+                                    "attachedFiles": {
+                                      "type": "array"
+                                    }
+                                  }
+                                }
+                              },
+                              "qualityInterventionStudyType": {
+                                "type": "string"
+                              },
+                              "qualityOfEvidenceLevel": {
+                                "type": "string"
+                              },
+                              "qualityOfEvidenceComment": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBias": {
+                                "type": "string"
+                              },
+                              "qualityRiskOfBiasComment": {
+                                "type": "string"
+                              },
+                              "qualityInconsistency": {
+                                "type": "string"
+                              },
+                              "qualityIndirectness": {
+                                "type": "string"
+                              },
+                              "qualityIndirectnessComment": {
+                                "type": "string"
+                              },
+                              "qualityImprecision": {
+                                "type": "string"
+                              },
+                              "qualityImprecisionComment": {
+                                "type": "string"
+                              },
+                              "qualityPublicationBias": {
+                                "type": "string"
+                              },
+                              "qualityUpgrade": {
+                                "type": "string"
+                              },
+                              "plainSummaryComment": {
+                                "type": "string"
+                              },
+                              "directionOfEffectType": {
+                                "type": "string"
+                              },
+                              "estimatesDescription": {
+                                "type": "string"
+                              },
+                              "shadow_PARENT_ID_FOR_MERGING": {
+                                "type": [
+                                  "integer",
+                                  "number"
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "practicalIssues": {
+                          "type": "array"
+                        }
+                      }
+                    },
+                    "guidelineId": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "references": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "referenceId": {
+                            "type": [
+                              "integer",
+                              "number"
+                            ]
+                          },
+                          "referenceNumber": {
+                            "type": [
+                              "integer",
+                              "number"
+                            ]
+                          },
+                          "authors": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": [
+                                    "integer",
+                                    "number"
+                                  ]
+                                },
+                                "firstName": {
+                                  "type": "string"
+                                },
+                                "lastName": {
+                                  "type": "string"
+                                },
+                                "formattedName": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "titleText": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "doi": {
+                            "type": "string"
+                          },
+                          "pmid": {
+                            "type": "string"
+                          },
+                          "journal": {
+                            "type": "string"
+                          },
+                          "year": {
+                            "type": "string"
+                          },
+                          "volume": {
+                            "type": "string"
+                          },
+                          "issue": {
+                            "type": "string"
+                          },
+                          "pageStart": {
+                            "type": "string"
+                          },
+                          "pageEnd": {
+                            "type": "string"
+                          },
+                          "creationType": {
+                            "type": "string"
+                          },
+                          "guidelineId": {
+                            "type": [
+                              "integer",
+                              "number"
+                            ]
+                          },
+                          "shortName": {
+                            "type": "string"
+                          },
+                          "order": {
+                            "type": [
+                              "integer",
+                              "number"
+                            ]
+                          },
+                          "referenceType": {
+                            "type": "string"
+                          },
+                          "studyType": {
+                            "type": "string"
+                          },
+                          "attachedFiles": {
+                            "type": "array"
+                          },
+                          "abstractText": {
+                            "type": "string"
+                          },
+                          "comments": {
+                            "type": "string"
+                          },
+                          "selected": {
+                            "type": "boolean"
+                          },
+                          "usageCount": {
+                            "type": "null"
+                          },
+                          "referencePicos": {
+                            "type": "array"
+                          },
+                          "files": {
+                            "type": "array"
+                          },
+                          "results": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "picoCodes": {
+                      "type": "array"
+                    }
+                  }
+                }
+              },
+              "references": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "referenceId": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "referenceNumber": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "authors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": [
+                              "integer",
+                              "number"
+                            ]
+                          },
+                          "firstName": {
+                            "type": "string"
+                          },
+                          "lastName": {
+                            "type": "string"
+                          },
+                          "formattedName": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "titleText": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "doi": {
+                      "type": "string"
+                    },
+                    "pmid": {
+                      "type": "string"
+                    },
+                    "journal": {
+                      "type": "string"
+                    },
+                    "year": {
+                      "type": "string"
+                    },
+                    "volume": {
+                      "type": "string"
+                    },
+                    "issue": {
+                      "type": "string"
+                    },
+                    "pageStart": {
+                      "type": "string"
+                    },
+                    "pageEnd": {
+                      "type": "string"
+                    },
+                    "creationType": {
+                      "type": "string"
+                    },
+                    "guidelineId": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "shortName": {
+                      "type": "string"
+                    },
+                    "order": {
+                      "type": [
+                        "integer",
+                        "number"
+                      ]
+                    },
+                    "referenceType": {
+                      "type": "string"
+                    },
+                    "studyType": {
+                      "type": "string"
+                    },
+                    "attachedFiles": {
+                      "type": "array"
+                    },
+                    "abstractText": {
+                      "type": "string"
+                    },
+                    "comments": {
+                      "type": "string"
+                    },
+                    "selected": {
+                      "type": "boolean"
+                    },
+                    "usageCount": {
+                      "type": "null"
+                    },
+                    "referencePicos": {
+                      "type": "array"
+                    },
+                    "files": {
+                      "type": "array"
+                    },
+                    "results": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "files": {
+                "type": "array"
+              },
+              "images": {
+                "type": "array"
+              },
+              "referenceIds": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MAGICapp_get_sections",
+    "description": "Get all sections (chapters) of a specific MAGICapp clinical guideline. Returns the structural organization of the guideline including section headings, text content, section types, and hierarchical ordering. Use this to understand the guideline's structure and find specific clinical topics within a guideline. Sections contain the narrative text while recommendations are accessed separately via MAGICapp_get_recommendations.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "guideline_id": {
+          "type": "integer",
+          "description": "Numeric guideline ID (use the publishedId from MAGICapp_list_guidelines, e.g., 10962 for oral cancer screening, 10258 for WHO mpox guidelines)"
+        }
+      },
+      "required": [
+        "guideline_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.magicapp.org/api/v1/guidelines/{guideline_id}/sections"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "guideline_id": 10962
+      },
+      {
+        "guideline_id": 10258
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "guidelineId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "sectionId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "order": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "sectionType": {
+                "type": "string"
+              },
+              "shortCode": {
+                "type": "string"
+              },
+              "sectionLabel": {
+                "type": "string"
+              },
+              "sectionNumber": {
+                "type": "string"
+              },
+              "isNumbered": {
+                "type": "boolean"
+              },
+              "heading": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "counts": {
+                "type": "object",
+                "properties": {
+                  "picoCount": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "recommendationCount": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  }
+                }
+              },
+              "hasUncommittedChanges": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "NCI_get_drug_by_name",
+    "description": "Get detailed information about a cancer drug from the NCI Drug Dictionary by its pretty-url-name (slug). Returns comprehensive drug information including definition, aliases (brand names, chemical names, code names, CAS registry numbers), NCI concept ID, and links to drug information summaries. The pretty-url-name is a lowercase hyphenated slug (e.g., 'pembrolizumab', 'tamoxifen-citrate', 'nivolumab'). You can find drug names from NCIDrugDict_search results (prettyUrlName field).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "description": "Pretty URL name (slug) of the drug (e.g., 'pembrolizumab', 'tamoxifen-citrate', 'nivolumab', 'trastuzumab')"
+        }
+      },
+      "required": [
+        "drug_name"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://webapis.cancer.gov/drugdictionary/v1/Drugs/{drug_name}"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "drug_name": "pembrolizumab"
+      },
+      {
+        "drug_name": "tamoxifen-citrate"
+      },
+      {
+        "drug_name": "nivolumab"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "aliases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "definition": {
+              "type": "object",
+              "properties": {
+                "html": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            },
+            "drugInfoSummaryLink": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            },
+            "nciConceptId": {
+              "type": "string"
+            },
+            "nciConceptName": {
+              "type": "string"
+            },
+            "termId": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "firstLetter": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "termNameType": {
+              "type": "string"
+            },
+            "prettyUrlName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "aliases"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "NCI_expand_drugs_by_letter",
+    "description": "Browse the NCI Drug Dictionary by first letter. Returns all cancer drugs and drug aliases starting with the specified letter. Each result includes the drug name, preferred name, type (DrugTerm or DrugAlias), and a pretty URL name for detailed lookups. Useful for discovering cancer drugs alphabetically or finding all drugs starting with a specific letter. Use NCI_get_drug_by_name with the prettyUrlName to get full details.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "letter": {
+          "type": "string",
+          "description": "First letter to browse by (a-z, or '#' for drugs starting with numbers/special characters)"
+        },
+        "size": {
+          "type": "integer",
+          "description": "Number of results per page (default: 100, max: 10000)",
+          "default": 100
+        },
+        "from": {
+          "type": "integer",
+          "description": "Offset for pagination (default: 0)",
+          "default": 0
+        }
+      },
+      "required": [
+        "letter"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://webapis.cancer.gov/drugdictionary/v1/Drugs/expand/{letter}"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "letter": "a",
+        "size": 5
+      },
+      {
+        "letter": "p",
+        "size": 5
+      },
+      {
+        "letter": "t",
+        "size": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "meta": {
+              "type": "object",
+              "properties": {
+                "totalResults": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "from": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                }
+              }
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "preferredName": {
+                    "type": "string"
+                  },
+                  "termId": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "firstLetter": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "termNameType": {
+                    "type": "string"
+                  },
+                  "prettyUrlName": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "links": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "meta"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "DailyMed_search_drug_classes",
+    "description": "Search the DailyMed database for FDA Established Pharmacologic Classes (EPC). Returns drug class names and NDF-RT codes that categorize drugs by their mechanism of action or pharmacologic effect. Use this to find drug classes for a specific therapeutic area (e.g., 'antihypertensive', 'antibiotic', 'antineoplastic') or to look up specific pharmacologic class codes. The drug class codes can be used to search DailyMed_search_spls for all drugs in that class.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "drug_class_name": {
+          "type": "string",
+          "description": "Search term for drug class name (e.g., 'anti', 'kinase inhibitor', 'antibacterial', 'antineoplastic', 'angiotensin')"
+        },
+        "pagesize": {
+          "type": "integer",
+          "description": "Number of results per page (default: 100)",
+          "default": 100
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number for pagination (default: 1)",
+          "default": 1
+        }
+      },
+      "required": [
+        "drug_class_name"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://dailymed.nlm.nih.gov/dailymed/services/v2/drugclasses.json"
+    },
+    "type": "DailyMedDrugClassesTool",
+    "test_examples": [
+      {
+        "drug_class_name": "kinase inhibitor",
+        "pagesize": 10
+      },
+      {
+        "drug_class_name": "antibacterial",
+        "pagesize": 10
+      },
+      {
+        "drug_class_name": "receptor",
+        "pagesize": 10
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "description": "Drug classes whose name contains the search term. DailyMed cannot filter, so `data` is the matching subset of its catalogue and `metadata` records that ToolUniverse applied the filter. On failure `status` is 'error', `error` carries the reason and `data` is absent.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "'success' or 'error'"
+        },
+        "error": {
+          "type": "string",
+          "description": "Present only when status is 'error'."
+        },
+        "data": {
+          "type": "array",
+          "description": "The matches on the requested page. Empty when nothing matched, which is an answer rather than a failure.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "NDF-RT code, e.g. 'N0000175809'"
+              },
+              "codingSystem": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "description": "EPC, MoA, PE or Chemical/Ingredient"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "drug_class_name": {
+              "type": "string",
+              "description": "The term that was searched for."
+            },
+            "total_matches": {
+              "type": "integer",
+              "description": "Matches across the whole catalogue, not just this page."
+            },
+            "returned": {
+              "type": "integer",
+              "description": "Rows in `data`."
+            },
+            "page": {
+              "type": "integer"
+            },
+            "pagesize": {
+              "type": "integer"
+            },
+            "classes_searched": {
+              "type": "integer",
+              "description": "Size of the catalogue that was filtered, 1210 today."
+            },
+            "upstream_pages_read": {
+              "type": "integer",
+              "description": "DailyMed pages fetched to assemble it; it caps a page at 100."
+            },
+            "filtered_by": {
+              "type": "string",
+              "description": "Records that the filter was applied by ToolUniverse, not upstream."
+            }
+          }
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    }
+  }
+]

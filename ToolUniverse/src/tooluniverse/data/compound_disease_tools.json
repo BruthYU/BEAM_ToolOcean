@@ -1,0 +1,196 @@
+[
+  {
+    "type": "CompoundDiseaseProfileTool",
+    "name": "gather_disease_profile",
+    "description": "Gather a comprehensive disease profile from Orphanet, OMIM, DisGeNET, OpenTargets, and OLS in a single call. Returns disease identifiers (ORPHA, MIM, EFO, MONDO), associated genes with scores, inheritance pattern, prevalence, and ontology cross-references. Use for disease research requiring multi-database evidence.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "disease": {
+          "type": "string",
+          "description": "Disease name (e.g., 'breast cancer', 'cystic fibrosis', 'distal renal tubular acidosis')"
+        }
+      },
+      "required": [
+        "disease"
+      ]
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "Unwrapped payload (result['data']) of a successful call.",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "The disease name that was queried."
+        },
+        "sources_queried": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sources_failed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Human-readable error messages for sources that failed or returned no usable data."
+        },
+        "profile": {
+          "type": "object",
+          "description": "Unified profile built from all successfully-queried sources.",
+          "properties": {
+            "disease": {
+              "type": "string"
+            },
+            "identifiers": {
+              "type": "object",
+              "description": "Cross-reference identifiers keyed by ontology/source name (e.g. orphanet, efo, mondo, doid, mesh, snomed, ncit, ordo, hp, omim); keys vary per disease."
+            },
+            "prevalence": {
+              "type": "string"
+            },
+            "inheritance": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "top_genes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "disease",
+            "identifiers"
+          ]
+        },
+        "per_source": {
+          "type": "object",
+          "description": "Raw-ish per-source parsed results; sources that failed or returned nothing appear as {}.",
+          "properties": {
+            "orphanet": {
+              "type": "object",
+              "properties": {
+                "orpha_code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "prevalence": {
+                  "type": "string"
+                },
+                "inheritance": {
+                  "type": "string"
+                }
+              }
+            },
+            "omim": {
+              "type": "object",
+              "properties": {
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "mim_number": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "disgenet": {
+              "type": "object",
+              "properties": {
+                "associated_genes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "gene": {
+                        "type": "string"
+                      },
+                      "score": {}
+                    }
+                  }
+                }
+              }
+            },
+            "opentargets": {
+              "type": "object",
+              "properties": {
+                "efo_id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "dbXRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "ols": {
+              "type": "object",
+              "properties": {
+                "terms": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "ontology": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "query",
+        "sources_queried",
+        "sources_failed",
+        "profile",
+        "per_source"
+      ]
+    },
+    "test_examples": [
+      {
+        "disease": "breast cancer"
+      },
+      {
+        "disease": "cystic fibrosis"
+      },
+      {
+        "disease": "distal renal tubular acidosis"
+      }
+    ]
+  }
+]

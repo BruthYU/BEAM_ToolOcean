@@ -1,0 +1,395 @@
+[
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_list_studies",
+    "description": "List all MetaboLights studies with pagination. Returns a list of study IDs (e.g., 'MTBLS1', 'MTBLS2'). Use metabolights_get_study to get detailed information for a specific study ID.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "size": {
+          "type": "integer",
+          "description": "Number of studies per page (default: 20)",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 100
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number (default: 0)",
+          "default": 0,
+          "minimum": 0
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of study identifiers",
+      "items": {
+        "type": "string"
+      }
+    },
+    "test_examples": [
+      {
+        "size": 10
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_search_studies",
+    "description": "Keyword-search MetaboLights studies and return the matching study accessions (MTBLS###). Searches organism, disease, metabolite and free-text study content. MetaboLights' own /ws/studies endpoint ignores keyword queries, so this tool searches through EBI Search, which indexes the same studies. Use metabolights_list_studies to browse all public studies without a keyword, and metabolights_get_study for the full record of a returned accession.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query string (e.g., organism name, disease, metabolite name)"
+        },
+        "size": {
+          "type": "integer",
+          "description": "Number of results per page (default: 20)",
+          "default": 20,
+          "maximum": 100
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number (default: 0)",
+          "default": 0
+        }
+      },
+      "required": ["query"]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of matching study identifiers",
+      "items": {
+        "type": "string"
+      }
+    },
+    "test_examples": [
+      {
+        "query": "cancer",
+        "size": 10
+      },
+      {
+        "query": "E. coli",
+        "size": 20
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study",
+    "description": "Get detailed information about a specific MetaboLights study by study ID. Returns complete study metadata including title, description, authors, and publication information.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID (e.g., 'MTBLS1')"
+        }
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "description": "Complete study information"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1"
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study_assays",
+    "description": "Get all assays associated with a MetaboLights study. Returns assay metadata including assay types, protocols, and measurement details.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID"
+        }
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}/assays",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of assays with metadata",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1"
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study_samples",
+    "description": "Get the samples of a MetaboLights study: one row per sample with its source name, characteristics (organism, organism part, variant, sample type ...) and factor values, as columns of the study's ISA-Tab sample sheet. The upstream /samples endpoint returns HTTP 400 for every study (checked 2026-09-21), so this tool reads the public archive copy of the sample sheet (s_<study_id>.txt) instead; that works for public studies only and returns an error for others. At most 1000 rows are returned; 'total_count' and 'truncated' say whether more exist. For study-level metadata use metabolights_get_study or metabolights_get_study_assays.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID"
+        }
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}/samples",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of samples, one object per row of the study's sample sheet (column name -> value)",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1"
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study_files",
+    "description": "Get list of files associated with a MetaboLights study. Returns file metadata including file names, types, and download links. Note: The files endpoint frequently returns 500 errors (known MetaboLights API issue). This tool automatically falls back to extracting file information from the study endpoint, including FTP/HTTP URLs. If both methods fail, access files via MetaboLights website: https://www.ebi.ac.uk/metabolights/studies/{study_id}.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID"
+        }
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}/files",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "File listings organized by category",
+      "properties": {
+        "study": {
+          "type": "array",
+          "description": "Study files"
+        },
+        "latest": {
+          "type": "array",
+          "description": "Latest files"
+        },
+        "private": {
+          "type": "array",
+          "description": "Private files"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1"
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study_protocols",
+    "description": "Get experimental protocols used in a MetaboLights study. Returns detailed protocol information including sample collection, extraction, chromatography, and data acquisition methods. Each protocol includes name, type, description, and controlled vocabulary annotations. Use this to understand the experimental methodology used in the study.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID (e.g., 'MTBLS1'). Use metabolights_list_studies or metabolights_search_studies to discover study IDs."
+        }
+      },
+      "required": [
+        "study_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}/protocols",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of protocols with detailed methodology",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1"
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study_factors",
+    "description": "Get experimental factors (variables) for a MetaboLights study. Returns factor definitions such as treatment groups, time points, disease states, or other experimental variables. Each factor includes name, type, and controlled vocabulary annotations. Use this to understand what variables were studied and how samples were grouped.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID (e.g., 'MTBLS1'). Use metabolights_list_studies or metabolights_search_studies to discover study IDs."
+        }
+      },
+      "required": [
+        "study_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}/factors",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of experimental factors (variables)",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1"
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_study_data_files",
+    "description": "Search for data files in a MetaboLights study. Returns a list of files matching the search criteria. Use search_pattern to filter by file type (e.g., '*.mzML', '*.raw', '*.d'). At least one of file_match or folder_match must be true. NOTE (checked 2026-09-20): the upstream data-files endpoint currently returns an empty list for every public study tried (MTBLS1, MTBLS2, MTBLS3, MTBLS10, MTBLS374); use metabolights_get_study_files to list a study's files.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "description": "MetaboLights study ID (e.g., 'MTBLS1')"
+        },
+        "search_pattern": {
+          "type": "string",
+          "description": "Search pattern for files (e.g., '*.mzML', '*.zip', '*.d'). Default is 'FILES/*' to match all files",
+          "default": "FILES/*"
+        },
+        "file_match": {
+          "type": "boolean",
+          "description": "Include file matches in results. At least one of file_match or folder_match must be true",
+          "default": true
+        },
+        "folder_match": {
+          "type": "boolean",
+          "description": "Include folder matches in results. At least one of file_match or folder_match must be true",
+          "default": false
+        }
+      },
+      "required": [
+        "study_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/studies/{study_id}/data-files",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "description": "List of matching files",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "study_id": "MTBLS1",
+        "file_match": true
+      }
+    ]
+  },
+  {
+    "type": "MetaboLightsRESTTool",
+    "name": "metabolights_get_reference_compound",
+    "description": "Retrieve a record from the MetaboLights Reference Compound database (the curated metabolite/compound catalogue, accessions MTBLC*). Pass a compound_id like 'MTBLC10' to get that compound's name, description, molecular formula, InChI, InChIKey, ChEBI ID, IUPAC names, study status, species (metSpecies), cross-references, and boolean flags for available data (hasNMR, hasMS, hasPathways, hasReactions, hasSpecies, hasLiterature). Example: MTBLC10 -> {name:'(+)-Atherospermoline', formula:'C36H38N2O6', chebiId:'CHEBI:10', inchikey:'XGEAUXVPBXUBKN-NSOVKSMOSA-N'}. This is distinct from study metadata (metabolights_get_study). To enumerate all reference-compound accessions, set list=true (returns the full MTBLC* id list).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "compound_id": {
+          "type": "string",
+          "description": "MetaboLights reference-compound accession, e.g. 'MTBLC10'. Always starts with 'MTBLC'. Required unless list=true."
+        },
+        "list": {
+          "type": "boolean",
+          "description": "If true, return the full list of all reference-compound accessions (MTBLC*) instead of a single record. Default false.",
+          "default": false
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://www.ebi.ac.uk/metabolights/ws/compounds/{compound_id}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": [
+            "object",
+            "array"
+          ],
+          "description": "Reference compound record (object) with name, formula, inchi, inchikey, chebiId, metSpecies, hasNMR, hasMS, hasPathways flags; or the full list of MTBLC* accessions (array) when list=true."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "compound_id": "MTBLC10"
+      }
+    ]
+  }
+]

@@ -1,0 +1,503 @@
+[
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_cancer_studies",
+    "description": "Get one page of the cBioPortal study catalogue. This returns a SLICE, not the whole catalogue: `limit` defaults to 20 while cBioPortal currently holds several hundred studies. The response always reports `total_available` (the full catalogue size) alongside `count` (studies actually returned), and sets `truncated: true` with a `truncation_note` whenever studies were left behind. Never conclude a study is missing from cBioPortal from a truncated page — raise `limit` to `total_available`, or page with `offset`, before drawing that conclusion.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "limit": {"type": "integer", "default": 20, "description": "Number of studies to return in this page. The default of 20 covers only a small fraction of the catalogue; set it to the `total_available` reported in the response to retrieve every study."},
+        "offset": {"type": "integer", "default": 0, "description": "0-based index of the first study to return, for paging through the catalogue. Applied client-side because the cBioPortal /studies endpoint ignores its own pageNumber parameter."}
+      }
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies?pageSize={limit}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "studyId": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "cancerTypeId": {"type": "string"},
+          "publicStudy": {"type": "boolean"},
+          "pmid": {"type": "string"},
+          "citation": {"type": "string"},
+          "groups": {"type": ["array", "string"]},
+          "status": {"type": ["string", "integer"]},
+          "importDate": {"type": "string"},
+          "allSampleCount": {"type": "integer"},
+          "readPermission": {"type": "boolean"},
+          "referenceGenome": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"limit": 5}, {"limit": 10}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_mutations",
+    "description": "Get mutation data for specific genes in a cancer study. This uses the updated cBioPortal API that requires molecular profiles.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID (e.g., 'brca_tcga')"},
+        "gene_list": {"type": "string", "description": "Comma-separated gene symbols (e.g., 'BRCA1,BRCA2')"},
+        "sample_list_id": {"type": "string", "description": "Optional sample list ID. If not provided, uses all samples in the study."}
+      },
+      "required": ["study_id", "gene_list"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/molecular-profiles/{study_id}_mutations/mutations/fetch",
+      "return_format": "JSON",
+      "method": "POST"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "molecularProfileId": {"type": "string"},
+          "sampleId": {"type": "string"},
+          "patientId": {"type": "string"},
+          "studyId": {"type": "string"},
+          "entrezGeneId": {"type": "integer"},
+          "gene": {
+            "type": "object",
+            "properties": {
+              "entrezGeneId": {"type": "integer"},
+              "hugoGeneSymbol": {"type": "string"},
+              "type": {"type": "string"}
+            }
+          },
+          "mutationType": {"type": "string"},
+          "proteinChange": {"type": "string"},
+          "mutationStatus": {"type": "string"},
+          "validationStatus": {"type": "string"},
+          "startPosition": {"type": "integer"},
+          "endPosition": {"type": "integer"},
+          "referenceAllele": {"type": "string"},
+          "variantAllele": {"type": "string"},
+          "keyword": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga", "gene_list": "BRCA2"},
+      {"study_id": "brca_tcga", "gene_list": "BRCA1,BRCA2"},
+      {"study_id": "luad_tcga", "gene_list": "EGFR,KRAS"}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_copy_number_alterations",
+    "description": "Get discrete copy-number alteration (CNA) calls per sample from GISTIC profiles for a gene in a cancer study. Returns per-sample alteration values: -2 (deep deletion), -1 (shallow loss), 0 (neutral), 1 (gain), 2 (amplification), plus a count breakdown by category. Use alteration_type to filter to a single category (AMP, GAIN, DIPLOID, HETLOSS, HOMDEL) or ALL for every altered sample. Example: ERBB2 (entrez 2064) AMP in brca_tcga_pan_can_atlas_2018 returns 123 amplified samples.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID (e.g., 'brca_tcga_pan_can_atlas_2018'). The discrete GISTIC profile is resolved automatically."},
+        "gene_list": {"type": "string", "description": "Comma-separated gene symbols (e.g., 'ERBB2' or 'TP53,ERBB2')"},
+        "gene": {"type": "string", "description": "Alias for gene_list: comma-separated gene symbols"},
+        "alteration_type": {"type": "string", "description": "CNA category filter: 'AMP' (amplification), 'GAIN', 'DIPLOID', 'HETLOSS' (shallow loss), 'HOMDEL' (deep deletion), or 'ALL' for every altered sample (default 'ALL').", "enum": ["AMP", "GAIN", "DIPLOID", "HETLOSS", "HOMDEL", "ALL"], "default": "ALL"},
+        "sample_list_id": {"type": "string", "description": "Optional sample list ID. Defaults to '{study_id}_all'."},
+        "molecular_profile_id": {"type": "string", "description": "Optional explicit GISTIC molecular profile ID (overrides auto-resolution)."}
+      },
+      "required": ["study_id", "gene_list"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/molecular-profiles/{study_id}_gistic/discrete-copy-number/fetch",
+      "return_format": "JSON",
+      "method": "POST"
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sampleId": {
+                "type": "string"
+              },
+              "patientId": {
+                "type": "string"
+              },
+              "entrezGeneId": {
+                "type": "integer"
+              },
+              "studyId": {
+                "type": "string"
+              },
+              "molecularProfileId": {
+                "type": "string"
+              },
+              "alteration": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga_pan_can_atlas_2018", "gene_list": "ERBB2", "alteration_type": "AMP"},
+      {"study_id": "brca_tcga_pan_can_atlas_2018", "gene_list": "TP53", "alteration_type": "ALL"}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_molecular_profiles",
+    "description": "Get molecular profiles for a cancer study. Molecular profiles include mutation data, copy number alterations, mRNA expression, etc.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/molecular-profiles",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "molecularProfileId": {"type": "string"},
+          "molecularAlterationType": {"type": "string"},
+          "datatype": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "showProfileInAnalysisTab": {"type": "boolean"}
+        }
+      }
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga"},
+      {"study_id": "luad_tcga"}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_samples",
+    "description": "Get all samples in a cancer study. Returns the full cohort by default; the response is a bare array with no truncation marker, so lower `page_size` only when you deliberately want a sample. Use this count as the denominator for mutation-frequency calculations.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"},
+        "page_size": {"type": "integer", "default": 100000, "description": "Maximum number of samples to return. Defaults high enough to return every sample in a study; a smaller value silently truncates the cohort, which will corrupt any frequency denominator computed from it."},
+        "page_number": {"type": "integer", "default": 0, "description": "0-based page index, used with `page_size` to page through very large studies."}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/samples?pageSize={page_size}&pageNumber={page_number}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sampleId": {"type": "string"},
+          "sampleType": {"type": "string"},
+          "patientId": {"type": "string"},
+          "studyId": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga", "page_size": 10},
+      {"study_id": "luad_tcga", "page_size": 20}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_patients",
+    "description": "Get all patients in a cancer study. Returns the full cohort by default; the response is a bare array with no truncation marker, so lower `page_size` only when you deliberately want a sample. Use this count as the denominator for mutation-frequency calculations.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"},
+        "page_size": {"type": "integer", "default": 100000, "description": "Maximum number of patients to return. Defaults high enough to return every patient in a study; a smaller value silently truncates the cohort, which will corrupt any frequency denominator computed from it."},
+        "page_number": {"type": "integer", "default": 0, "description": "0-based page index, used with `page_size` to page through very large studies."}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/patients?pageSize={page_size}&pageNumber={page_number}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "patientId": {"type": "string"},
+          "studyId": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga", "page_size": 10}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_genes",
+    "description": "Search for genes by keyword or query (gene symbol or alias). Alias: cBioPortal_search.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "keyword": {"type": "string", "description": "Gene symbol or alias to search for (e.g., 'BRCA1', 'TP53')"},
+        "query": {"type": "string", "description": "Alias for keyword: gene symbol or alias to search for"}
+      }
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/genes?keyword={keyword}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entrezGeneId": {"type": "integer"},
+          "hugoGeneSymbol": {"type": "string"},
+          "type": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [
+      {"keyword": "BRCA2"},
+      {"keyword": "TP53"}
+    ],
+    "aliases": ["cBioPortal_search"]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_cancer_types",
+    "description": "Get all cancer types from cBioPortal including TCGA, Pan-Cancer Atlas, and other studies. Returns cancerTypeId, name, and clinical trial keywords for filtering studies.",
+    "parameter": {
+      "type": "object",
+      "properties": {}
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/cancer-types",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "cancerTypeId": {"type": "string"},
+          "name": {"type": "string"},
+          "dedicatedColor": {"type": "string"},
+          "shortName": {"type": "string"},
+          "parent": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_gene_panels",
+    "description": "Get gene panels used in cBioPortal studies. Gene panels define which genes were sequenced in a study. Use to understand coverage before querying mutation data. Returns one page: `page_size` defaults to 50, and the response reports `total_available` (all panels matching) next to `count` (panels returned), plus `truncated`/`truncation_note` when panels were left behind.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "page_size": {"type": "integer", "default": 50, "description": "Number of panels to return"}
+      }
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/gene-panels?pageSize={page_size}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "genePanelId": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"page_size": 10}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_gene_panel_genes",
+    "description": "Get all genes in a specific gene panel. Essential for understanding what genes are covered when analyzing mutation frequency data from targeted sequencing studies.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_panel_id": {"type": "string", "description": "Gene panel ID (e.g., 'IMPACT468')"}
+      },
+      "required": ["gene_panel_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/gene-panels/{gene_panel_id}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "genePanelId": {"type": "string"},
+        "description": {"type": "string"},
+        "genes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entrezGeneId": {"type": "integer"},
+              "hugoGeneSymbol": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [{"gene_panel_id": "IMPACT468"}, {"gene_panel_id": "IMPACT341"}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_clinical_attributes",
+    "description": "Get available clinical attributes for a cancer study. Returns attribute IDs, names, and data types. Use to know what clinical data can be queried (e.g., stage, grade, survival).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID (e.g., 'brca_tcga')"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/clinical-attributes",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "clinicalAttributeId": {"type": "string"},
+          "displayName": {"type": "string"},
+          "description": {"type": "string"},
+          "datatype": {"type": "string"},
+          "patientAttribute": {"type": "boolean"},
+          "priority": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"study_id": "brca_tcga"}, {"study_id": "luad_tcga"}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_clinical_data",
+    "description": "Get clinical data for samples in a study. Returns patient-level data like tumor stage, histology, survival status. Filter by clinical attribute ID for specific data types. Returns one page: `page_size` defaults to 100 while a single TCGA study can hold tens of thousands of clinical records, so the response reports `total_available` (all records matching) next to `count` (records returned), plus `truncated`/`truncation_note` when records were left behind.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"},
+        "clinical_attribute_id": {"type": "string", "description": "Optional clinical attribute ID to filter by"},
+        "page_size": {"type": "integer", "default": 100, "description": "Number of records to return"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/clinical-data?pageSize={page_size}&clinicalDataType=SAMPLE",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "clinicalAttributeId": {"type": "string"},
+          "value": {"type": "string"},
+          "sampleId": {"type": "string"},
+          "patientId": {"type": "string"},
+          "studyId": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [
+      {"study_id": "brca_tcga", "page_size": 50},
+      {"study_id": "luad_tcga", "page_size": 50}
+    ]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_sample_lists",
+    "description": "Get all sample lists (cohort definitions) in a cancer study. Sample lists define groups like 'samples with mutations', 'samples with CNA data'. Use for targeted queries.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_id": {"type": "string", "description": "Cancer study ID"}
+      },
+      "required": ["study_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/studies/{study_id}/sample-lists",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sampleListId": {"type": "string"},
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "category": {"type": "string"},
+          "sampleCount": {"type": "integer"},
+          "studyId": {"type": "string"}
+        }
+      }
+    },
+    "test_examples": [{"study_id": "brca_tcga"}, {"study_id": "luad_tcga"}]
+  },
+  {
+    "type": "CBioPortalRESTTool",
+    "name": "cBioPortal_get_gene_info",
+    "description": "Get basic information about a specific gene by Entrez Gene ID. Returns the HUGO gene symbol and gene type (e.g., 'protein-coding'); does not return aliases -- use HGNC_fetch_gene_by_symbol or NCBIGene_get_summary for gene aliases/chromosome location.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entrez_gene_id": {"type": "integer", "description": "Entrez Gene ID (e.g., 672 for BRCA1)"}
+      },
+      "required": ["entrez_gene_id"]
+    },
+    "fields": {
+      "endpoint": "https://www.cbioportal.org/api/genes/{entrez_gene_id}",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "entrezGeneId": {"type": "integer"},
+        "hugoGeneSymbol": {"type": "string"},
+        "type": {"type": "string"},
+        "cytoband": {"type": "string"},
+        "length": {"type": "integer"}
+      }
+    },
+    "test_examples": [{"entrez_gene_id": 672}, {"entrez_gene_id": 7157}]
+  }
+]

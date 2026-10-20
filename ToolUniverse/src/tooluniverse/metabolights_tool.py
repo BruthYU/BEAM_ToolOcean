@@ -1,0 +1,510 @@
+"""
+MetaboLights Database Tool
+
+This tool provides access to the MetaboLights database, the largest repository
+of metabolomics experiments and raw data.
+"""
+
+import csv
+import io
+import re
+import requests
+from typing import Any, Dict
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+# MetaboLights' own /ws/studies endpoint ignores keyword queries; EBI Search
+# indexes the same studies and honours them.
+EBI_SEARCH_URL = "https://www.ebi.ac.uk/ebisearch/ws/rest/metabolights"
+
+# Public archive copy of each study's ISA-Tab files (sample sheet s_<id>.txt).
+SAMPLE_TABLE_BASE = "https://ftp.ebi.ac.uk/pub/databases/metabolights/studies/public"
+MAX_SAMPLE_ROWS = 1000
+
+
+@register_tool("MetaboLightsRESTTool")
+class MetaboLightsRESTTool(BaseTool):
+    """
+    MetaboLights REST API tool.
+    Generic wrapper for MetaboLights API endpoints defined in metabolights_tools.json.
+    """
+
+    def __init__(self, tool_config: Dict):
+        super().__init__(tool_config)
+        self.base_url = "https://www.ebi.ac.uk/metabolights/ws"
+        self.session = requests.Session()
+        self.session.headers.update(
+            {"Accept": "application/json", "User-Agent": "ToolUniverse/1.0"}
+        )
+        self.timeout = 30
+
+    def _build_url(self, args: Dict[str, Any]) -> str:
+        """Build URL from endpoint template and arguments"""
+        endpoint_template = self.tool_config["fields"].get("endpoint", "")
+        tool_name = self.tool_config.get("name", "")
+
+        # Reference-compound tool: route to the /compounds/list endpoint when
+        # list=true, otherwise to the single-compound record endpoint.
+        if tool_name == "metabolights_get_reference_compound":
+            if args.get("list"):
+                return f"{self.base_url}/compounds/list"
+            compound_id = str(args.get("compound_id", "")).strip()
+            return f"{self.base_url}/compounds/{compound_id}"
+
+        if endpoint_template:
+            url = endpoint_template
+            for k, v in args.items():
+                url = url.replace(f"{{{k}}}", str(v))
+            return url
+
+        # Build URL based on tool name
+        if tool_name == "metabolights_list_studies":
+            return f"{self.base_url}/studies"
+
+        elif tool_name == "metabolights_get_study":
+            study_id = args.get("study_id", "")
+            if study_id:
+                return f"{self.base_url}/studies/{study_id}"
+
+        elif tool_name == "metabolights_get_study_assays":
+            study_id = args.get("study_id", "")
+            if study_id:
+                return f"{self.base_url}/studies/{study_id}/assays"
+
+        elif tool_name == "metabolights_get_study_samples":
+            study_id = args.get("study_id", "")
+            if study_id:
+                return f"{self.base_url}/studies/{study_id}/samples"
+
+        elif tool_name == "metabolights_get_study_files":
+            study_id = args.get("study_id", "")
+            if study_id:
+                return f"{self.base_url}/studies/{study_id}/files"
+
+        return self.base_url
+
+    def _build_params(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Build query parameters for MetaboLights API"""
+        params = {}
+        tool_name = self.tool_config.get("name", "")
+
+        if tool_name == "metabolights_list_studies":
+            if "size" in args:
+                params["size"] = args["size"]
+            if "page" in args:
+                params["page"] = args["page"]
+
+        elif tool_name == "metabolights_get_study_data_files":
+            # Required parameters for data-files endpoint
+            if "search_pattern" in args:
+                params["search_pattern"] = args["search_pattern"]
+            if "file_match" in args:
+                params["file_match"] = str(args["file_match"]).lower()
+            if "folder_match" in args:
+                params["folder_match"] = str(args["folder_match"]).lower()
+
+        return params
+
+    def _samples_from_sample_table(self, study_id: str) -> Dict[str, Any]:
+        """Read the study's ISA-Tab sample table (s_<id>.txt) from the public archive.
+
+        The /studies/{id}/samples endpoint answers HTTP 400 ("not a valid TSV or CSV
+        file") for every study, and the study record carries no sample rows, so the
+        archive copy of the sample sheet is the only place the samples can be read.
+        """
+        if not re.fullmatch(r"MTBLS\d+", study_id):
+            return {"error": f"'{study_id}' is not a MetaboLights study ID like MTBLS1"}
+        url = f"{SAMPLE_TABLE_BASE}/{study_id}/s_{study_id}.txt"
+        try:
+            response = self.session.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            rows = list(csv.DictReader(io.StringIO(response.text), delimiter="\t"))
+        except Exception as e:
+            return {"error": f"Could not read the sample table {url}: {e}"}
+        return {
+            "samples": rows[:MAX_SAMPLE_ROWS],
+            "total_count": len(rows),
+            "url": url,
+            "note": (
+                "Samples read from the study's public ISA-Tab sample sheet "
+                "(the /samples API endpoint is unavailable)"
+            ),
+        }
+
+    def _extract_files_from_study(self, study_id: str) -> Dict[str, Any]:
+        """Extract file information from study endpoint as fallback"""
+        try:
+            study_url = f"{self.base_url}/studies/{study_id}"
+            response = self.session.get(study_url, timeout=self.timeout)
+            response.raise_for_status()
+            study_data = response.json()
+
+            files_info = {
+                "files": [],
+                "file_urls": {},
+                "note": "Files extracted from study endpoint (files API endpoint unavailable)",
+            }
+
+            # Extract file URLs from study data
+            if "mtblsStudy" in study_data:
+                study = study_data["mtblsStudy"]
+
+                # Get FTP and HTTP URLs
+                if "studyFtpUrl" in study and study["studyFtpUrl"]:
+                    files_info["file_urls"]["ftp"] = study["studyFtpUrl"]
+                if "studyHttpUrl" in study and study["studyHttpUrl"]:
+                    files_info["file_urls"]["http"] = study["studyHttpUrl"]
+                if "studyGlobusUrl" in study and study["studyGlobusUrl"]:
+                    files_info["file_urls"]["globus"] = study["studyGlobusUrl"]
+
+            # Extract ISA investigation file references
+            if "isaInvestigation" in study_data:
+                isa = study_data["isaInvestigation"]
+
+                # Check for filename
+                if "filename" in isa and isa["filename"]:
+                    files_info["files"].append(
+                        {
+                            "name": isa["filename"],
+                            "type": "investigation",
+                            "source": "isaInvestigation",
+                        }
+                    )
+
+                # Check studies array for files
+                if "studies" in isa and isinstance(isa["studies"], list):
+                    for study_item in isa["studies"]:
+                        if isinstance(study_item, dict) and "filename" in study_item:
+                            files_info["files"].append(
+                                {
+                                    "name": study_item["filename"],
+                                    "type": "study",
+                                    "source": "isaInvestigation.studies",
+                                }
+                            )
+
+            files_info["count"] = len(files_info["files"])
+            files_info["has_urls"] = len(files_info["file_urls"]) > 0
+
+            return files_info
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Failed to extract files from study endpoint: {str(e)}",
+            }
+
+    def _search_via_ebi_search(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Keyword-search MetaboLights studies through EBI Search.
+
+        MetaboLights' own /ws/studies endpoint accepts a `query` parameter and
+        silently ignores it, so every search returned the same first N study
+        accessions by ID with status "success" -- a wrong answer that looked
+        like a right one. EBI Search indexes the same MetaboLights studies and
+        does honour the query (confirmed live: "acylcarnitine" -> 113 hits).
+        """
+        query = str(arguments.get("query", "")).strip()
+        size = arguments.get("size", 20)
+        page = arguments.get("page", 0)
+        params = {
+            "query": query,
+            "format": "json",
+            "size": size,
+            "start": int(page) * int(size),
+        }
+        # EBI Search's first response for an uncached query regularly exceeds
+        # 30s while warm repeats return in ~1s, so retry once before failing.
+        try:
+            response = self.session.get(
+                EBI_SEARCH_URL, params=params, timeout=self.timeout
+            )
+        except requests.exceptions.Timeout:
+            response = self.session.get(
+                EBI_SEARCH_URL, params=params, timeout=self.timeout * 2
+            )
+        response.raise_for_status()
+        payload = response.json()
+        entries = payload.get("entries", []) or []
+        result = {
+            "status": "success",
+            "data": [e.get("id") for e in entries if e.get("id")],
+            "url": response.url,
+            "count": len(entries),
+            "total_hits": payload.get("hitCount", 0),
+        }
+        if not entries:
+            suggested = payload.get("suggestedQuery")
+            result["note"] = (
+                f"No MetaboLights study matched '{query}'."
+                + (f" Did you mean '{suggested}'?" if suggested else "")
+                + " Use metabolights_list_studies to browse all public studies."
+            )
+        return result
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the MetaboLights API call"""
+        tool_name = self.tool_config.get("name", "")
+
+        if tool_name == "metabolights_search_studies":
+            if not str(arguments.get("query", "")).strip():
+                return {
+                    "status": "error",
+                    "error": "query is required. To browse all public studies without "
+                    "a keyword, use metabolights_list_studies.",
+                }
+            try:
+                return self._search_via_ebi_search(arguments)
+            except (requests.RequestException, ValueError) as e:
+                return {
+                    "status": "error",
+                    "error": f"MetaboLights search via EBI Search failed: {str(e)}",
+                }
+
+        if tool_name == "metabolights_get_reference_compound":
+            if (
+                not arguments.get("list")
+                and not str(arguments.get("compound_id", "")).strip()
+            ):
+                return {
+                    "status": "error",
+                    "error": "compound_id is required (e.g. 'MTBLC10'), or set list=true "
+                    "to retrieve all reference-compound accessions.",
+                }
+
+        try:
+            url = self._build_url(arguments)
+            params = self._build_params(arguments)
+
+            response = self.session.get(url, params=params, timeout=self.timeout)
+
+            # Handle samples endpoint 400 errors with fallback
+            if (
+                tool_name == "metabolights_get_study_samples"
+                and response.status_code == 400
+            ):
+                study_id = arguments.get("study_id", "")
+                if study_id:
+                    fallback_data = self._samples_from_sample_table(study_id)
+
+                    if "error" not in fallback_data:
+                        samples = fallback_data["samples"]
+                        return {
+                            "status": "success",
+                            "data": samples,
+                            "url": fallback_data["url"],
+                            "count": len(samples),
+                            "total_count": fallback_data["total_count"],
+                            "truncated": fallback_data["total_count"] > len(samples),
+                            "note": fallback_data["note"],
+                            "fallback_used": True,
+                        }
+                    else:
+                        return {
+                            "status": "error",
+                            "error": f"Samples endpoint returned 400 error for study {study_id}. {fallback_data['error']}",
+                            "url": url,
+                            "suggestion": f"Access samples via MetaboLights website: https://www.ebi.ac.uk/metabolights/studies/{study_id}",
+                        }
+
+            # Handle files endpoint 500 errors with fallback
+            if (
+                tool_name == "metabolights_get_study_files"
+                and response.status_code == 500
+            ):
+                study_id = arguments.get("study_id", "")
+                if study_id:
+                    # Try to extract files from study endpoint
+                    fallback_data = self._extract_files_from_study(study_id)
+
+                    if "error" not in fallback_data:
+                        return {
+                            "status": "success",
+                            "data": fallback_data.get("files", []),
+                            "file_urls": fallback_data.get("file_urls", {}),
+                            "url": url,
+                            "count": fallback_data.get("count", 0),
+                            "note": fallback_data.get("note", ""),
+                            "fallback_used": True,
+                            "original_error": "Files endpoint returned 500 error, used study endpoint fallback",
+                        }
+                    else:
+                        return {
+                            "status": "error",
+                            "error": f"Files endpoint returned server error (500) for study {study_id}. Fallback to study endpoint also failed.",
+                            "url": url,
+                            "suggestion": f"Access files via MetaboLights website: https://www.ebi.ac.uk/metabolights/studies/{study_id} or use FTP/HTTP URLs if available in study data.",
+                        }
+                else:
+                    return {
+                        "status": "error",
+                        "error": "Files endpoint returned server error (500). This is a known MetaboLights API issue.",
+                        "url": url,
+                        "suggestion": "The files endpoint is currently unavailable. Try accessing files via the MetaboLights website directly.",
+                    }
+
+            response.raise_for_status()
+            data = response.json()
+
+            # The compounds endpoints wrap their payload in {"content": ...,
+            # "message": ..., "err": ...}. For a single reference compound
+            # (MTBLC*) content is a dict; for the /compounds/list route it is a
+            # list. Unwrap content directly so callers get the record/list.
+            if (
+                tool_name == "metabolights_get_reference_compound"
+                and isinstance(data, dict)
+                and "content" in data
+            ):
+                content = data["content"]
+                return {
+                    "status": "success",
+                    "data": content,
+                    "url": response.url,
+                    "count": len(content) if isinstance(content, list) else 1,
+                }
+
+            # Extract arrays from dict wrappers for protocols, factors, data-files endpoints
+            # These endpoints return {'protocols': [...]}, {'factors': [...]}, {'files': [...]}
+            tool_name = self.tool_config.get("name", "")
+            extracted_data = data
+            count = None
+
+            if isinstance(data, dict):
+                # Check for common array wrapper keys
+                for key in ["protocols", "factors", "files", "assays", "samples"]:
+                    if key in data and isinstance(data[key], list):
+                        extracted_data = data[key]
+                        count = len(data[key])
+                        break
+
+                # Handle nested structure like {'data': {'assays': [...]}}
+                if "data" in data and isinstance(data["data"], dict):
+                    for key in ["assays", "protocols", "factors", "files"]:
+                        if key in data["data"] and isinstance(data["data"][key], list):
+                            extracted_data = data["data"][key]
+                            count = len(data["data"][key])
+                            break
+
+                # Fallback: check for other common patterns
+                if count is None:
+                    if "content" in data and isinstance(data["content"], list):
+                        extracted_data = data["content"]
+                        count = len(data["content"])
+                    elif "studies" in data and isinstance(data["studies"], list):
+                        extracted_data = data["studies"]
+                        count = len(data["studies"])
+            elif isinstance(data, list):
+                extracted_data = data
+                count = len(data)
+
+            # Apply client-side pagination for the study list (API ignores size/page)
+            if tool_name == "metabolights_list_studies":
+                size = arguments.get("size", 20)
+                page = arguments.get("page", 0)
+                if isinstance(extracted_data, list):
+                    total = len(extracted_data)
+                    start = page * size
+                    extracted_data = extracted_data[start : start + size]
+                    count = len(extracted_data)
+
+            response_data = {
+                "status": "success",
+                "data": extracted_data,
+                "url": response.url,
+            }
+
+            if count is not None:
+                response_data["count"] = count
+
+            return response_data
+
+        except requests.exceptions.HTTPError as e:
+            tool_name = self.tool_config.get("name", "")
+
+            # Handle samples endpoint 400 errors
+            if (
+                tool_name == "metabolights_get_study_samples"
+                and e.response.status_code == 400
+            ):
+                study_id = arguments.get("study_id", "")
+                if study_id:
+                    fallback_data = self._extract_samples_from_study(study_id)
+                    if "error" not in fallback_data:
+                        return {
+                            "status": "success",
+                            "data": fallback_data.get("samples", []),
+                            "url": url if "url" in locals() else None,
+                            "count": fallback_data.get("count", 0),
+                            "note": fallback_data.get("note", ""),
+                            "fallback_used": True,
+                        }
+
+            # Handle files endpoint which may return 500 errors
+            if (
+                tool_name == "metabolights_get_study_files"
+                and e.response.status_code == 500
+            ):
+                study_id = arguments.get("study_id", "")
+                if study_id:
+                    # Try fallback
+                    fallback_data = self._extract_files_from_study(study_id)
+                    if "error" not in fallback_data:
+                        return {
+                            "status": "success",
+                            "data": fallback_data.get("files", []),
+                            "file_urls": fallback_data.get("file_urls", {}),
+                            "url": url if "url" in locals() else None,
+                            "count": fallback_data.get("count", 0),
+                            "note": fallback_data.get("note", ""),
+                            "fallback_used": True,
+                        }
+
+            return {
+                "status": "error",
+                "error": f"MetaboLights API error: {str(e)}",
+                "url": url if "url" in locals() else None,
+            }
+        except requests.exceptions.RequestException as e:
+            tool_name = self.tool_config.get("name", "")
+
+            # Handle samples endpoint
+            if tool_name == "metabolights_get_study_samples" and "400" in str(e):
+                study_id = arguments.get("study_id", "")
+                if study_id:
+                    fallback_data = self._extract_samples_from_study(study_id)
+                    if "error" not in fallback_data:
+                        return {
+                            "status": "success",
+                            "data": fallback_data.get("samples", []),
+                            "url": url if "url" in locals() else None,
+                            "count": fallback_data.get("count", 0),
+                            "note": fallback_data.get("note", ""),
+                            "fallback_used": True,
+                        }
+
+            # Handle files endpoint
+            if tool_name == "metabolights_get_study_files" and "500" in str(e):
+                study_id = arguments.get("study_id", "")
+                if study_id:
+                    fallback_data = self._extract_files_from_study(study_id)
+                    if "error" not in fallback_data:
+                        return {
+                            "status": "success",
+                            "data": fallback_data.get("files", []),
+                            "file_urls": fallback_data.get("file_urls", {}),
+                            "url": url if "url" in locals() else None,
+                            "count": fallback_data.get("count", 0),
+                            "note": fallback_data.get("note", ""),
+                            "fallback_used": True,
+                        }
+
+            return {
+                "status": "error",
+                "error": f"MetaboLights API error: {str(e)}",
+                "url": url if "url" in locals() else None,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Unexpected error: {str(e)}",
+                "url": url if "url" in locals() else None,
+            }

@@ -1,0 +1,451 @@
+"""
+PathwayCommons Tool - Unified Pathway and Interaction Database
+
+Provides access to Pathway Commons REST API (PC2) for searching pathways,
+retrieving pathway details, and querying gene interaction neighborhoods
+across 22 integrated pathway/interaction databases including Reactome,
+KEGG, WikiPathways, PID, BioGRID, IntAct, and more.
+
+API base: https://www.pathwaycommons.org/pc2/
+No authentication required.
+
+Reference: Cerami et al., Nucleic Acids Res. 2011; Rodchenkov et al., Nucleic Acids Res. 2020
+"""
+
+import requests
+from typing import Dict, Any, Optional
+
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+
+PC2_BASE_URL = "https://www.pathwaycommons.org/pc2"
+
+
+@register_tool("PathwayCommonsTool")
+class PathwayCommonsTool(BaseTool):
+    """
+    Tool for querying Pathway Commons (PC2) unified pathway/interaction database.
+
+    Supported operations:
+    - search: Search for pathways, interactions, or molecular entities by gene/keyword
+    - get_pathway: Get pathway details by URI
+    - get_neighborhood: Get interaction neighborhood for a gene (SIF format)
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        self.parameter = tool_config.get("parameter", {})
+        self.required = self.parameter.get("required", [])
+        self.session = requests.Session()
+        self.timeout = 120
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        operation = (
+            arguments.get("operation")
+            or self.tool_config.get("fields", {}).get("operation")
+            or self.get_schema_const_operation()
+        )
+        if not operation:
+            return {"status": "error", "error": "Missing required parameter: operation"}
+
+        handlers = {
+            "search": self._search,
+            "get_pathway": self._get_pathway,
+            "get_neighborhood": self._get_neighborhood,
+            "paths_between": self._paths_between,
+        }
+
+        handler = handlers.get(operation)
+        if not handler:
+            return {
+                "status": "error",
+                "error": "Unknown operation: {}. Available: {}".format(
+                    operation, list(handlers.keys())
+                ),
+            }
+
+        try:
+            return handler(arguments)
+        except requests.exceptions.Timeout:
+            return {"status": "error", "error": "PathwayCommons API request timed out"}
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "error",
+                "error": "Failed to connect to PathwayCommons API",
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": "PathwayCommons error: {}".format(str(e)),
+            }
+
+    def _search(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Search PathwayCommons for pathways/interactions by gene or keyword."""
+        query = arguments.get("query") or arguments.get("q")
+        if not query:
+            return {"status": "error", "error": "Missing required parameter: query"}
+
+        params = {"q": query, "format": "json"}
+
+        entity_type = arguments.get("type")
+        if entity_type:
+            params["type"] = entity_type
+
+        datasource = arguments.get("datasource")
+        if datasource:
+            params["datasource"] = datasource
+
+        organism = arguments.get("organism")
+        if organism:
+            params["organism"] = organism
+
+        page = arguments.get("page")
+        if page is not None:
+            params["page"] = page
+
+        response = self.session.get(
+            "{}/search".format(PC2_BASE_URL), params=params, timeout=self.timeout
+        )
+
+        if response.status_code != 200:
+            return {
+                "status": "error",
+                "error": "PathwayCommons search returned HTTP {}".format(
+                    response.status_code
+                ),
+            }
+
+        data = response.json()
+        hits = data.get("searchHit", [])
+        results = []
+        for hit in hits:
+            results.append(
+                {
+                    "uri": hit.get("uri"),
+                    "name": hit.get("name"),
+                    "biopax_class": hit.get("biopaxClass"),
+                    "data_source": hit.get("dataSource", []),
+                    "organism": hit.get("organism", []),
+                    "pathway": hit.get("pathway", []),
+                    "num_participants": hit.get("numParticipants"),
+                    "num_processes": hit.get("numProcesses"),
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": results,
+            "metadata": {
+                "total_hits": data.get("numHits", 0),
+                "max_hits_per_page": data.get("maxHitsPerPage", 100),
+                "page": data.get("pageNo", 0),
+                "query": query,
+            },
+        }
+
+    def _traverse(self, uri: str, path: str) -> Optional[list]:
+        """Helper: call the PC2 traverse endpoint."""
+        params = {"uri": uri, "path": path}
+        resp = self.session.get(
+            "{}/traverse".format(PC2_BASE_URL), params=params, timeout=self.timeout
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        entries = data.get("traverseEntry", [])
+        if entries:
+            return entries[0].get("value", [])
+        return []
+
+    def _get_pathway(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get pathway details by URI from PathwayCommons using traverse API."""
+        uri = arguments.get("uri")
+        if not uri:
+            return {"status": "error", "error": "Missing required parameter: uri"}
+
+        # Get pathway metadata via traverse endpoint (fast, reliable)
+        name = self._traverse(uri, "Pathway/displayName")
+        comment = self._traverse(uri, "Pathway/comment")
+        organism = self._traverse(uri, "Pathway/organism/displayName")
+        data_source = self._traverse(uri, "Pathway/dataSource/displayName")
+        sub_pathways = self._traverse(
+            uri, "Pathway/pathwayComponent:Pathway/displayName"
+        )
+        participants = self._traverse(
+            uri, "Pathway/pathwayComponent/participant/displayName"
+        )
+
+        if name is None:
+            return {
+                "status": "error",
+                "error": "Failed to retrieve pathway data for URI: {}".format(uri),
+            }
+
+        # _traverse returns None on a failed request but [] on a genuinely
+        # empty-but-successful one -- track which secondary fields failed to
+        # fetch so the response doesn't silently conflate "fetch failed"
+        # with "this pathway genuinely has no such data."
+        fetch_failures = []
+
+        def _scalar(values, label):
+            if values is None:
+                fetch_failures.append(label)
+                return None
+            return values[0] if values else None
+
+        def _list(values, label):
+            if values is None:
+                fetch_failures.append(label)
+                return []
+            return values
+
+        result = {
+            "pathway": {
+                "uri": uri,
+                "name": name[0] if name else None,
+                "description": _scalar(comment, "comment"),
+                "organism": _scalar(organism, "organism"),
+                "data_source": _scalar(data_source, "data_source"),
+            },
+            "sub_pathways": _list(sub_pathways, "sub_pathways"),
+            "participants": _list(participants, "participants"),
+        }
+
+        metadata = {
+            "uri": uri,
+            "sub_pathway_count": len(result["sub_pathways"]),
+            "participant_count": len(result["participants"]),
+        }
+        if fetch_failures:
+            metadata["fetch_failures"] = fetch_failures
+
+        return {
+            "status": "success",
+            "data": result,
+            "metadata": metadata,
+        }
+
+    def _get_neighborhood(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get interaction neighborhood for a gene from PathwayCommons (SIF format)."""
+        gene = arguments.get("gene") or arguments.get("source")
+        if not gene:
+            return {"status": "error", "error": "Missing required parameter: gene"}
+
+        limit = arguments.get("limit", 1)
+        datasource = arguments.get("datasource")
+
+        params = {
+            "source": gene,
+            "kind": "neighborhood",
+            "format": "TXT",
+            "limit": limit,
+        }
+        if datasource:
+            params["datasource"] = datasource
+
+        response = self.session.get(
+            "{}/graph".format(PC2_BASE_URL), params=params, timeout=self.timeout
+        )
+
+        if response.status_code != 200:
+            return {
+                "status": "error",
+                "error": "PathwayCommons graph returned HTTP {}".format(
+                    response.status_code
+                ),
+            }
+
+        text = response.text.strip()
+        if not text:
+            return {
+                "status": "success",
+                "data": {"interactions": [], "gene": gene},
+                "metadata": {"gene": gene, "interaction_count": 0},
+            }
+
+        lines = text.split("\n")
+        header = None
+        interactions = []
+
+        for line in lines:
+            fields = line.split("\t")
+            if header is None:
+                header = fields
+                continue
+            if len(fields) >= 3:
+                interaction = {
+                    "participant_a": fields[0],
+                    "interaction_type": fields[1],
+                    "participant_b": fields[2],
+                }
+                if len(fields) > 3:
+                    interaction["data_source"] = fields[3] if fields[3] else None
+                if len(fields) > 4:
+                    interaction["pubmed_ids"] = fields[4] if fields[4] else None
+                if len(fields) > 5:
+                    interaction["pathway_names"] = fields[5] if fields[5] else None
+                interactions.append(interaction)
+
+        # Collect unique interaction types and partners
+        interaction_types = {}
+        partners = set()
+        for ix in interactions:
+            itype = ix["interaction_type"]
+            interaction_types[itype] = interaction_types.get(itype, 0) + 1
+            if ix["participant_a"].upper() != gene.upper():
+                partners.add(ix["participant_a"])
+            if ix["participant_b"].upper() != gene.upper():
+                partners.add(ix["participant_b"])
+
+        max_return = arguments.get("max_results", 100)
+        return {
+            "status": "success",
+            "data": {
+                "gene": gene,
+                "interactions": interactions[:max_return],
+                "interaction_type_counts": interaction_types,
+                "unique_partners": len(partners),
+            },
+            "metadata": {
+                "gene": gene,
+                "total_interactions": len(interactions),
+                "returned": min(len(interactions), max_return),
+                "limit": limit,
+            },
+        }
+
+    @staticmethod
+    def _parse_sif_edges(text: str) -> list:
+        """Parse Pathway Commons SIF output into {source, relation, target} edges.
+
+        SIF format is tab-separated triples: "ENTITY_A <relation> ENTITY_B"
+        (e.g. "BRCA1 in-complex-with BARD1"). No header line. Lines with fewer
+        than 3 tab-separated fields are skipped.
+        """
+        edges = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            fields = line.split("\t")
+            if len(fields) < 3:
+                continue
+            edges.append(
+                {
+                    "source": fields[0],
+                    "relation": fields[1],
+                    "target": fields[2],
+                }
+            )
+        return edges
+
+    def _paths_between(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Find mechanistic interaction paths connecting a set of genes.
+
+        Uses the PC2 /graph endpoint with kind=PATHSBETWEEN, sending one
+        ``source=`` parameter per gene and parsing the SIF response into edges.
+        Requires at least two distinct genes.
+        """
+        genes = arguments.get("genes")
+        if genes is None:
+            # Tolerate a comma-separated string as a convenience.
+            single = arguments.get("source")
+            if isinstance(single, str):
+                genes = [g.strip() for g in single.split(",")]
+
+        if isinstance(genes, str):
+            genes = [g.strip() for g in genes.split(",")]
+
+        if not isinstance(genes, list):
+            return {
+                "status": "error",
+                "error": "Missing required parameter: genes (list of gene symbols/identifiers)",
+            }
+
+        # Clean: drop blanks and de-duplicate while preserving order.
+        seen = set()
+        clean_genes = []
+        for g in genes:
+            if not isinstance(g, str):
+                continue
+            g = g.strip()
+            if not g or g.upper() in seen:
+                continue
+            seen.add(g.upper())
+            clean_genes.append(g)
+
+        if len(clean_genes) < 2:
+            return {
+                "status": "error",
+                "error": "paths_between requires at least 2 distinct genes; got {}".format(
+                    len(clean_genes)
+                ),
+            }
+
+        # requests serializes a list value into repeated key=value pairs,
+        # i.e. one source= per gene, which is the correct PATHSBETWEEN form.
+        params = {
+            "source": clean_genes,
+            "kind": "PATHSBETWEEN",
+            "format": "SIF",
+        }
+        limit = arguments.get("limit")
+        if limit is not None:
+            params["limit"] = limit
+
+        datasource = arguments.get("datasource")
+        if datasource:
+            params["datasource"] = datasource
+
+        # PATHSBETWEEN graph queries are heavier than search; allow a longer
+        # per-request budget but cap at 30s to satisfy the contract.
+        response = self.session.get(
+            "{}/graph".format(PC2_BASE_URL), params=params, timeout=30
+        )
+
+        if response.status_code != 200:
+            return {
+                "status": "error",
+                "error": "PathwayCommons graph returned HTTP {}".format(
+                    response.status_code
+                ),
+            }
+
+        text = response.text.strip()
+        edges = self._parse_sif_edges(text)
+
+        max_return = arguments.get("max_results", 200)
+        relation_counts = {}
+        entities = set()
+        for edge in edges:
+            relation_counts[edge["relation"]] = (
+                relation_counts.get(edge["relation"], 0) + 1
+            )
+            entities.add(edge["source"])
+            entities.add(edge["target"])
+
+        note = None
+        if not edges:
+            note = (
+                "No mechanistic paths found connecting the given genes. "
+                "Check gene symbols (HGNC) and that at least two are present "
+                "in Pathway Commons."
+            )
+
+        return {
+            "status": "success",
+            "data": {
+                "genes": clean_genes,
+                "edges": edges[:max_return],
+                "relation_counts": relation_counts,
+                "entity_count": len(entities),
+                "note": note,
+            },
+            "metadata": {
+                "genes": clean_genes,
+                "total_edges": len(edges),
+                "returned": min(len(edges), max_return),
+                "limit": limit,
+            },
+        }

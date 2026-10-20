@@ -1,0 +1,640 @@
+[
+  {
+    "name": "HPO_get_term",
+    "description": "Get detailed information about a Human Phenotype Ontology (HPO) term by its ID. HPO provides standardized descriptions of phenotypic abnormalities in human disease with over 18,000 terms. Returns the term name, definition, synonyms, cross-references to UMLS/SNOMED, descendant count, and translations. Example: HP:0001250 (Seizure) returns definition, 346 descendants, synonyms including 'Epileptic seizure' and 'Epilepsy', and cross-references to UMLS and SNOMED-CT.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "term_id": {
+          "type": "string",
+          "description": "HPO term identifier. Must start with 'HP:' followed by 7 digits. Examples: 'HP:0001250' (Seizure), 'HP:0001263' (Global developmental delay), 'HP:0000252' (Microcephaly), 'HP:0001249' (Intellectual disability)."
+        }
+      },
+      "required": [
+        "term_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "get_term"
+    },
+    "type": "HPOTool",
+    "test_examples": [
+      {
+        "term_id": "HP:0001250"
+      },
+      {
+        "term_id": "HP:0001263"
+      },
+      {
+        "term_id": "HP:0006887"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "HPO term ID (e.g., HP:0001250)"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Term name"
+            },
+            "definition": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Full term definition"
+            },
+            "comment": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Additional comments or notes"
+            },
+            "synonyms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Alternative names for the term"
+            },
+            "descendant_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Number of more specific child terms"
+            },
+            "xrefs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Cross-references (UMLS, SNOMED-CT, etc.)"
+            },
+            "translations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              },
+              "description": "Translations in other languages"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "HPO_search_terms",
+    "description": "Search for Human Phenotype Ontology (HPO) terms by keyword. HPO contains over 18,000 standardized phenotype terms used in clinical genetics and rare disease research. Returns matching terms with definitions, synonym counts, and descendant counts. Useful for finding the correct HPO ID for a clinical phenotype before querying disease or gene associations. Example: searching 'seizure' returns terms like 'Bilateral tonic-clonic seizure' (HP:0007334), 'Generalized-onset seizure' (HP:0002197), 'Focal-onset seizure' (HP:0007359).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search keyword for phenotype terms. Examples: 'seizure', 'intellectual disability', 'cardiomyopathy', 'scoliosis', 'microcephaly'."
+        },
+        "max_results": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of results to return (default 10, max 50)."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "endpoint": "search_terms"
+    },
+    "type": "HPOTool",
+    "test_examples": [
+      {
+        "query": "seizure"
+      },
+      {
+        "query": "cardiomyopathy",
+        "max_results": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "HPO term ID"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Term name"
+              },
+              "definition": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Term definition"
+              },
+              "descendant_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Number of child terms"
+              },
+              "synonyms": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "First 5 synonyms"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "HPO_get_term_hierarchy",
+    "description": "Get the parent or child terms of an HPO phenotype term in the ontology hierarchy. HPO is organized as a directed acyclic graph (DAG) where more specific phenotypes are children of broader terms. Use direction='children' to find more specific sub-phenotypes, or direction='parents' to find broader categories. Example: children of HP:0001250 (Seizure) include 'Bilateral tonic-clonic seizure', 'Focal-onset seizure', 'Febrile seizure', and others. Parents include 'Abnormal nervous system physiology'.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "term_id": {
+          "type": "string",
+          "description": "HPO term identifier (e.g., 'HP:0001250'). Must start with 'HP:' followed by 7 digits."
+        },
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Direction to traverse: 'children' (more specific terms, default) or 'parents' (broader terms)."
+        }
+      },
+      "required": [
+        "term_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "get_term_hierarchy"
+    },
+    "type": "HPOTool",
+    "test_examples": [
+      {
+        "term_id": "HP:0001250",
+        "direction": "children"
+      },
+      {
+        "term_id": "HP:0001250",
+        "direction": "parents"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "HPO term ID"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Term name"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "HPO_get_genes_by_phenotype",
+    "description": "Get the genes associated with an HPO phenotype term (genes in which variants cause this phenotype), from the JAX HPO network annotations. Returns NCBI gene IDs and symbols. Example: HP:0001250 (Seizure) is linked to genes such as RELN, SCN1A, and ~2000 others. Use to go from an observed patient phenotype to candidate disease genes for variant prioritization. A phenotype term can be linked to thousands of genes but 'limit' caps a single response at 500 -- check metadata.has_more in the response and pass 'offset' to page through the rest; a well-known gene for a common phenotype may not appear in the first page.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "term_id": {
+          "type": "string",
+          "description": "HPO term identifier (e.g., 'HP:0001250'). Must start with 'HP:' followed by 7 digits."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of results to return (1-500, default 50). Phenotype terms can be linked to thousands of genes."
+        },
+        "offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of results to skip before returning 'limit' results (default 0). Use with the response's metadata.has_more/metadata.total to page through phenotypes with more genes than fit in one call."
+        }
+      },
+      "required": [
+        "term_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "get_associated_genes"
+    },
+    "type": "HPOTool",
+    "test_examples": [
+      {
+        "term_id": "HP:0001250",
+        "limit": 10
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "genes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Identifier (e.g. 'NCBIGene:5649' for genes, 'ORPHA:..'/'OMIM:..' for diseases)"
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "HPO_get_diseases_by_phenotype",
+    "description": "Get the diseases that present with an HPO phenotype term, from the JAX HPO network annotations. Returns disease IDs (ORPHA/OMIM/DECIPHER), names, and the cross-referenced MONDO ID. Example: HP:0001250 (Seizure) is a feature of thousands of diseases. Use to build a differential diagnosis from a set of observed phenotypes. A phenotype term can be linked to thousands of diseases but 'limit' caps a single response at 500 -- check metadata.has_more in the response and pass 'offset' to page through the rest; a well-known disease for a common phenotype may not appear in the first page.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "term_id": {
+          "type": "string",
+          "description": "HPO term identifier (e.g., 'HP:0001250'). Must start with 'HP:' followed by 7 digits."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of results to return (1-500, default 50). Phenotype terms can be linked to thousands of diseases."
+        },
+        "offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of results to skip before returning 'limit' results (default 0). Use with the response's metadata.has_more/metadata.total to page through phenotypes with more diseases than fit in one call."
+        }
+      },
+      "required": [
+        "term_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "get_associated_diseases"
+    },
+    "type": "HPOTool",
+    "test_examples": [
+      {
+        "term_id": "HP:0001250",
+        "limit": 10
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "diseases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Identifier (e.g. 'NCBIGene:5649' for genes, 'ORPHA:..'/'OMIM:..' for diseases)"
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Name"
+                  },
+                  "mondo_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Cross-referenced MONDO disease ID"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "HPO_get_disease_annotations",
+    "description": "Get the full curated HPO annotation profile for a disease, keyed by a disease ID (OMIM / ORPHA / DECIPHER), from the JAX HPO network annotations. Returns three things: (1) medical_actions \u2014 MAxO curated treatments / management actions, each with TREATS / PREVENTS relations and the specific phenotypes they target; (2) categories \u2014 the disease's phenotypes grouped by body system (e.g., Cardiovascular, Nervous System, Eye), each with frequency / onset; (3) genes \u2014 the causative genes (NCBI gene IDs and symbols). Use to retrieve evidence-based management options and the organ-system phenotype breakdown for a known disease. Example: OMIM:154700 (Marfan syndrome) returns 3 medical actions including MAXO:0000653 'angiotensin receptor blocker therapy' (PREVENTS/TREATS aortic root aneurysm), 13 body systems, and gene NCBIGene:2200 (FBN1). Other examples: OMIM:277900 (Wilson disease) \u2192 copper chelator / zinc therapy; OMIM:261600 (phenylketonuria) \u2192 dietary phenylalanine avoidance.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "disease_id": {
+          "type": "string",
+          "description": "Disease identifier as an OMIM, ORPHA, or DECIPHER CURIE (e.g., 'OMIM:154700' for Marfan syndrome, 'OMIM:277900' for Wilson disease, 'ORPHA:558')."
+        }
+      },
+      "required": [
+        "disease_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "get_disease_annotations"
+    },
+    "type": "HPOTool",
+    "test_examples": [
+      {
+        "disease_id": "OMIM:154700"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "disease": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mondo_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "medical_actions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "MAxO action CURIE (e.g., 'MAXO:0000653')."
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "relations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Action relations, e.g. ['PREVENTS', 'TREATS']."
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "description": "Targeted HPO phenotypes."
+                  }
+                }
+              }
+            },
+            "categories": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "body_system": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phenotype_count": {
+                    "type": "integer"
+                  },
+                  "phenotypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "name": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "frequency": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "onset": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "genes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

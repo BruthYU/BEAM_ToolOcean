@@ -1,0 +1,686 @@
+[
+  {
+    "name": "OMA_get_protein",
+    "description": "Get protein information from the OMA (Orthologous MAtrix) Browser by UniProt accession or OMA ID. OMA is a comprehensive orthology database covering 2,600+ complete genomes. Returns protein details including species, genomic location, OMA group membership, and Hierarchical Orthologous Group (HOG) assignment. Example: P04637 returns human TP53 with OMA ID HUMAN31534, HOG:F0782425.2c.7a, and genomic locus on chromosome 17.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "protein_id": {
+          "type": "string",
+          "description": "UniProt accession (e.g., 'P04637' for human p53) or OMA ID (e.g., 'HUMAN31534'). UniProt accessions are recommended for cross-database compatibility."
+        }
+      },
+      "required": [
+        "protein_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "protein"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "protein_id": "P04637"
+      },
+      {
+        "protein_id": "P00533"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "entry_nr": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "oma_id": {
+              "type": "string"
+            },
+            "canonical_id": {
+              "type": "string"
+            },
+            "sequence_length": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "species_code": {
+              "type": "string"
+            },
+            "species_name": {
+              "type": "string"
+            },
+            "taxon_id": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "oma_group": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "oma_hog_id": {
+              "type": "string"
+            },
+            "chromosome": {
+              "type": "string"
+            },
+            "locus_start": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "locus_end": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "locus_strand": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "is_main_isoform": {
+              "type": "boolean"
+            },
+            "roothog_id": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "entry_nr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "OMA_get_orthologs",
+    "description": "Get pairwise orthologs for a protein from the OMA (Orthologous MAtrix) Browser. Returns orthologous proteins across species with relationship type (1:1, 1:many, many:1, many:many), evolutionary distance, and alignment score. OMA orthologs are inferred using a rigorous algorithm that provides high-confidence predictions. Example: P04637 (human p53) returns orthologs in 200+ species including Mus musculus, Danio rerio, and Drosophila melanogaster. The response reports 'count' (orthologs in this response) alongside 'total_count' (all orthologs OMA holds for the protein); these differ whenever 'per_page' is smaller than the full set, which is usual -- P04637 has 157. When they differ 'truncated' is true and 'truncation_note' says how to widen the request. Treat 'count' as a page size and never as the number of species with an ortholog.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "protein_id": {
+          "type": "string",
+          "description": "UniProt accession (e.g., 'P04637' for human p53) or OMA ID."
+        },
+        "rel_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by orthology relationship type. Options: '1:1' (one-to-one), '1:n' (one-to-many), 'n:1' (many-to-one), 'n:m' (many-to-many). Leave empty for all types."
+        },
+        "per_page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of orthologs to return (default: 20). OMA does not paginate this endpoint -- it returns the complete ortholog set in one response -- so this limit is applied by ToolUniverse after fetching, and there is no maximum: set it to 'total_count' to receive every ortholog."
+        }
+      },
+      "required": [
+        "protein_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "orthologs"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "protein_id": "P04637",
+        "per_page": 10
+      },
+      {
+        "protein_id": "P00533",
+        "rel_type": "1:1",
+        "per_page": 10
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "oma_id": {
+                "type": "string"
+              },
+              "canonical_id": {
+                "type": "string"
+              },
+              "species_name": {
+                "type": "string"
+              },
+              "species_code": {
+                "type": "string"
+              },
+              "taxon_id": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "rel_type": {
+                "type": "string"
+              },
+              "distance": {
+                "type": "number"
+              },
+              "score": {
+                "type": "number"
+              },
+              "sequence_length": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "chromosome": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "OMA_get_hog",
+    "description": "Get Hierarchical Orthologous Group (HOG) information from OMA. HOGs represent groups of genes that descended from a single ancestral gene within a given taxonomic range. HOGs capture the full evolutionary history of gene families including gene duplications. Example: HOG:F0782425 returns the p53 HOG at the Euteleostomi level with description 'cellular tumor antigen p53', completeness score 0.61, and child HOGs for fish, mammals, etc.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "hog_id": {
+          "type": "string",
+          "description": "Hierarchical Orthologous Group ID. Examples: 'HOG:F0782425' (p53 family), 'HOG:F0798498' (insulin family). Use OMA_get_protein to find the current HOG ID for a specific protein (the 'oma_hog_id' field). Note: OMA reassigns HOG IDs between releases, so IDs from older releases may return 'no longer valid'."
+        }
+      },
+      "required": [
+        "hog_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "hog"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "hog_id": "HOG:F0782425"
+      },
+      {
+        "hog_id": "HOG:F0798498"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hog_id": {
+                "type": "string"
+              },
+              "level": {
+                "type": "string"
+              },
+              "roothog_id": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "completeness_score": {
+                "type": "number"
+              },
+              "description": {
+                "type": "string"
+              },
+              "parent_hogs": {
+                "type": "array"
+              },
+              "children_hogs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "hog_id": {
+                      "type": "string"
+                    },
+                    "alternative_levels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "alternative_levels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "OMA_get_group",
+    "description": "Get OMA Group details including member proteins. OMA Groups contain sets of strict 1:1 orthologs across all genomes, ensuring each species contributes at most one gene. This is the most stringent orthology definition in OMA. Group numbers are not stable/predictable identifiers to memorize -- resolve the current group ID for a protein of interest via OMA_get_protein's 'oma_group' field first. Verified example: group 1458663 returns the p53 OMA Group, description 'Cellular tumor antigen p53', fingerprint 'ACCQRNQ'.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "description": "OMA Group number (numeric ID). Verified example: '1458663' (p53 group). Use OMA_get_protein to find the current group ID for a specific protein rather than assuming a remembered ID still maps to the same group."
+        }
+      },
+      "required": [
+        "group_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "group"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "group_id": "1458663"
+      },
+      {
+        "group_id": "839588"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "group_nr": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "fingerprint": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "members": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "oma_id": {
+                    "type": "string"
+                  },
+                  "canonical_id": {
+                    "type": "string"
+                  },
+                  "species_name": {
+                    "type": "string"
+                  },
+                  "species_code": {
+                    "type": "string"
+                  },
+                  "taxon_id": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "sequence_length": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "chromosome": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "group_nr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "OMA_resolve_xref",
+    "description": "Resolve a gene name, gene symbol, UniProt entry name, or any cross-reference identifier to OMA protein entries. This is the entry point into the OMA toolchain when you only have a common identifier (e.g. 'BRCA2' or 'MED4_HUMAN') rather than a UniProt accession or OMA ID. OMA_get_protein only accepts a UniProt accession (P04637) or OMA ID (HUMAN31534); use this tool first to obtain the entry_nr / oma_id / genome for the gene of interest, then feed the oma_id into OMA_get_protein, OMA_get_orthologs, OMA_get_protein_go, etc. Example: search='MED4_HUMAN' returns entry_nr 24423700, oma_id HUMAN17018, species Homo sapiens (taxon 9606); search='BRCA2' returns matching OMA entries across species.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Gene symbol (e.g. 'BRCA2'), UniProt entry name (e.g. 'MED4_HUMAN'), or any cross-reference identifier to resolve to OMA entries."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of cross-reference matches to return (default: 25, max: 100)."
+        }
+      },
+      "required": [
+        "search"
+      ]
+    },
+    "fields": {
+      "endpoint": "xref"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "search": "MED4_HUMAN"
+      },
+      {
+        "search": "BRCA2"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "xref": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "seq_match": {
+                "type": "string"
+              },
+              "entry_nr": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "oma_id": {
+                "type": "string"
+              },
+              "species_code": {
+                "type": "string"
+              },
+              "species_name": {
+                "type": "string"
+              },
+              "taxon_id": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "OMA_get_genome_pair_orthologs",
+    "description": "Retrieve the complete set of pairwise orthologs between TWO whole genomes (proteome-vs-proteome) in OMA. Unlike OMA_get_orthologs (which returns orthologs of a single query protein), this returns every orthologous protein PAIR between two species genomes -- the data used to build species-pair ortholog tables, dN/dS panels, and comparative-genomics / synteny analyses. Each pair reports entry_1 and entry_2 (omaid, canonical_id, species, HOG/group), the relationship type (1:1, 1:n, n:1, n:m), evolutionary distance, and alignment score. Provide species codes (e.g. genome1='HUMAN', genome2='MOUSE') or NCBI taxon IDs. Results are paginated; use per_page and page. Example: genome1='HUMAN', genome2='MOUSE' returns pairs such as HUMAN01436 (NK2R_HUMAN) <-> MOUSE00001 (NK2R_MOUSE), rel_type 1:1.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "genome1": {
+          "type": "string",
+          "description": "First genome: UniProt species code (e.g. 'HUMAN', 'PANTR') or NCBI taxon ID (e.g. '9606')."
+        },
+        "genome2": {
+          "type": "string",
+          "description": "Second genome: UniProt species code (e.g. 'MOUSE', 'PANTR') or NCBI taxon ID (e.g. '10090')."
+        },
+        "per_page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of ortholog pairs to return per page (default: 20, max: 100). The full proteome-vs-proteome set is large; paginate with 'page'."
+        },
+        "page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Page number for paginated results (default: 1)."
+        }
+      },
+      "required": [
+        "genome1",
+        "genome2"
+      ]
+    },
+    "fields": {
+      "endpoint": "genome_pairs"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "genome1": "HUMAN",
+        "genome2": "MOUSE",
+        "per_page": 1
+      },
+      {
+        "genome1": "HUMAN",
+        "genome2": "PANTR",
+        "per_page": 2
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entry_1": {
+                "type": "object"
+              },
+              "entry_2": {
+                "type": "object"
+              },
+              "rel_type": {
+                "type": "string"
+              },
+              "distance": {
+                "type": "number"
+              },
+              "score": {
+                "type": "number"
+              },
+              "oma_group": {
+                "type": [
+                  "integer",
+                  "number",
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "OMA_get_protein_go",
+    "description": "Get Gene Ontology (GO) functional annotations for a specific OMA protein. OMA attaches per-entry GO annotations with the aspect (biological_process / molecular_function / cellular_component), information content (ic), evidence code (e.g. IDA, NAS, IEA), and a literature reference (PMID). Other OMA tools return orthology / HOG / group membership but not these functional annotations. Accepts an OMA ID (e.g. 'HUMAN17018') or UniProt accession (e.g. 'P04637'); use OMA_resolve_xref or OMA_get_protein first if you only have a gene symbol. Example: protein_id='HUMAN17018' returns GO:0060261 'positive regulation of transcription initiation by RNA polymerase II', aspect biological_process, ic 8.27, evidence IDA, reference PMID:12218053.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "protein_id": {
+          "type": "string",
+          "description": "OMA ID (e.g. 'HUMAN17018') or UniProt accession (e.g. 'P04637')."
+        },
+        "aspect": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional GO aspect filter: 'biological_process', 'molecular_function', or 'cellular_component'. Leave empty for all aspects."
+        }
+      },
+      "required": [
+        "protein_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "protein_ontology"
+    },
+    "type": "OMATool",
+    "test_examples": [
+      {
+        "protein_id": "HUMAN17018"
+      },
+      {
+        "protein_id": "P04637"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "go_term": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "aspect": {
+                "type": "string"
+              },
+              "information_content": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "evidence": {
+                "type": "string"
+              },
+              "reference": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

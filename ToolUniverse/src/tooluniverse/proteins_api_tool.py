@@ -1,0 +1,750 @@
+"""
+Proteins API Tool
+
+This tool provides access to the EBI Proteins API for comprehensive protein
+annotations, variation data, proteomics, and reference genome mappings.
+"""
+
+import re
+import requests
+from typing import Any, Dict, Optional, List, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+# Canonical UniProtKB accession format (6 or 10 characters), per UniProt's own spec:
+# https://www.uniprot.org/help/accession_numbers
+_UNIPROT_ACCESSION_RE = re.compile(
+    r"^([A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})$" r"|^([OPQ][0-9][A-Z0-9]{3}[0-9])$"
+)
+
+
+def _numeric_organism_as_taxid(args: dict[str, Any]) -> str | None:
+    """Return the taxonomy id when ``organism`` was supplied as a bare number.
+
+    The Proteins API documents these as two distinct query parameters --
+    ``organism`` is "Organism name" and ``taxid`` is "Organism taxon ID"
+    (https://www.ebi.ac.uk/proteins/api/doc/) -- and matches nothing when a
+    taxon id is sent as ``organism=``. Since no organism name is all digits,
+    a purely numeric value is unambiguously a taxonomy id and is routed to
+    ``taxid=`` instead of silently returning an empty success.
+    """
+    if not isinstance(args, dict) or "organism" not in args:
+        return None
+    value = str(args["organism"]).strip()
+    return value if value.isdigit() else None
+
+
+def _entry_gene_names(entry: Any) -> set:
+    """Every gene label an entry carries, upper-cased.
+
+    Covers the primary name plus synonyms and ORF/ordered-locus names, because
+    a gene symbol is often recorded as a synonym on one species' entry and as
+    the primary name on another's.
+    """
+    names = set()
+    if not isinstance(entry, dict):
+        return names
+    for gene in entry.get("gene") or []:
+        if not isinstance(gene, dict):
+            continue
+        for key in ("name", "olnNames", "orfNames", "synonyms"):
+            value = gene.get(key)
+            items = value if isinstance(value, list) else [value]
+            for item in items:
+                if isinstance(item, dict) and item.get("value"):
+                    names.add(str(item["value"]).strip().upper())
+    return names
+
+
+def _has_exact_gene_match(entries: Any, query: str) -> bool:
+    """True when some entry carries ``query`` as a gene label, exactly.
+
+    "Gene label" is deliberately wider than "gene symbol": it includes
+    synonyms and ORF/ordered-locus names, because the same gene is recorded
+    as a primary name on one species' entry and a synonym on another's. The
+    cost is that a query colliding with some organism's locus tag (say
+    'C54C6.2') also passes the gate -- acceptable, since the alternative for
+    such a query is a free-text protein-name search, which is exactly the
+    path that answered 'ben-1' with BANP_HUMAN.
+    """
+    wanted = str(query or "").strip().upper()
+    if not wanted or not isinstance(entries, list):
+        return False
+    return any(wanted in _entry_gene_names(entry) for entry in entries)
+
+
+@register_tool("ProteinsAPIRESTTool")
+class ProteinsAPIRESTTool(BaseTool):
+    """
+    Proteins API REST tool.
+    Generic wrapper for Proteins API endpoints defined in proteins_api_tools.json.
+    """
+
+    def __init__(self, tool_config: Dict):
+        super().__init__(tool_config)
+        self.base_url = "https://www.ebi.ac.uk/proteins/api"
+        self.session = requests.Session()
+        self.session.headers.update(
+            {"Accept": "application/json", "User-Agent": "ToolUniverse/1.0"}
+        )
+        self.timeout = 30
+
+    def _build_url(self, args: Dict[str, Any]) -> str:
+        """Build URL from endpoint template and arguments"""
+        endpoint_template = self.tool_config["fields"].get("endpoint", "")
+        tool_name = self.tool_config.get("name", "")
+
+        if endpoint_template:
+            url = endpoint_template
+            for k, v in args.items():
+                url = url.replace(f"{{{k}}}", str(v))
+            return url
+
+        # Build URL based on tool name
+        if tool_name == "proteins_api_get_protein":
+            accession = args.get("accession", "")
+            if accession:
+                return f"{self.base_url}/proteins/{accession}"
+
+        elif tool_name == "proteins_api_get_variants":
+            accession = args.get("accession", "")
+            if accession:
+                # Use the variation API endpoint (not the proteins endpoint)
+                return f"{self.base_url}/variation"
+
+        elif tool_name == "proteins_api_get_proteomics":
+            accession = args.get("accession", "")
+            if accession:
+                # Try proteomics endpoint, fallback to main protein endpoint
+                return f"{self.base_url}/proteins/{accession}/proteomics"
+
+        elif tool_name == "proteins_api_get_epitopes":
+            accession = args.get("accession", "")
+            if accession:
+                # Try epitopes endpoint, fallback to main protein endpoint
+                return f"{self.base_url}/proteins/{accession}/epitopes"
+
+        elif tool_name == "proteins_api_search":
+            # Proteins API search uses query parameter, not path
+            return f"{self.base_url}/proteins/search"
+
+        return self.base_url
+
+    def _build_params(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Build query parameters for Proteins API"""
+        params = {}
+        tool_name = self.tool_config.get("name", "")
+
+        if tool_name == "proteins_api_search":
+            # Proteins API search requires specific parameters:
+            # gene, protein, accession, organism, taxid, etc.
+            if "query" in args:
+                query = args["query"]
+                # Fix-T3A-008: match the canonical UniProt accession format (e.g.
+                # 'P05067') before falling back to the Feature-81B-007 gene-name
+                # heuristic below. Without this, accessions were indistinguishable
+                # from short gene names like 'CYP2D6' and always misrouted to
+                # gene=, contradicting this tool's own documented behavior.
+                if query and _UNIPROT_ACCESSION_RE.match(query.strip().upper()):
+                    params["accession"] = query.strip().upper()
+                # Feature-81B-007: always use gene param for short queries —
+                # gene names like CYP2D6 are 6 chars and were incorrectly
+                # classified as UniProt accessions.
+                elif query and len(query) <= 10 and any(c.isalpha() for c in query):
+                    params["gene"] = query
+                else:
+                    # For longer queries, try protein parameter
+                    params["protein"] = query
+            if "size" in args:
+                params["size"] = args["size"]
+            if "offset" in args:
+                params["offset"] = args["offset"]
+            # Feature-69A-007: Default to human (taxId 9606) to avoid non-human proteins
+            # appearing before human proteins. User can override with organism param.
+            if "reviewed" in args:
+                params["reviewed"] = str(args["reviewed"]).lower()
+            if "organism" in args:
+                # A purely numeric organism is a taxonomy id, not a name; send
+                # it as taxid= so it actually filters instead of matching
+                # nothing (see _numeric_organism_as_taxid). run() discloses the
+                # correction via 'normalization_note'.
+                numeric_taxid = _numeric_organism_as_taxid(args)
+                if numeric_taxid:
+                    params["taxid"] = numeric_taxid
+                else:
+                    params["organism"] = args["organism"]
+            elif "taxid" in args:
+                params["taxid"] = args["taxid"]
+            elif "accession" not in params:
+                # Only apply human filter for gene/protein name searches
+                params["taxid"] = "9606"
+
+        elif tool_name == "proteins_api_get_variants":
+            # Variation API uses accession query parameter
+            if "accession" in args:
+                params["accession"] = args["accession"]
+            if "size" in args:
+                params["size"] = args.get("size", 100)
+            if "offset" in args:
+                params["offset"] = args["offset"]
+
+        # Format parameter
+        if "format" in args:
+            params["format"] = args["format"]
+        else:
+            params["format"] = "json"
+
+        return params
+
+    def _extract_from_protein_endpoint(
+        self, accession: str, tool_name: str
+    ) -> Optional[Dict[str, Any]]:
+        """Extract data from main protein endpoint when specific endpoints don't exist"""
+        try:
+            protein_url = f"{self.base_url}/proteins/{accession}"
+            response = self.session.get(protein_url, timeout=self.timeout)
+            response.raise_for_status()
+            protein_data = response.json()
+
+            # Extract relevant data based on tool name
+            if tool_name == "proteins_api_get_proteomics":
+                # Look for proteomics-related data in response
+                proteomics_data = []
+
+                # Check comments for proteomics information
+                if "comments" in protein_data:
+                    for comment in protein_data["comments"]:
+                        comment_type = str(comment.get("commentType", "")).upper()
+                        if any(
+                            x in comment_type
+                            for x in [
+                                "PTM",
+                                "MODIFIED",
+                                "MASS",
+                                "SPECTROMETRY",
+                                "PROTEOMICS",
+                            ]
+                        ):
+                            proteomics_data.append(comment)
+
+                # Check features for proteomics-related features
+                if "features" in protein_data:
+                    for feature in protein_data["features"]:
+                        feature_type = str(feature.get("type", "")).lower()
+                        if any(
+                            x in feature_type
+                            for x in ["modified", "mutagenesis", "site", "variant"]
+                        ):
+                            proteomics_data.append(feature)
+
+                return {
+                    "status": "success",
+                    "data": proteomics_data,
+                    "url": response.url,
+                    "count": len(proteomics_data),
+                    "note": "Proteomics data extracted from main protein endpoint (proteomics endpoint not available). Includes PTM comments, modified residues, and related features.",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+            elif tool_name == "proteins_api_get_epitopes":
+                # Look for epitope-related data
+                epitopes_data = []
+
+                # Check comments for epitope information
+                if "comments" in protein_data:
+                    for comment in protein_data["comments"]:
+                        comment_str = str(comment).lower()
+                        comment_type = str(comment.get("commentType", "")).upper()
+                        if "epitope" in comment_str or comment_type == "IMMUNOLOGY":
+                            epitopes_data.append(comment)
+
+                # Check features for epitope sites
+                if "features" in protein_data:
+                    for feature in protein_data["features"]:
+                        feature_str = str(feature).lower()
+                        feature_type = str(feature.get("type", "")).lower()
+                        if "epitope" in feature_str or "epitope" in feature_type:
+                            epitopes_data.append(feature)
+
+                return {
+                    "status": "success",
+                    "data": epitopes_data,
+                    "url": response.url,
+                    "count": len(epitopes_data),
+                    "note": "Epitope data extracted from main protein endpoint (epitopes endpoint not available). Includes immunology comments and epitope features if present.",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+            elif tool_name == "proteins_api_get_features":
+                # Extract features directly from main protein endpoint
+                features_data = protein_data.get("features", [])
+                return {
+                    "status": "success",
+                    "data": features_data,
+                    "url": response.url,
+                    "count": len(features_data),
+                    "note": "Features extracted from main protein endpoint (features endpoint not available as separate endpoint).",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+            elif tool_name == "proteins_api_get_comments":
+                # Extract comments directly from main protein endpoint
+                comments_data = protein_data.get("comments", [])
+                return {
+                    "status": "success",
+                    "data": comments_data,
+                    "url": response.url,
+                    "count": len(comments_data),
+                    "note": "Comments extracted from main protein endpoint (comments endpoint not available as separate endpoint).",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+            elif tool_name == "proteins_api_get_xrefs":
+                # Extract cross-references (dbReferences) from main protein endpoint
+                xrefs_data = protein_data.get("dbReferences", [])
+                return {
+                    "status": "success",
+                    "data": xrefs_data,
+                    "url": response.url,
+                    "count": len(xrefs_data),
+                    "note": "Cross-references extracted from main protein endpoint (xrefs endpoint not available as separate endpoint).",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+            elif tool_name == "proteins_api_get_publications":
+                # Extract references (publications) from main protein endpoint
+                publications_data = protein_data.get("references", [])
+                return {
+                    "status": "success",
+                    "data": publications_data,
+                    "url": response.url,
+                    "count": len(publications_data),
+                    "note": "Publications extracted from main protein endpoint (publications endpoint not available as separate endpoint).",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+            elif tool_name == "proteins_api_get_genome_mappings":
+                # Extract genome-related cross-references (Ensembl, RefSeq, etc.)
+                genome_mappings = []
+                db_references = protein_data.get("dbReferences", [])
+
+                # Look for Ensembl, RefSeq, and other genome-related cross-references
+                genome_db_types = ["Ensembl", "RefSeq", "EMBL", "GenBank"]
+                for ref in db_references:
+                    ref_type = ref.get("type", "")
+                    if ref_type in genome_db_types:
+                        # Try to extract genome-related information
+                        mapping_entry = {
+                            "database": ref_type,
+                            "id": ref.get("id", ""),
+                            "properties": ref.get("properties", {}),
+                        }
+                        genome_mappings.append(mapping_entry)
+
+                return {
+                    "status": "success",
+                    "data": genome_mappings,
+                    "url": response.url,
+                    "count": len(genome_mappings),
+                    "note": "Genome mappings extracted from cross-references in main protein endpoint (genome endpoint not available as separate endpoint). Includes Ensembl, RefSeq, EMBL, and GenBank cross-references that may contain genomic location information.",
+                    "fallback_used": True,
+                    "source": "main_protein_endpoint",
+                }
+
+        except Exception:
+            return None
+
+    def _parse_accessions(self, accession: Union[str, List[str]]) -> List[str]:
+        """Parse accession parameter - handle string, list, or comma-separated string"""
+        if isinstance(accession, list):
+            return [str(acc).strip() for acc in accession if acc]
+        elif isinstance(accession, str):
+            # Check if it's comma-separated
+            if "," in accession:
+                return [acc.strip() for acc in accession.split(",") if acc.strip()]
+            else:
+                return [accession.strip()]
+        else:
+            return [str(accession).strip()]
+
+    def _handle_batch_request(
+        self, accessions: List[str], tool_name: str, format: str = "json"
+    ) -> Dict[str, Any]:
+        """Handle batch requests by making multiple API calls and aggregating results"""
+        results = []
+        errors = []
+        successful_count = 0
+
+        # Use ThreadPoolExecutor for parallel requests (max 5 concurrent)
+        max_workers = min(5, len(accessions))
+
+        def fetch_single(
+            acc: str,
+        ) -> tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+            """Fetch data for a single accession"""
+            try:
+                # Build arguments for single accession
+                single_args = {"accession": acc, "format": format}
+                url = self._build_url(single_args)
+                params = self._build_params(single_args)
+
+                # For variants tool, params should contain accession
+                if tool_name == "proteins_api_get_variants":
+                    params["accession"] = acc
+
+                response = self.session.get(url, params=params, timeout=self.timeout)
+
+                # Handle fallback for endpoints that may not exist
+                fallback_tools = [
+                    "proteins_api_get_proteomics",
+                    "proteins_api_get_epitopes",
+                    "proteins_api_get_features",
+                    "proteins_api_get_comments",
+                    "proteins_api_get_xrefs",
+                    "proteins_api_get_publications",
+                    "proteins_api_get_genome_mappings",
+                ]
+
+                if tool_name in fallback_tools and response.status_code == 404:
+                    fallback_result = self._extract_from_protein_endpoint(
+                        acc, tool_name
+                    )
+                    if fallback_result:
+                        return (acc, fallback_result, None)
+
+                response.raise_for_status()
+                data = response.json()
+
+                return (
+                    acc,
+                    {"status": "success", "data": data, "url": response.url},
+                    None,
+                )
+            except Exception as e:
+                return (acc, None, str(e))
+
+        # Execute requests in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_acc = {
+                executor.submit(fetch_single, acc): acc for acc in accessions
+            }
+
+            for future in as_completed(future_to_acc):
+                acc, result, error = future.result()
+                if result:
+                    results.append({"accession": acc, **result})
+                    successful_count += 1
+                else:
+                    errors.append({"accession": acc, "error": error})
+
+        # Aggregate results
+        response_data = {
+            "status": "success" if successful_count > 0 else "error",
+            "data": results,
+            "count": successful_count,
+            "total_requested": len(accessions),
+            "errors": errors if errors else None,
+        }
+
+        if errors:
+            response_data["note"] = (
+                f"Successfully retrieved {successful_count} of {len(accessions)} accessions. {len(errors)} accessions failed."
+            )
+
+        return response_data
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the Proteins API call"""
+        tool_name = self.tool_config.get("name", "")
+
+        # Check if this is a batch operation (accession is list or comma-separated)
+        # Only apply to tools that use accession parameter
+        batch_tools = [
+            "proteins_api_get_protein",
+            "proteins_api_get_variants",
+            "proteins_api_get_proteomics",
+            "proteins_api_get_epitopes",
+            "proteins_api_get_features",
+            "proteins_api_get_comments",
+            "proteins_api_get_xrefs",
+            "proteins_api_get_publications",
+            "proteins_api_get_genome_mappings",
+        ]
+
+        # Feature-111B-007: gene_symbol/gene as aliases for query in proteins_api_search
+        if tool_name == "proteins_api_search" and not arguments.get("query"):
+            gene_alias = arguments.get("gene_symbol") or arguments.get("gene")
+            if gene_alias:
+                arguments = dict(arguments, query=gene_alias)
+
+        if tool_name in batch_tools and "accession" in arguments:
+            accession = arguments.get("accession")
+            accessions = self._parse_accessions(accession)
+
+            # If multiple accessions, use batch handler
+            if len(accessions) > 1:
+                format_param = arguments.get("format", "json")
+                return self._handle_batch_request(accessions, tool_name, format_param)
+            # Single accession - continue with normal flow
+            elif len(accessions) == 1:
+                arguments["accession"] = accessions[0]
+
+        try:
+            url = self._build_url(arguments)
+            params = self._build_params(arguments)
+
+            response = self.session.get(url, params=params, timeout=self.timeout)
+
+            # Handle endpoints that may not exist - fallback to main protein endpoint
+            fallback_tools = [
+                "proteins_api_get_proteomics",
+                "proteins_api_get_epitopes",
+                "proteins_api_get_features",
+                "proteins_api_get_comments",
+                "proteins_api_get_xrefs",
+                "proteins_api_get_publications",
+                "proteins_api_get_genome_mappings",
+            ]
+            if tool_name in fallback_tools:
+                if response.status_code == 404:
+                    fallback_result = self._extract_from_protein_endpoint(
+                        arguments.get("accession", ""), tool_name
+                    )
+                    if fallback_result:
+                        return fallback_result
+
+            # Handle search endpoint which may not exist
+            if tool_name == "proteins_api_search" and response.status_code == 400:
+                return {
+                    "status": "error",
+                    "error": "Proteins API search endpoint may not be available. Use proteins_api_get_protein with a specific accession instead, or use EBI Search API with 'uniprot' domain.",
+                    "url": response.url,
+                    "suggestion": "Try using ebi_search_domain with domain='uniprot' and your query instead.",
+                }
+
+            response.raise_for_status()
+            data = response.json()
+            widened_organism = False
+
+            # If a name search came back empty, progressively widen it before
+            # giving up. Two reasons a search returns nothing:
+            #   1. the query is a protein name, not a gene symbol ("insulin")
+            #   2. the default human filter (taxid=9606, Feature-69A-007) drops
+            #      every hit for a non-human query (e.g. bacterial "blaKPC",
+            #      "Klebsiella pneumoniae KPC carbapenemase") — a silent empty.
+            # Retry with protein=/gene= and without the human-only filter so
+            # non-human proteins surface instead of a silent empty success.
+            auto_human = (
+                "organism" not in arguments
+                and "taxid" not in arguments
+                and params.get("taxid") == "9606"
+            )
+            if (
+                tool_name == "proteins_api_search"
+                and isinstance(data, list)
+                and len(data) == 0
+            ):
+                query = arguments.get("query", "")
+                used_gene = "gene" in params
+                used_protein = "protein" in params
+
+                def _retry_params(use_gene: bool, keep_human: bool) -> Dict[str, Any]:
+                    # Carry the original request forward and change only the
+                    # field being retried. Rebuilding from scratch dropped
+                    # every scoping parameter the caller had supplied
+                    # (organism=/taxid=), so a wheat query silently retried
+                    # against all of UniProt and answered with an insect.
+                    p = {
+                        k: v for k, v in params.items() if k not in ("gene", "protein")
+                    }
+                    p["gene" if use_gene else "protein"] = query
+                    if not keep_human and auto_human:
+                        # Only the human default this tool added itself may be
+                        # dropped; a caller-supplied taxid stays.
+                        p.pop("taxid", None)
+                    return p
+
+                # Each candidate is (params, require_exact_gene_match). Order:
+                # same field widened (gated on an exact gene match); swap field
+                # keeping the caller's scoping; then drop the human filter, same
+                # field then swapped field, so any-organism hits surface.
+                #
+                # The field swap must be symmetric. The _build_params routing
+                # heuristic sends anything longer than 10 characters to
+                # protein=, so realistic queries land there ('blaCTX-M-15', the
+                # most common ESBL gene worldwide, is 11 characters and only
+                # matches under gene=). Guarding this candidate on used_gene
+                # meant a protein=-routed query was never retried as gene=, and
+                # when the caller also supplied organism/taxid the auto_human
+                # branch below was skipped too -- leaving no retry at all and a
+                # silent empty success for data that exists upstream.
+                #
+                # The first candidate keeps the field the query was routed to and
+                # drops only the human default this tool added itself, and is
+                # accepted ONLY if some hit's gene symbol is exactly the query.
+                # Without it, a gene symbol with no human ortholog was answered
+                # with a different entity entirely -- 'ben-1' returned
+                # BANP_HUMAN. The gate is what stops it over-firing on a genuine
+                # protein-name query. Full upstream evidence for both halves:
+                # tests/unit/test_proteins_api_gene_symbol_not_swapped_to_free_text.py
+                candidates = []
+                if auto_human and (used_gene or used_protein):
+                    candidates.append(
+                        (_retry_params(use_gene=used_gene, keep_human=False), True)
+                    )
+                if used_gene or used_protein:
+                    candidates.append(
+                        (_retry_params(use_gene=not used_gene, keep_human=True), False)
+                    )
+                if auto_human:
+                    candidates.append(
+                        (_retry_params(use_gene=used_gene, keep_human=False), False)
+                    )
+                    candidates.append(
+                        (_retry_params(use_gene=not used_gene, keep_human=False), False)
+                    )
+
+                # Candidate 1 and candidate 3 are the same param set with and
+                # without the gate, so memoise by params: one GET, and one JSON
+                # parse, for a body that can run to megabytes at size=100.
+                seen: Dict[tuple, Any] = {}
+                for cand, require_exact in candidates:
+                    key = tuple(sorted(cand.items()))
+                    if key not in seen:
+                        resp = self.session.get(url, params=cand, timeout=self.timeout)
+                        parsed = resp.json() if resp.status_code == 200 else None
+                        seen[key] = (resp, parsed)
+                    retry_resp, retry_data = seen[key]
+                    if not isinstance(retry_data, list) or not retry_data:
+                        continue
+                    if require_exact and not _has_exact_gene_match(retry_data, query):
+                        continue
+                    data = retry_data
+                    response = retry_resp
+                    widened_organism = auto_human and "taxid" not in cand
+                    break
+
+            # Cap features per entry to avoid 25MB+ responses for heavily-annotated proteins
+            if tool_name == "proteins_api_get_variants" and isinstance(data, list):
+                max_variants = int(arguments.get("max_variants", 200))
+                for entry in data:
+                    if isinstance(entry, dict) and "features" in entry:
+                        features = entry["features"]
+                        if len(features) > max_variants:
+                            entry["features"] = features[:max_variants]
+                            entry["features_truncated"] = True
+                            entry["total_features"] = len(features)
+
+            # For gene-name searches, sort exact gene matches to the top.
+            # Deliberately narrower than _has_exact_gene_match: ranking uses the
+            # primary gene name only, so an entry that merely lists the query as
+            # a synonym does not outrank one whose primary name it is.
+            if (
+                tool_name == "proteins_api_search"
+                and isinstance(data, list)
+                and "query" in arguments
+            ):
+                query_upper = arguments["query"].strip().upper()
+
+                def _gene_sort_key(entry):
+                    primary = (
+                        entry.get("gene", [{}])[0].get("name", {}).get("value", "")
+                        if entry.get("gene")
+                        else ""
+                    )
+                    return 0 if primary.upper() == query_upper else 1
+
+                data = sorted(data, key=_gene_sort_key)
+
+            response_data = {
+                "status": "success",
+                "data": data,
+                "url": response.url,
+            }
+            normalized_taxid = _numeric_organism_as_taxid(arguments)
+            if normalized_taxid:
+                # Silent input mutation is its own defect: say what was changed.
+                response_data["normalization_note"] = (
+                    f"Input auto-normalized: organism '{normalized_taxid}' is "
+                    "purely numeric, so it was sent as taxid="
+                    f"'{normalized_taxid}'. The Proteins API 'organism' "
+                    "parameter takes an organism name (e.g. 'Homo sapiens'); "
+                    "'taxid' takes an NCBI taxonomy id."
+                )
+            if widened_organism:
+                response_data["note"] = (
+                    "No human matches found; the search was automatically "
+                    "widened to all organisms. Pass an explicit 'organism' "
+                    "(e.g. 'Klebsiella pneumoniae') or 'taxid' to scope it."
+                )
+
+            if isinstance(data, list):
+                response_data["count"] = len(data)
+            elif isinstance(data, dict):
+                if "results" in data and isinstance(data["results"], list):
+                    response_data["count"] = len(data["results"])
+
+            return response_data
+
+        except requests.exceptions.RequestException as e:
+            tool_name = self.tool_config.get("name", "")
+
+            # For endpoints that may not exist, try fallback
+            fallback_tools = [
+                "proteins_api_get_proteomics",
+                "proteins_api_get_epitopes",
+                "proteins_api_get_features",
+                "proteins_api_get_comments",
+                "proteins_api_get_xrefs",
+                "proteins_api_get_publications",
+                "proteins_api_get_genome_mappings",
+            ]
+            if tool_name in fallback_tools:
+                # Check if it's a 404 error (either in exception message or response status)
+                is_404 = "404" in str(e) or (
+                    hasattr(e, "response")
+                    and e.response is not None
+                    and e.response.status_code == 404
+                )
+                if is_404:
+                    fallback_result = self._extract_from_protein_endpoint(
+                        arguments.get("accession", ""), tool_name
+                    )
+                    if fallback_result:
+                        return fallback_result
+
+            # For variations endpoint, provide helpful error
+            if tool_name == "proteins_api_get_variants":
+                if "404" in str(e):
+                    return {
+                        "status": "error",
+                        "error": "No variations found for this protein accession.",
+                        "url": url if "url" in locals() else None,
+                        "note": "The protein may not have annotated variants. Try using proteins_api_get_protein to get other protein information.",
+                    }
+                elif "400" in str(e):
+                    return {
+                        "status": "error",
+                        "error": "Invalid accession format for variation query.",
+                        "url": url if "url" in locals() else None,
+                        "note": "Ensure you're using a valid UniProt accession (e.g., P05067).",
+                    }
+            return {
+                "status": "error",
+                "error": f"Proteins API error: {str(e)}",
+                "url": url if "url" in locals() else None,
+            }
+        except Exception as e:
+            tool_name = self.tool_config.get("name", "")
+            return {
+                "status": "error",
+                "error": f"Unexpected error: {str(e)}",
+                "url": url if "url" in locals() else None,
+            }

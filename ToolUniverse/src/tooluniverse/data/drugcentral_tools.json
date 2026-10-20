@@ -1,0 +1,352 @@
+[
+  {
+    "name": "DrugCentral_search",
+    "type": "DrugCentralTool",
+    "description": "Search for drugs in DrugCentral by name, returning DrugCentral-curated data including drug names (INN), CAS registry numbers, SMILES structures, regulatory approval status (FDA/EMA/PMDA), and cross-references to DrugBank, ChEMBL, PubChem, and other databases. DrugCentral is an open-access drug information resource from the University of New Mexico. Data accessed via MyChem.info aggregation. Example: searching 'metformin' returns its approval history, structure, and database cross-references.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Drug name or identifier to search for. Examples: 'metformin', 'aspirin', 'imatinib', 'pembrolizumab'."
+        },
+        "size": {
+          "type": "integer",
+          "default": 10,
+          "description": "Maximum number of results to return (default: 10, max: 50)."
+        }
+      },
+      "required": ["query"]
+    },
+    "fields": {
+      "operation": "search"
+    },
+    "test_examples": [
+      {
+        "query": "metformin",
+        "size": 3
+      },
+      {
+        "query": "imatinib",
+        "size": 5
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "description": "List of matching drugs with DrugCentral data",
+      "items": {
+        "type": "object",
+        "properties": {
+          "inchikey": {
+            "type": ["string", "null"],
+            "description": "InChIKey identifier"
+          },
+          "name": {
+            "type": ["string", "null"],
+            "description": "International Nonproprietary Name (INN)"
+          },
+          "cas_rn": {
+            "type": ["string", "null"],
+            "description": "CAS Registry Number"
+          },
+          "smiles": {
+            "type": ["string", "null"],
+            "description": "SMILES chemical structure"
+          },
+          "approval": {
+            "description": "Regulatory approval record(s), passed through from DrugCentral unchanged. Upstream returns a single object when the drug has exactly one approval record (e.g. praziquantel) and an array when it has several (e.g. metformin: FDA, EMA, PMDA), so both shapes occur.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "agency": {"type": ["string", "null"]},
+                  "company": {"type": ["string", "null"]},
+                  "date": {"type": ["string", "null"]},
+                  "orphan": {
+                    "type": ["string", "null"],
+                    "description": "Orphan-drug designation flag, reported upstream as the string 'True' or 'False'."
+                  }
+                }
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "agency": {"type": ["string", "null"]},
+                    "company": {"type": ["string", "null"]},
+                    "date": {"type": ["string", "null"]},
+                    "orphan": {
+                      "type": ["string", "null"],
+                      "description": "Orphan-drug designation flag, reported upstream as the string 'True' or 'False'."
+                    }
+                  }
+                }
+              },
+              {"type": "null"}
+            ]
+          },
+          "drugbank_id": {
+            "type": ["string", "null"],
+            "description": "DrugBank identifier"
+          },
+          "chembl_id": {
+            "type": ["string", "array", "null"],
+            "description": "ChEMBL identifier(s)"
+          },
+          "pubchem_cid": {
+            "type": ["string", "integer", "null"],
+            "description": "PubChem Compound ID"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "DrugCentral_get_drug",
+    "type": "DrugCentralTool",
+    "description": "Get detailed DrugCentral information for a specific drug by its InChIKey or ChEMBL ID. Returns comprehensive drug data including: regulatory approvals (FDA/EMA/PMDA with dates), therapeutic indications (with SNOMED/UMLS codes), contraindications, off-label uses, chemical structure (SMILES, CAS RN), and cross-references to DrugBank, ChEMBL, PubChem, KEGG, RxNorm, etc. DrugCentral data accessed via MyChem.info. Example: 'XZWYZXLIPXDOLR-UHFFFAOYSA-N' returns full metformin data.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "chem_id": {
+          "type": "string",
+          "description": "Drug identifier. InChIKey recommended (e.g., 'XZWYZXLIPXDOLR-UHFFFAOYSA-N' for metformin, 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N' for aspirin). Also accepts ChEMBL ID (e.g., 'CHEMBL1431')."
+        }
+      },
+      "required": ["chem_id"]
+    },
+    "fields": {
+      "operation": "get_drug"
+    },
+    "test_examples": [
+      {
+        "chem_id": "XZWYZXLIPXDOLR-UHFFFAOYSA-N"
+      },
+      {
+        "chem_id": "BSYNRYMUTXBXSQ-UHFFFAOYSA-N"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "description": "Detailed DrugCentral drug information",
+              "properties": {
+                "inchikey": {
+                  "type": ["string", "null"],
+                  "description": "InChIKey identifier"
+                },
+                "name": {
+                  "type": ["string", "null"],
+                  "description": "International Nonproprietary Name (INN)"
+                },
+                "cas_rn": {
+                  "type": ["string", "null"],
+                  "description": "CAS Registry Number"
+                },
+                "smiles": {
+                  "type": ["string", "null"],
+                  "description": "SMILES chemical structure"
+                },
+                "approval": {
+                  "type": "array",
+                  "description": "Regulatory approval records",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "agency": {"type": ["string", "null"]},
+                      "company": {"type": ["string", "null"]},
+                      "date": {"type": ["string", "null"]},
+                      "orphan": {"type": ["string", "null"]}
+                    }
+                  }
+                },
+                "indications": {
+                  "type": "array",
+                  "description": "Therapeutic indications with SNOMED/UMLS codes",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": ["string", "null"]},
+                      "snomed_id": {"type": ["integer", "null"]},
+                      "umls_cui": {"type": ["string", "null"]}
+                    }
+                  }
+                },
+                "contraindications": {
+                  "type": "array",
+                  "description": "Contraindications with SNOMED/UMLS codes",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": ["string", "null"]},
+                      "snomed_id": {"type": ["integer", "null"]},
+                      "umls_cui": {"type": ["string", "null"]}
+                    }
+                  }
+                },
+                "off_label_uses": {
+                  "type": "array",
+                  "description": "Off-label uses with SNOMED/UMLS codes",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": ["string", "null"]},
+                      "snomed_id": {"type": ["integer", "null"]},
+                      "umls_cui": {"type": ["string", "null"]}
+                    }
+                  }
+                },
+                "cross_references": {
+                  "type": "object",
+                  "description": "Cross-references to DrugBank, ChEMBL, PubChem, KEGG, RxNorm, etc."
+                }
+              }
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "query_id": {"type": "string"},
+                "source": {"type": "string"}
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {"type": "string"}
+          },
+          "required": ["error"]
+        }
+      ]
+    }
+  },
+  {
+    "name": "DrugCentral_get_targets",
+    "type": "DrugCentralTool",
+    "description": "Get drug target information from DrugCentral for a specific drug by its InChIKey or ChEMBL ID. Returns bioactivity data including target protein names, target classes (Enzyme, Kinase, Transporter, GPCR, etc.), organisms, action types (INHIBITOR, AGONIST, etc.), potency measurements, mechanism of action (MoA) flags, UniProt protein IDs, and gene symbols. IMPORTANT - POTENCY UNITS: DrugCentral reports potency on the p-scale, i.e. 'activity_value' is the -log10 of the molar potency (the pChEMBL convention), NOT a concentration in nM or uM. So an entry reading activity_type 'IC50' with activity_value '4.01' means pIC50 = 4.01, i.e. an IC50 of 10^-4.01 M = ~96800 nM (96.8 uM) - weak, not sub-micromolar. Higher activity_value means more potent. For convenience each target also carries 'activity_type_reported' (the p-scale name, e.g. 'pIC50'), 'activity_value_scale' (a plain-language note on the scale), and 'activity_value_nM' (the same potency converted to nanomolar, or null when upstream reports no numeric value). DrugCentral data accessed via MyChem.info. Example: 'XZWYZXLIPXDOLR-UHFFFAOYSA-N' returns metformin targets (AMPK, Complex I, OCT1/2/3, DPP4).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "chem_id": {
+          "type": "string",
+          "description": "Drug identifier. InChIKey recommended (e.g., 'XZWYZXLIPXDOLR-UHFFFAOYSA-N' for metformin, 'KTUFNOKKBVMGRW-UHFFFAOYSA-N' for imatinib). Also accepts ChEMBL ID (e.g., 'CHEMBL1431')."
+        }
+      },
+      "required": ["chem_id"]
+    },
+    "fields": {
+      "operation": "get_targets"
+    },
+    "test_examples": [
+      {
+        "chem_id": "XZWYZXLIPXDOLR-UHFFFAOYSA-N"
+      },
+      {
+        "chem_id": "BSYNRYMUTXBXSQ-UHFFFAOYSA-N"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object",
+              "description": "Drug target information from DrugCentral",
+              "properties": {
+                "drug_name": {
+                  "type": ["string", "null"],
+                  "description": "Drug INN name"
+                },
+                "targets": {
+                  "type": "array",
+                  "description": "Drug targets with bioactivity data",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "target_name": {
+                        "type": ["string", "null"],
+                        "description": "Target protein name"
+                      },
+                      "target_class": {
+                        "type": ["string", "null"],
+                        "description": "Target class (Enzyme, Kinase, Transporter, GPCR, Ion channel, etc.)"
+                      },
+                      "organism": {
+                        "type": ["string", "null"],
+                        "description": "Target organism"
+                      },
+                      "action_type": {
+                        "type": ["string", "null"],
+                        "description": "Drug action type (INHIBITOR, AGONIST, ANTAGONIST, etc.)"
+                      },
+                      "activity_type": {
+                        "type": ["string", "null"],
+                        "description": "Raw DrugCentral activity measure type (IC50, Ki, EC50, Kd, etc.). NOTE: the accompanying activity_value is the p-scale (-log10 M) form of this measure, not a concentration -- see activity_type_reported."
+                      },
+                      "activity_value": {
+                        "type": ["string", "null"],
+                        "description": "Potency on the p-scale: -log10 of the molar potency, as reported by DrugCentral (e.g. '4.01' means 10^-4.01 M = ~96800 nM). This is NOT a nM/uM concentration. Higher = more potent."
+                      },
+                      "activity_type_reported": {
+                        "type": ["string", "null"],
+                        "description": "Name of the quantity actually reported in activity_value, i.e. the p-scale form of activity_type (e.g. 'pIC50', 'pKi', 'pKd'). Null when DrugCentral reports no activity type."
+                      },
+                      "activity_value_scale": {
+                        "type": "string",
+                        "description": "Plain-language statement of the scale and units of activity_value (constant: pActivity, -log10 molar, with the nM conversion formula)."
+                      },
+                      "activity_value_nM": {
+                        "type": ["number", "null"],
+                        "description": "activity_value converted to nanomolar as 10**(9 - activity_value), rounded to 4 significant figures. Null when activity_value is missing or non-numeric."
+                      },
+                      "is_moa": {
+                        "type": "boolean",
+                        "description": "Whether this target is the mechanism of action target"
+                      },
+                      "source": {
+                        "type": ["string", "null"],
+                        "description": "Data source (CHEMBL, WOMBAT-PK, etc.)"
+                      },
+                      "uniprot_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "UniProt protein IDs for target subunits"
+                      },
+                      "gene_symbols": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Gene symbols for target subunits"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "total_targets": {"type": "integer"},
+                "query_id": {"type": "string"},
+                "source": {"type": "string"}
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {"type": "string"}
+          },
+          "required": ["error"]
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,218 @@
+[
+  {
+    "name": "ScanProsite_scan_protein",
+    "description": "Scan a protein against the PROSITE database of protein motifs, domains, and families. Given a UniProt accession (e.g., P04637 for TP53, P01308 for insulin), identifies all PROSITE pattern matches in the protein sequence. Returns matched PROSITE signature accessions and IDs with start/end positions. PROSITE is part of the ExPASy/SIB suite and contains 1,800+ patterns and profiles for protein functional sites and domains. Essential for identifying conserved motifs like zinc fingers, kinase activation loops, or receptor binding sites. Note: only patterns (PS00xxx) are scanned; profile matches require the ScanProsite web interface.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "seq": {
+          "type": "string",
+          "description": "UniProt accession to scan for PROSITE motifs. Examples: 'P04637' (TP53, returns PS00348 p53 signature), 'P01308' (insulin, returns PS00262 insulin family), 'Q9UHC1' (MLH3, returns PS00058 DNA mismatch repair). Can also accept a raw amino acid sequence."
+        }
+      },
+      "required": [
+        "seq"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://prosite.expasy.org/cgi-bin/prosite/PSScan.cgi",
+      "params": {
+        "output": "json"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "seq": "P04637"
+      },
+      {
+        "seq": "P01308"
+      },
+      {
+        "seq": "Q9UHC1"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "n_match": {
+              "type": "integer",
+              "description": "Number of PROSITE motif matches found"
+            },
+            "n_seq": {
+              "type": "integer",
+              "description": "Number of sequences scanned (1 for single protein)"
+            },
+            "matchset": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "sequence_ac": {
+                    "type": "string",
+                    "description": "UniProt accession of the scanned protein"
+                  },
+                  "sequence_id": {
+                    "type": "string",
+                    "description": "UniProt entry name (e.g., P53_HUMAN)"
+                  },
+                  "sequence_db": {
+                    "type": "string",
+                    "description": "Sequence database (sp for Swiss-Prot, tr for TrEMBL)"
+                  },
+                  "start": {
+                    "type": "integer",
+                    "description": "Start position of the motif match in the protein"
+                  },
+                  "stop": {
+                    "type": "integer",
+                    "description": "End position of the motif match"
+                  },
+                  "signature_ac": {
+                    "type": "string",
+                    "description": "PROSITE accession (e.g., PS00348 for p53 family signature)"
+                  },
+                  "signature_id": {
+                    "type": "string",
+                    "description": "PROSITE entry name (e.g., P53, INSULIN, DNA_MISMATCH_REPAIR_1)"
+                  },
+                  "level_tag": {
+                    "type": "string",
+                    "description": "Match confidence level tag (0 = strong match)"
+                  }
+                }
+              },
+              "description": "Array of PROSITE motif matches with positions"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "ScanProsite_find_proteins_with_motif",
+    "type": "PROSITETool",
+    "description": "Reverse PROSITE motif scan: given a PROSITE signature accession (e.g., PS00029 for LEUCINE_ZIPPER), enumerate ALL UniProtKB/Swiss-Prot proteins that contain that motif, with per-match positions. This is the INVERSE of the forward scan (ScanProsite_scan_protein / PROSITE_scan_sequence, which take a protein and return its motifs). Use this to find the proteome-wide occurrences of one signature - for example, every Swiss-Prot protein with a leucine zipper. Returns each matching protein's UniProt accession, entry name, and the start/stop of the motif. Results can be capped by the server for very frequent signatures (the 'capped' metadata flag indicates this). Note: very frequent low-information signatures flagged SKIP-FLAG=TRUE (e.g. PS00005 PKC phosphorylation, PS00008 N-myristoylation) are skipped by default and return no hits unless skip_frequent is set to false.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "signature_ac": {
+          "type": "string",
+          "description": "PROSITE signature accession starting with 'PS'. Examples: 'PS00029' (LEUCINE_ZIPPER), 'PS00107' (PROTEIN_KINASE_ATP), 'PS00028' (ZINC_FINGER_C2H2_1). Use PROSITE_search or PROSITE_get_entry to discover signature accessions."
+        },
+        "db": {
+          "type": "string",
+          "enum": ["sprot", "trembl", "uniprot"],
+          "default": "sprot",
+          "description": "Sequence database to search: 'sprot' = Swiss-Prot (reviewed, default), 'trembl' = TrEMBL (unreviewed), 'uniprot' = both."
+        },
+        "skip_frequent": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true (default), skip very frequent low-information signatures (SKIP-FLAG=TRUE patterns such as PS00005, PS00008). Set to false to force ScanProsite to include them; note these can produce extremely large or truncated responses across the whole proteome."
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 50,
+          "description": "Maximum number of matching protein records to return (default 50, max 1000). The 'total_matches' metadata reports the full count found by the server."
+        }
+      },
+      "required": ["signature_ac"]
+    },
+    "fields": {
+      "endpoint": "find_proteins_with_motif"
+    },
+    "test_examples": [
+      {"signature_ac": "PS00029"},
+      {"signature_ac": "PS00029", "max_results": 10}
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sequence_ac": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "UniProt accession of the matching protein (e.g., Q6GZW6)"
+              },
+              "sequence_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "UniProt entry name (e.g., 009L_FRG3G)"
+              },
+              "sequence_db": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Sequence database (sp for Swiss-Prot, tr for TrEMBL)"
+              },
+              "start": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Start position of the motif match in the protein"
+              },
+              "stop": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "End position of the motif match"
+              },
+              "signature_ac": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "PROSITE signature accession that matched (e.g., PS00029)"
+              },
+              "signature_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "PROSITE signature name (e.g., LEUCINE_ZIPPER)"
+              }
+            }
+          },
+          "description": "Array of matching UniProt proteins with motif positions"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

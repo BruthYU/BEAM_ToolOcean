@@ -1,0 +1,271 @@
+"""AOPWiki API tools for Adverse Outcome Pathways.
+
+AOPWiki provides structured data on Adverse Outcome Pathways (AOPs) that
+link molecular initiating events through key events to adverse outcomes.
+Used in toxicology and regulatory science.
+"""
+
+import json
+from typing import Any, Dict
+from urllib.request import Request, urlopen
+
+from tooluniverse.tool_registry import register_tool
+
+_BASE = "https://aopwiki.org"
+
+
+def _get_json(url: str, timeout: int = 30) -> Any:
+    req = Request(url, headers={"Accept": "application/json"})
+    with urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+
+def _aopwiki_not_found(result: Any) -> bool:
+    """AOP-Wiki returns HTTP 200 with a body like
+    {"message": "This AOP does not exist.", "status": "unprocessable_entity"}
+    for an invalid id (confirmed live for both /aops and /events) -- there is
+    no HTTP error to catch. Detect that string status, not a numeric one.
+    """
+    return isinstance(result, dict) and result.get("status") in (
+        404,
+        500,
+        "unprocessable_entity",
+    )
+
+
+@register_tool(
+    "AOPWikiListTool",
+    config={
+        "name": "AOPWiki_list_aops",
+        "type": "AOPWikiListTool",
+        "description": (
+            "List Adverse Outcome Pathways (AOPs) from AOPWiki. Returns AOP IDs, "
+            "titles, and short names. AOPs describe causal chains from molecular "
+            "initiating events through key events to adverse outcomes, used in "
+            "toxicology and risk assessment. Pass `search` to keep only AOPs whose "
+            "title or short name contains a keyword (e.g. 'thyroid', 'PPAR', "
+            "'steatosis') -- AOPWiki publishes ~600 AOPs, so an unfiltered list is "
+            "rarely what you want. Use AOPWiki_get_aop on a returned ID for its key "
+            "events, stressor chemicals, and causal relationships."
+        ),
+        "parameter": {
+            "type": "object",
+            "properties": {
+                "search": {
+                    "type": "string",
+                    "description": (
+                        "Case-insensitive keyword to filter AOPs by title or short "
+                        "name. Omit to return every AOP."
+                    ),
+                },
+            },
+        },
+        "settings": {"base_url": _BASE, "timeout": 30},
+    },
+)
+class AOPWikiListTool:
+    def __init__(self, tool_config=None):
+        self.tool_config = tool_config or {}
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        base = self.tool_config.get("settings", {}).get("base_url", _BASE)
+        timeout = int(self.tool_config.get("settings", {}).get("timeout", 30))
+
+        aops, page = [], 1
+        try:
+            while True:
+                payload = _get_json(
+                    f"{base}/aops.json?per_page=500&page={page}", timeout=timeout
+                )
+                items = payload["aops"] if isinstance(payload, dict) else payload
+                if not isinstance(items, list):
+                    return {"status": "error", "error": "Unexpected response format"}
+                aops.extend(
+                    {
+                        "id": it.get("id"),
+                        "title": it.get("title"),
+                        "short_name": it.get("short_name"),
+                    }
+                    for it in items
+                )
+                pagination = (
+                    payload.get("pagination") if isinstance(payload, dict) else None
+                )
+                if not pagination or page >= pagination.get("total_pages", 1):
+                    break
+                page += 1
+        except Exception as e:
+            return {"status": "error", "error": f"AOPWiki API error: {e}"}
+
+        # AOPWiki's /aops.json has no server-side keyword filter, so filter the
+        # fetched list here rather than making callers pull ~600 AOPs and grep.
+        search = str(arguments.get("search") or "").strip().lower()
+        if not search:
+            return {"status": "success", "data": aops}
+
+        matches = [
+            a
+            for a in aops
+            if search in str(a.get("title") or "").lower()
+            or search in str(a.get("short_name") or "").lower()
+        ]
+        result = {
+            "status": "success",
+            "data": matches,
+            "count": len(matches),
+            "total_aops": len(aops),
+            "search": arguments.get("search"),
+        }
+        if not matches:
+            result["note"] = (
+                f"No AOP title or short name contains '{arguments.get('search')}'. "
+                f"Searched all {len(aops)} AOPs. Try a broader keyword (AOPWiki "
+                "titles use terms like 'thyroid', 'PPAR', 'steatosis', "
+                "'neurotoxicity'), or omit `search` to list every AOP."
+            )
+        return result
+
+
+@register_tool(
+    "AOPWikiDetailTool",
+    config={
+        "name": "AOPWiki_get_aop",
+        "type": "AOPWikiDetailTool",
+        "description": (
+            "Get detailed information about a specific Adverse Outcome Pathway "
+            "(AOP) from AOPWiki by AOP ID. Returns the molecular initiating "
+            "events (MIEs), key events (KEs), adverse outcomes (AOs), stressors "
+            "(chemicals), and key event relationships (causal chain)."
+        ),
+        "parameter": {
+            "type": "object",
+            "properties": {
+                "aop_id": {
+                    "type": "integer",
+                    "description": (
+                        "AOP numeric identifier. Find IDs using AOPWiki_list_aops. "
+                        "Example: 3 (mitochondrial complex I inhibition leading to "
+                        "parkinsonian motor deficits)."
+                    ),
+                },
+            },
+            "required": ["aop_id"],
+        },
+        "settings": {"base_url": _BASE, "timeout": 30},
+    },
+)
+class AOPWikiDetailTool:
+    def __init__(self, tool_config=None):
+        self.tool_config = tool_config or {}
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        settings = self.tool_config.get("settings", {})
+        base = settings.get("base_url", _BASE)
+        timeout = int(settings.get("timeout", 30))
+
+        # A config can set settings.endpoint_kind = "event" to fetch a single
+        # AOP-Wiki Key Event (/events/{id}.json) with its ontology-annotated
+        # event_components, instead of the default whole-AOP detail.
+        if settings.get("endpoint_kind") == "event":
+            return self._run_event(arguments, base, timeout)
+        return self._run_aop(arguments, base, timeout)
+
+    def _run_event(
+        self, arguments: Dict[str, Any], base: str, timeout: int
+    ) -> Dict[str, Any]:
+        event_id = arguments.get("event_id")
+        if event_id is None:
+            return {"status": "error", "error": "event_id is required"}
+
+        try:
+            result = _get_json(f"{base}/events/{event_id}.json", timeout=timeout)
+        except Exception as e:
+            return {"status": "error", "error": f"AOPWiki API error: {e}"}
+
+        if not isinstance(result, dict) or _aopwiki_not_found(result):
+            return {
+                "status": "error",
+                "error": f"Key Event {event_id} not found or server error",
+            }
+
+        def _term(node):
+            if not isinstance(node, dict):
+                return None
+            return {"term": node.get("term"), "source_id": node.get("source_id")}
+
+        components = []
+        for comp in result.get("event_components", []) or []:
+            if not isinstance(comp, dict):
+                continue
+            components.append(
+                {
+                    "id": comp.get("id"),
+                    "process": _term(comp.get("process")),
+                    "object": _term(comp.get("object")),
+                    "action": _term(comp.get("action")),
+                }
+            )
+
+        data = {
+            "id": result.get("id"),
+            "title": result.get("title"),
+            "short_name": result.get("short_name"),
+            "biological_organization": result.get("biological_organization"),
+            "created_at": result.get("created_at"),
+            "updated_at": result.get("updated_at"),
+            "event_components": components,
+        }
+        return {"status": "success", "data": data}
+
+    def _run_aop(
+        self, arguments: Dict[str, Any], base: str, timeout: int
+    ) -> Dict[str, Any]:
+        aop_id = arguments.get("aop_id")
+        if aop_id is None:
+            return {"status": "error", "error": "aop_id is required"}
+
+        try:
+            result = _get_json(f"{base}/aops/{aop_id}.json", timeout=timeout)
+        except Exception as e:
+            return {"status": "error", "error": f"AOPWiki API error: {e}"}
+
+        if _aopwiki_not_found(result):
+            return {
+                "status": "error",
+                "error": f"AOP {aop_id} not found or server error",
+            }
+
+        data = {
+            "id": result.get("id"),
+            "title": result.get("title"),
+            "short_name": result.get("short_name"),
+            "created_at": result.get("created_at"),
+            "updated_at": result.get("updated_at"),
+            "stressors": [
+                {"id": s.get("stressor_id"), "name": s.get("stressor_name")}
+                for s in result.get("aop_stressors", [])
+            ],
+            "molecular_initiating_events": [
+                {"event_id": e.get("event_id"), "event": e.get("event")}
+                for e in result.get("aop_mies", [])
+            ],
+            "key_events": [
+                {"event_id": e.get("event_id"), "event": e.get("event")}
+                for e in result.get("aop_kes", [])
+            ],
+            "adverse_outcomes": [
+                {"event_id": e.get("event_id"), "event": e.get("event")}
+                for e in result.get("aop_aos", [])
+            ],
+            "relationships": [
+                {
+                    "upstream_event_id": r.get("upstream_event_id"),
+                    "upstream_event": r.get("upstream_event"),
+                    "downstream_event_id": r.get("downstream_event_id"),
+                    "downstream_event": r.get("downstream_event"),
+                }
+                for r in result.get("relationships", [])
+            ],
+        }
+
+        return {"status": "success", "data": data}

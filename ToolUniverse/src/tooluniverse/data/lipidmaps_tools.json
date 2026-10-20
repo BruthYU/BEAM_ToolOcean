@@ -1,0 +1,364 @@
+[
+  {
+    "name": "LipidMaps_get_compound_by_id",
+    "description": "Get lipid structure and classification by LIPID MAPS ID (LMID). Returns full lipid record including name, formula, exact mass, SMILES, InChI, cross-references to KEGG/HMDB/ChEBI/PubChem. Example: 'LMFA08040013' returns Palmitoyl-EA.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "input_value": {
+          "type": "string",
+          "description": "LIPID MAPS ID (LMID), e.g., 'LMFA08040013'. Format: LM + 2-letter category + 8-digit number."
+        },
+        "output_item": {
+          "type": "string",
+          "description": "Type of output. Options: 'all' (complete record), 'name', 'formula', 'exactmass', 'smiles', 'classification', 'molfile'.",
+          "default": "all"
+        }
+      },
+      "required": [
+        "input_value"
+      ]
+    },
+    "fields": {
+      "context": "compound",
+      "input_item": "lm_id"
+    },
+    "type": "LipidMapsTool",
+    "test_examples": [
+      {
+        "input_value": "LMFA08040013"
+      },
+      {
+        "input_value": "LMFA01030185",
+        "output_item": "all"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "lm_id": {
+          "type": ["string", "null"]
+        },
+        "name": {
+          "type": ["string", "null"]
+        },
+        "sys_name": {
+          "type": ["string", "null"]
+        },
+        "formula": {
+          "type": ["string", "null"]
+        },
+        "exactmass": {
+          "type": ["string", "null"]
+        },
+        "smiles": {
+          "type": ["string", "null"]
+        },
+        "inchi_key": {
+          "type": ["string", "null"]
+        },
+        "core": {
+          "type": ["string", "null"]
+        },
+        "main_class": {
+          "type": ["string", "null"]
+        },
+        "sub_class": {
+          "type": ["string", "null"]
+        },
+        "kegg_id": {
+          "type": ["string", "null"]
+        },
+        "hmdb_id": {
+          "type": ["string", "null"]
+        },
+        "chebi_id": {
+          "type": ["string", "null"]
+        },
+        "pubchem_cid": {
+          "type": ["string", "null"]
+        },
+        "input": {
+          "type": ["string", "null"]
+        },
+        "regno": {
+          "type": ["string", "null"]
+        },
+        "abbrev": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  },
+  {
+    "name": "LipidMaps_search_by_name",
+    "description": "Search for lipids by exact abbreviation in LIPID MAPS Structure Database. IMPORTANT: Only exact lipidomics abbreviations work (e.g., 'DHA', 'EPA', 'PC 34:1' sum-composition, 'PC 16:0/18:1' acyl-chain-specific -- automatically retried against LIPID MAPS' abbrev_chains field if the sum-composition lookup finds nothing, 'SM 34:1;O2' -- sphingolipids require the ';O2' hydroxyl-count suffix, plain 'SM 34:1' does not match). Class names like 'ceramide' or 'sphingomyelin' will NOT match — use LipidMaps_search_by_formula for class-level searches. Returns matching lipid records with structures and classification.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "input_value": {
+          "type": "string",
+          "description": "Exact lipid abbreviation used in lipidomics (e.g., 'DHA', 'EPA', 'PC 34:1', 'PC 16:0/18:1', 'SM 34:1;O2'). Class names like 'ceramide' will not match — use exact abbreviations only. Sphingolipid sum-composition abbreviations must include the ';O2'-style hydroxyl-count suffix."
+        },
+        "output_item": {
+          "type": "string",
+          "description": "Type of output. Options: 'all', 'name', 'formula', 'exactmass', 'smiles', 'classification'.",
+          "default": "all"
+        }
+      },
+      "required": [
+        "input_value"
+      ]
+    },
+    "fields": {
+      "context": "compound",
+      "input_item": "abbrev"
+    },
+    "type": "LipidMapsTool",
+    "test_examples": [
+      {
+        "input_value": "DHA"
+      },
+      {
+        "input_value": "EPA",
+        "output_item": "all"
+      },
+      {
+        "input_value": "PC 16:0/18:1"
+      },
+      {
+        "input_value": "SM 34:1;O2"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "lm_id": {"type": ["string", "null"]},
+            "name": {"type": ["string", "null"]},
+            "formula": {"type": ["string", "null"]},
+            "exactmass": {"type": ["string", "null"]},
+            "smiles": {"type": ["string", "null"]},
+            "core": {"type": ["string", "null"]},
+            "abbrev": {"type": ["string", "null"]}
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lm_id": {"type": ["string", "null"]},
+              "name": {"type": ["string", "null"]},
+              "formula": {"type": ["string", "null"]},
+              "abbrev": {"type": ["string", "null"]}
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "LipidMaps_search_by_formula",
+    "description": "Search lipids by molecular formula in LIPID MAPS Structure Database. Returns all lipids matching the given formula. Example: 'C22H32O2' finds DHA and related C22:6 fatty acids.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "input_value": {
+          "type": "string",
+          "description": "Molecular formula (e.g., 'C22H32O2', 'C16H32O2'). Standard chemical formula format."
+        },
+        "output_item": {
+          "type": "string",
+          "description": "Type of output. Options: 'all', 'name', 'smiles', 'classification'.",
+          "default": "all"
+        }
+      },
+      "required": [
+        "input_value"
+      ]
+    },
+    "fields": {
+      "context": "compound",
+      "input_item": "formula"
+    },
+    "type": "LipidMapsTool",
+    "test_examples": [
+      {
+        "input_value": "C16H32O2"
+      },
+      {
+        "input_value": "C22H32O2",
+        "output_item": "all"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "lm_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "formula": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exactmass": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "smiles": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "core": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "main_class": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sub_class": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "input": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "regno": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sys_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abbrev": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inchi": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inchi_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chebi_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pubchem_cid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "LipidMaps_get_compound_by_xref",
+    "description": "Look up a LIPID MAPS Structure Database (LMSD) record from an external cross-reference identifier, resolving any common metabolite/lipid ID to its LIPID MAPS lm_id plus all of its cross-references. Set xref_type to the namespace of input_value: 'kegg_id', 'hmdb_id', 'chebi_id', 'pubchem_cid', 'inchi_key', or 'abbrev_chains' (a structure-resolved lipid abbreviation such as 'PC(16:0/18:1)'). Examples: kegg_id 'C00157' -> lm_id LMGP01010000 (PC), hmdb_id HMDB00564, chebi_id 57643; hmdb_id 'HMDB0000564' -> lm_id LMGP01010564 (PC 16:0/16:0); abbrev_chains 'PC(16:0/18:1)' -> lm_id LMGP01010005. Sends a browser User-Agent so the JSON route passes Cloudflare.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "input_value": {
+          "type": "string",
+          "description": "The cross-reference identifier value to resolve, e.g. 'C00157' (KEGG), 'HMDB0000564' (HMDB), '57643' (ChEBI), or 'PC(16:0/18:1)' (abbrev_chains)."
+        },
+        "xref_type": {
+          "type": "string",
+          "description": "Namespace of input_value. One of: 'kegg_id', 'hmdb_id', 'chebi_id', 'pubchem_cid', 'inchi_key', 'abbrev_chains'.",
+          "enum": ["kegg_id", "hmdb_id", "chebi_id", "pubchem_cid", "inchi_key", "abbrev_chains"],
+          "default": "kegg_id"
+        },
+        "output_item": {
+          "type": "string",
+          "description": "Type of output. Options: 'all' (complete record with all cross-refs), 'name', 'formula', 'exactmass', 'smiles', 'classification'.",
+          "default": "all"
+        }
+      },
+      "required": ["input_value"]
+    },
+    "fields": {
+      "context": "compound",
+      "input_item": "kegg_id"
+    },
+    "type": "LipidMapsTool",
+    "test_examples": [
+      {
+        "input_value": "C00157",
+        "xref_type": "kegg_id"
+      },
+      {
+        "input_value": "HMDB0000564",
+        "xref_type": "hmdb_id"
+      },
+      {
+        "input_value": "PC(16:0/18:1)",
+        "xref_type": "abbrev_chains"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": [
+            "object",
+            "array"
+          ],
+          "description": "LMSD record (single object) or list of records with lm_id, name, formula, exactmass, and cross-references (kegg_id, hmdb_id, chebi_id, pubchem_cid)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

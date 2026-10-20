@@ -1,0 +1,6 @@
+torch>=2.1
+borzoi-pytorch>=0.4.4,<0.5
+fastmcp>=3.4.5,<4
+# borzoi-pytorch 0.4.4 declares transformers<4.51. Keep the deployment resolver
+# inside that supported range instead of relying on a warmed incompatible mix.
+transformers>=4.46,<4.51

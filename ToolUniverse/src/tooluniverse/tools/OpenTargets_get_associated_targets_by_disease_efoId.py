@@ -1,0 +1,61 @@
+"""
+OpenTargets_get_associated_targets_by_disease_efoId
+
+Find targets associated with a specific disease or phenotype based on efoId. Results are PAGINATE...
+"""
+
+from typing import Any, Optional, Callable
+from ._shared_client import get_shared_client
+
+
+def OpenTargets_get_associated_targets_by_disease_efoId(
+    efoId: str,
+    size: Optional[int] = 50,
+    index: Optional[int] = None,
+    *,
+    stream_callback: Optional[Callable[[str], None]] = None,
+    use_cache: bool = False,
+    validate: bool = True,
+) -> dict[str, Any]:
+    """
+    Find targets associated with a specific disease or phenotype based on efoId. Results are PAGINATE...
+
+    Parameters
+    ----------
+    efoId : str
+        The efoId of a disease or phenotype.
+    size : int
+        Number of top-scored associated targets to return (default 50). A disease can...
+    index : int
+        Zero-based page index for paginating beyond the first `size` targets (default...
+    stream_callback : Callable, optional
+        Callback for streaming output
+    use_cache : bool, default False
+        Enable caching
+    validate : bool, default True
+        Validate parameters
+
+    Returns
+    -------
+    dict[str, Any]
+    """
+    # Handle mutable defaults to avoid B006 linting error
+
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {
+        k: v
+        for k, v in {"efoId": efoId, "size": size, "index": index}.items()
+        if v is not None
+    }
+    return get_shared_client().run_one_function(
+        {
+            "name": "OpenTargets_get_associated_targets_by_disease_efoId",
+            "arguments": _args,
+        },
+        stream_callback=stream_callback,
+        use_cache=use_cache,
+        validate=validate,
+    )
+
+
+__all__ = ["OpenTargets_get_associated_targets_by_disease_efoId"]

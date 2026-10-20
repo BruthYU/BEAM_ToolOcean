@@ -1,0 +1,228 @@
+[
+  {
+    "name": "IMGT_get_sequence",
+    "description": "Get immunoglobulin/T cell receptor sequence from IMGT by accession number. IMGT is the reference for IG/TR/MHC gene sequences. Returns sequence in FASTA or EMBL format. Uses EBI DBFetch. No authentication required.",
+    "type": "IMGTTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_sequence",
+          "default": "get_sequence"
+        },
+        "accession": {
+          "type": "string",
+          "description": "IMGT/LIGM-DB accession or EMBL/GenBank accession"
+        },
+        "format": {
+          "type": "string",
+          "description": "Output format: fasta or embl (default: fasta)",
+          "enum": [
+            "fasta",
+            "embl"
+          ],
+          "default": "fasta"
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "accession": "M12950",
+        "format": "fasta"
+      }
+    ],
+    "fields": {
+      "operation": "get_sequence"
+    }
+  },
+  {
+    "name": "IMGT_get_germline_gene_fasta",
+    "description": "Retrieve IMGT germline immunoglobulin (IG) / T-cell-receptor (TR) gene reference sequences in FASTA from IMGT/GENE-DB for a given gene type and species. Returns labeled FASTA records (V/D/J-REGION) e.g. '>AB019441|IGHV(II)-1-1*01|Homo sapiens|...'. Use for antibody/TCR repertoire reference sets and germline alignment. gene_type is an IG/TR locus (IGHV, IGHD, IGHJ, IGKV, IGLV, TRAV, TRBV, TRBD, TRBJ, ...). No authentication required.",
+    "type": "IMGTTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_germline_fasta",
+          "default": "get_germline_fasta"
+        },
+        "gene_type": {
+          "type": "string",
+          "description": "IG/TR gene type/locus: IGHV, IGHD, IGHJ, IGKV, IGLV, TRAV, TRBV, TRBD, TRBJ, etc. (alias: gene, query)"
+        },
+        "gene": {
+          "type": "string",
+          "description": "Alias for gene_type."
+        },
+        "species": {
+          "type": "string",
+          "description": "Species name (default: Homo sapiens). Examples: 'Mus musculus', 'Homo sapiens'.",
+          "default": "Homo sapiens"
+        },
+        "label": {
+          "type": "string",
+          "description": "IMGT GENElect label controlling the region set (default '7.2' = all V/D/J-REGION reference alleles).",
+          "default": "7.2"
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "gene_type": {
+              "type": "string"
+            },
+            "species": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            },
+            "fasta": {
+              "type": "string"
+            },
+            "record_count": {
+              "type": "integer"
+            },
+            "first_records": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "gene_type",
+            "fasta",
+            "record_count"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "gene_type": "IGHV",
+        "species": "Homo sapiens"
+      },
+      {
+        "gene_type": "TRBV",
+        "species": "Homo sapiens"
+      }
+    ],
+    "fields": {
+      "operation": "get_germline_fasta"
+    }
+  },
+  {
+    "name": "IMGT_search_genes",
+    "description": "Search IMGT for immunoglobulin/TCR germline genes. Filter by gene type (IGHV, IGKV, TRAV, etc.) and species. Returns search URLs and gene type information for navigating IMGT GENE-DB.",
+    "type": "IMGTTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "search_genes",
+          "default": "search_genes"
+        },
+        "query": {
+          "type": "string",
+          "description": "Search query (gene name)"
+        },
+        "gene_type": {
+          "type": "string",
+          "description": "Gene type: IGHV, IGHD, IGHJ, IGKV, IGLV, TRAV, TRBV, etc."
+        },
+        "species": {
+          "type": "string",
+          "description": "Species name (default: Homo sapiens)",
+          "default": "Homo sapiens"
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "gene_type": "IGHV",
+        "species": "Homo sapiens"
+      }
+    ],
+    "fields": {
+      "operation": "search_genes"
+    }
+  },
+  {
+    "name": "IMGT_get_gene_info",
+    "description": "Get information about IMGT databases, gene nomenclature, and analysis tools. Returns descriptions of IMGT resources (LIGM-DB, GENE-DB, V-QUEST) and gene naming conventions. Good starting point for immunogenetics research.",
+    "type": "IMGTTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_gene_info",
+          "default": "get_gene_info"
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    },
+    "test_examples": [
+      {}
+    ],
+    "fields": {
+      "operation": "get_gene_info"
+    }
+  }
+]

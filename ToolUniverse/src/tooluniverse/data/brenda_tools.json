@@ -1,0 +1,433 @@
+[
+  {
+    "name": "BRENDA_get_km",
+    "description": "Get Km (Michaelis constant) values from BRENDA enzyme database. Km indicates substrate affinity - lower Km means higher affinity. Returns values in mM with organism and substrate information. Requires free BRENDA account (register at brenda-enzymes.org/register.php).",
+    "type": "BRENDATool",
+    "required_api_keys": [
+      "BRENDA_EMAIL",
+      "BRENDA_PASSWORD"
+    ],
+    "api_key_info": {
+      "BRENDA_EMAIL": {
+        "domain": "Drugs & Chemistry",
+        "type": "secret",
+        "register_url": "https://www.brenda-enzymes.org/register.php",
+        "purpose": "BRENDA account email \u2014 retrieves enzyme kinetics, substrates, and parameters.",
+        "without": "BRENDA tools are blocked without an account (paired with the password)."
+      },
+      "BRENDA_PASSWORD": {
+        "domain": "Drugs & Chemistry",
+        "type": "secret",
+        "register_url": "https://www.brenda-enzymes.org/register.php",
+        "purpose": "BRENDA account password \u2014 authenticates the enzyme-data SOAP API.",
+        "without": "Required together with the BRENDA email."
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_km",
+          "description": "Operation type (fixed: get_km)",
+          "default": "get_km"
+        },
+        "ec_number": {
+          "type": "string",
+          "description": "EC number (e.g., 1.1.1.1 for alcohol dehydrogenase, 2.7.1.1 for hexokinase)"
+        },
+        "organism": {
+          "type": "string",
+          "description": "Optional organism filter (e.g., 'Homo sapiens', 'Escherichia coli')"
+        },
+        "enzyme_id": {
+          "type": "string",
+          "description": "Alias for ec_number. Enzyme identifier in EC notation (e.g., 1.1.1.1)."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "ec_number": {
+              "type": "string"
+            },
+            "km_values": {
+              "type": "array"
+            },
+            "count": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "ec_number": "1.1.1.1"
+      }
+    ],
+    "fields": {
+      "operation": "get_km"
+    }
+  },
+  {
+    "name": "BRENDA_get_kcat",
+    "description": "Get kcat (turnover number) values from BRENDA enzyme database. kcat is the maximum number of substrate molecules converted to product per enzyme per second. Returns values in 1/s. Requires free BRENDA account.",
+    "type": "BRENDATool",
+    "required_api_keys": [
+      "BRENDA_EMAIL",
+      "BRENDA_PASSWORD"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_kcat",
+          "description": "Operation type (fixed: get_kcat)",
+          "default": "get_kcat"
+        },
+        "ec_number": {
+          "type": "string",
+          "description": "EC number"
+        },
+        "organism": {
+          "type": "string",
+          "description": "Optional organism filter"
+        },
+        "enzyme_id": {
+          "type": "string",
+          "description": "Alias for ec_number. Enzyme identifier in EC notation (e.g., 1.1.1.1)."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "ec_number": {
+              "type": "string"
+            },
+            "kcat_values": {
+              "type": "array"
+            },
+            "count": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "ec_number": "1.1.1.1"
+      }
+    ],
+    "fields": {
+      "operation": "get_kcat"
+    }
+  },
+  {
+    "name": "BRENDA_get_inhibitors",
+    "description": "Get enzyme inhibitor data from BRENDA. Returns inhibitor names and Ki (inhibition constant) values in mM with organism information. Lower Ki means more potent inhibition. Requires free BRENDA account (register at brenda-enzymes.org/register.php).",
+    "type": "BRENDATool",
+    "required_api_keys": [
+      "BRENDA_EMAIL",
+      "BRENDA_PASSWORD"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_inhibitors",
+          "description": "Operation type (fixed: get_inhibitors)",
+          "default": "get_inhibitors"
+        },
+        "ec_number": {
+          "type": "string",
+          "description": "EC number"
+        },
+        "organism": {
+          "type": "string",
+          "description": "Optional organism filter"
+        },
+        "enzyme_id": {
+          "type": "string",
+          "description": "Alias for ec_number. Enzyme identifier in EC notation (e.g., 1.1.1.1)."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "inhibitors": {
+              "type": "array"
+            },
+            "count": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "ec_number": "1.1.1.1"
+      }
+    ],
+    "fields": {
+      "operation": "get_inhibitors"
+    }
+  },
+  {
+    "name": "BRENDA_get_enzyme_info",
+    "description": "Get general enzyme information from BRENDA by EC number. Returns enzyme name, systematic name, and catalyzed reaction. Requires free BRENDA account (register at brenda-enzymes.org/register.php).",
+    "type": "BRENDATool",
+    "required_api_keys": [
+      "BRENDA_EMAIL",
+      "BRENDA_PASSWORD"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_enzyme_info",
+          "description": "Operation type (fixed: get_enzyme_info)",
+          "default": "get_enzyme_info"
+        },
+        "ec_number": {
+          "type": "string",
+          "description": "EC number (e.g., 1.1.1.1)"
+        },
+        "enzyme_id": {
+          "type": "string",
+          "description": "Alias for ec_number. Enzyme identifier in EC notation (e.g., 1.1.1.1)."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "ec_number": {
+              "type": "string"
+            },
+            "info": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "ec_number": "1.1.1.1"
+      }
+    ],
+    "fields": {
+      "operation": "get_enzyme_info"
+    }
+  },
+  {
+    "name": "BRENDA_get_enzyme_kinetics",
+    "description": "Get comprehensive enzyme kinetic parameters WITHOUT requiring BRENDA credentials. Retrieves enzyme identity (name, catalytic activity, alternative names) from ExPASy ENZYME and kinetic parameters (Km, kcat, Ki, Vmax, kcat/Km) from SABIO-RK. If BRENDA credentials are set (BRENDA_EMAIL, BRENDA_PASSWORD), additionally fetches optimal pH, optimal temperature, and specific activity from BRENDA. Accepts EC number (e.g., 1.1.1.1) or enzyme name (e.g., alcohol dehydrogenase). Returns aggregated summary statistics across all reported values plus individual measurements with substrate specificity and organism information.",
+    "type": "BRENDATool",
+    "optional_api_keys": [
+      "BRENDA_EMAIL",
+      "BRENDA_PASSWORD"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "const": "get_enzyme_kinetics",
+          "description": "Operation type (fixed: get_enzyme_kinetics)",
+          "default": "get_enzyme_kinetics"
+        },
+        "ec_number": {
+          "type": "string",
+          "description": "EC number (e.g., 1.1.1.1 for alcohol dehydrogenase, 2.7.1.1 for hexokinase, 3.4.21.5 for thrombin)"
+        },
+        "enzyme_name": {
+          "type": "string",
+          "description": "Enzyme common name. Will be resolved to EC number via UniProt. Examples: alcohol dehydrogenase, hexokinase, lactate dehydrogenase, thrombin"
+        },
+        "organism": {
+          "type": "string",
+          "description": "Optional organism filter (e.g., Homo sapiens, Escherichia coli, Saccharomyces cerevisiae)"
+        },
+        "enzyme_id": {
+          "type": "string",
+          "description": "Alias for ec_number. Enzyme identifier in EC notation."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of SABIO-RK kinetic law entries to retrieve (default 20)"
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "ec_number": {
+          "type": "string"
+        },
+        "enzyme_name": {
+          "type": "string"
+        },
+        "alternative_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "catalytic_activity": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kinetic_parameters": {
+          "type": "array",
+          "description": "Individual kinetic law entries from SABIO-RK; each has 'parameters' (Km/kcat/Ki/Vmax/kcat-Km values with the substrate they refer to) and 'conditions' (pH, temperature)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "parameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "description": "Parameter type (Km, kcat, Ki, Vmax, kcat/Km)"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "species": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Compound the constant refers to (e.g. the substrate for a Km), if SABIO-RK names one"
+                    },
+                    "value": {
+                      "type": "number",
+                      "description": "Value as reported, in 'unit'"
+                    },
+                    "unit": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "value_si": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "SABIO-RK's SI-normalised value, in 'unit_si' (Km in M, kcat in s^(-1))"
+                    },
+                    "unit_si": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "end_value": {
+                      "type": "number",
+                      "description": "Upper end when a range is reported"
+                    },
+                    "standard_deviation": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Assay conditions: ph, temperature, temperature_unit (when reported)"
+              }
+            }
+          }
+        },
+        "parameter_summary": {
+          "type": "object",
+          "description": "Per parameter type (Km, kcat, Ki, Vmax, kcat/Km): count, min, max, median of the SI-normalised values in the returned entries, with their unit; values_in_other_units counts values left out because their unit differs"
+        },
+        "sabiork_total_entries": {
+          "type": "integer"
+        },
+        "ph_optima": {
+          "type": "array",
+          "description": "Optimal pH values (BRENDA only, requires credentials)"
+        },
+        "temperature_optima": {
+          "type": "array",
+          "description": "Optimal temperature values (BRENDA only, requires credentials)"
+        },
+        "specific_activity": {
+          "type": "array",
+          "description": "Specific activity values (BRENDA only, requires credentials)"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "ec_number": "1.1.1.1"
+      },
+      {
+        "enzyme_name": "hexokinase"
+      },
+      {
+        "ec_number": "2.7.1.1",
+        "organism": "Homo sapiens",
+        "limit": 10
+      }
+    ],
+    "fields": {
+      "operation": "get_enzyme_kinetics"
+    }
+  }
+]

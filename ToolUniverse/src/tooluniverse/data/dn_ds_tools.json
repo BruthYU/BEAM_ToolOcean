@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Sequence_dn_ds",
+    "type": "DnDsTool",
+    "description": "Compute dN/dS (Ka/Ks) between two coding sequences via the Nei-Gojobori (1986) estimator with Jukes-Cantor correction — the standard test for selection: dN/dS > 1 = positive/diversifying, << 1 = purifying, ~ 1 = near-neutral. Give two in-frame, codon-aligned coding sequences inline ('seq1'/'seq2') or as single-record FASTA files. Returns dN, dS, the ratio, per-site counts, and an interpretation. Pure Python, no API key. Works for any organisms/genes.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "seq1": {"type": ["string", "null"], "description": "First coding sequence (in-frame, codon-aligned to seq2). DNA/RNA letters."},
+        "seq2": {"type": ["string", "null"], "description": "Second coding sequence (same length/frame as seq1)."},
+        "fasta1_path": {"type": ["string", "null"], "description": "Alternative to seq1: path to a single-record FASTA"},
+        "fasta2_path": {"type": ["string", "null"], "description": "Alternative to seq2: path to a single-record FASTA"}
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "Nei-Gojobori (1986) dN/dS estimate between two coding sequences.",
+      "properties": {
+        "dN_dS": {"type": "number", "description": "dN/dS (Ka/Ks) ratio."},
+        "dN": {"type": "number", "description": "Nonsynonymous substitution rate."},
+        "dS": {"type": "number", "description": "Synonymous substitution rate."},
+        "pN": {"type": "number", "description": "Proportion of nonsynonymous differences."},
+        "pS": {"type": "number", "description": "Proportion of synonymous differences."},
+        "N_sites": {"type": "number", "description": "Number of nonsynonymous sites."},
+        "S_sites": {"type": "number", "description": "Number of synonymous sites."},
+        "Nd": {"type": "number", "description": "Observed number of nonsynonymous differences."},
+        "Sd": {"type": "number", "description": "Observed number of synonymous differences."},
+        "codons_compared": {"type": "integer", "description": "Number of codons compared."},
+        "interpretation": {"type": "string", "description": "Human-readable interpretation of the selection signal."}
+      },
+      "required": ["dN_dS", "dN", "dS", "codons_compared"]
+    },
+    "test_examples": [
+      {"seq1": "ATGGCCAAATTTGAAGATCTGAGCACCGTGCGTGGC", "seq2": "ATGGCCAAGTTCGAAAATCTGAGCACCGTACGTGGC"}
+    ]
+  }
+]

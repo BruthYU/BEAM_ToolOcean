@@ -1,0 +1,1090 @@
+# alliance_genome_tool.py
+"""
+Alliance of Genome Resources REST API tool for ToolUniverse.
+
+The Alliance of Genome Resources (AGR) integrates data from 7 model organism
+databases (SGD, FlyBase, WormBase, ZFIN, RGD, MGI, Xenbase) plus human data.
+It provides unified access to gene information, disease associations,
+phenotypes, and cross-species search across all model organisms.
+
+API: https://www.alliancegenome.org/api
+No authentication required.
+"""
+
+import re
+from html import unescape
+from typing import Dict, Any
+
+import requests
+
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+ALLIANCE_BASE = "https://www.alliancegenome.org/api"
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text):
+    """Strip inline HTML markup from an Alliance text field.
+
+    Alliance phenotype/description fields embed markup (e.g. italicised gene
+    symbols: 'anatomical structure <i>acta1a</i> expression decreased amount')
+    that leaks literal <i>...</i> tags into the JSON a caller renders. Remove the
+    tags and unescape entities so downstream consumers get clean plain text."""
+    if not isinstance(text, str):
+        return text
+    # Unescape entities FIRST so an entity-encoded tag ('&lt;i&gt;') becomes a
+    # real tag and is then removed too, not just literal '<i>' markup.
+    return _HTML_TAG_RE.sub("", unescape(text)).strip()
+
+
+def _display(value):
+    """Alliance wraps names as {"displayText": ...}; return the text (or None)."""
+    if isinstance(value, dict):
+        return value.get("displayText") or value.get("name")
+    return value
+
+
+def _allele_summary(record):
+    """Flatten one /gene/{id}/alleles record.
+
+    The API nests the allele under ``allele`` (``primaryExternalId`` and
+    ``alleleSymbol.displayText`` for curated alleles such as zebrafish; only a
+    ``curie`` for the variant-only records returned for fly, mouse, rat, worm, yeast
+    and human) and lists variants under ``variantList``. The old code read ``id``,
+    ``symbol`` and ``symbolText`` from the top level, so every allele came back with
+    null identifiers.
+    """
+    allele = record.get("allele") or {}
+    symbol = _display(allele.get("alleleSymbol")) or record.get("symbol")
+    variants = []
+    for v in (record.get("variantList") or [])[:3]:
+        locations = v.get("curatedVariantGenomicLocations") or []
+        loc = locations[0] if locations else {}
+        consequence = loc.get("mostSevereConsequence")
+        variants.append(
+            {
+                "id": v.get("id") or v.get("primaryExternalId"),
+                "name": loc.get("hgvs"),
+                "type": _display(v.get("variantType")),
+                "location": {
+                    "chromosome": _display(
+                        loc.get("variantGenomicLocationAssociationObject")
+                    ),
+                    "start": loc.get("start"),
+                    "end": loc.get("end"),
+                    "hgvs": loc.get("hgvs"),
+                }
+                if loc
+                else None,
+                "most_severe_consequence": _display(consequence),
+            }
+        )
+    return {
+        "id": allele.get("primaryExternalId")
+        or allele.get("curie")
+        or record.get("id"),
+        "symbol": symbol,
+        "symbol_text": symbol or record.get("symbolText"),
+        "synonyms": [
+            _display(x) for x in allele.get("alleleSynonyms") or [] if _display(x)
+        ],
+        "category": record.get("category"),
+        "alteration_type": record.get("alterationType"),
+        "has_disease": record.get("hasDisease"),
+        "has_phenotype": record.get("hasPhenotype"),
+        "variants": variants,
+    }
+
+
+@register_tool("AllianceGenomeTool")
+class AllianceGenomeTool(BaseTool):
+    """
+    Tool for querying the Alliance of Genome Resources API.
+
+    Provides cross-species gene information across 7 model organisms
+    (yeast, fly, worm, zebrafish, rat, mouse, frog) plus human.
+    Supports gene detail, disease associations, phenotypes, and search.
+
+    No authentication required.
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        self.timeout = tool_config.get("timeout", 30)
+        self.endpoint_type = tool_config.get("fields", {}).get(
+            "endpoint_type", "gene_detail"
+        )
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the Alliance of Genome Resources API call."""
+        try:
+            return self._query(arguments)
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "error": f"Alliance API request timed out after {self.timeout}s",
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "error",
+                "error": "Failed to connect to Alliance API. Check network connectivity.",
+            }
+        except requests.exceptions.HTTPError as e:
+            return {
+                "status": "error",
+                "error": f"Alliance API HTTP error: {e.response.status_code}",
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Unexpected error querying Alliance API: {str(e)}",
+            }
+
+    def _query(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Route to the appropriate Alliance endpoint."""
+        endpoint_type = self.endpoint_type
+
+        if endpoint_type == "gene_detail":
+            return self._get_gene_detail(arguments)
+        elif endpoint_type == "search_genes":
+            return self._search_genes(arguments)
+        elif endpoint_type == "gene_phenotypes":
+            return self._get_gene_phenotypes(arguments)
+        elif endpoint_type == "disease_genes":
+            return self._get_disease_genes(arguments)
+        elif endpoint_type == "disease_detail":
+            return self._get_disease_detail(arguments)
+        elif endpoint_type == "gene_orthologs":
+            return self._get_gene_orthologs(arguments)
+        elif endpoint_type == "gene_alleles":
+            return self._get_gene_alleles(arguments)
+        elif endpoint_type == "gene_expression_summary":
+            return self._get_gene_expression_summary(arguments)
+        elif endpoint_type == "gene_interactions":
+            return self._get_gene_interactions(arguments)
+        elif endpoint_type == "gene_disease_models":
+            return self._get_gene_disease_models(arguments)
+        elif endpoint_type == "gene_orthologs_paralogs":
+            return self._get_gene_orthologs_paralogs(arguments)
+        elif endpoint_type == "gene_molecular_interactions":
+            return self._get_gene_molecular_interactions(arguments)
+        elif endpoint_type == "gene_alleles_and_models":
+            return self._get_gene_alleles_and_models(arguments)
+        elif endpoint_type == "allele_detail":
+            return self._get_allele_detail(arguments)
+        elif endpoint_type == "zfin_search":
+            return self._search_genes_by_species(
+                arguments, species_prefix="ZFIN:", species_name="Danio rerio"
+            )
+        elif endpoint_type == "mgi_search":
+            return self._search_genes_by_species(
+                arguments, species_prefix="MGI:", species_name="Mus musculus"
+            )
+        elif endpoint_type == "flybase_search":
+            return self._search_genes_by_species(
+                arguments, species_prefix="FB:", species_name="Drosophila melanogaster"
+            )
+        elif endpoint_type == "wormbase_search":
+            return self._search_genes_by_species(
+                arguments, species_prefix="WB:", species_name="Caenorhabditis elegans"
+            )
+        else:
+            return {
+                "status": "error",
+                "error": f"Unknown endpoint type: {endpoint_type}",
+            }
+
+    @staticmethod
+    def _normalize_gene_id(gene_id: str) -> str:
+        """Auto-add required namespace prefix if missing."""
+        if not gene_id:
+            return gene_id
+        # Already has a known prefix
+        for prefix in (
+            "FB:",
+            "ZFIN:",
+            "MGI:",
+            "WB:",
+            "RGD:",
+            "SGD:",
+            "HGNC:",
+            "Xenbase:",
+        ):
+            if gene_id.startswith(prefix):
+                return gene_id
+        # FlyBase bare IDs (FBgn, FBtr, FBpp, FBgn...)
+        if (
+            gene_id.startswith("FBgn")
+            or gene_id.startswith("FBtr")
+            or gene_id.startswith("FBpp")
+        ):
+            return f"FB:{gene_id}"
+        # ZFIN bare IDs (ZDB-GENE-...)
+        if gene_id.startswith("ZDB-"):
+            return f"ZFIN:{gene_id}"
+        # WormBase bare IDs (WBGene...)
+        if gene_id.startswith("WBGene"):
+            return f"WB:{gene_id}"
+        # MGI bare numeric IDs (e.g. "98834")
+        if gene_id.isdigit() and len(gene_id) >= 5:
+            return f"MGI:{gene_id}"
+        return gene_id
+
+    def _get_gene_detail(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get detailed gene information from Alliance."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {
+                "status": "error",
+                "error": "gene_id parameter is required (e.g., 'HGNC:6081', 'MGI:98834', 'FB:FBgn0003996')",
+            }
+
+        url = f"{ALLIANCE_BASE}/gene/{gene_id}"
+        response = requests.get(
+            url, headers={"Accept": "application/json"}, timeout=self.timeout
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        # The Alliance API nests the gene record under a top-level "gene" key.
+        # Fall back to the payload itself for resilience against schema drift.
+        data = payload.get("gene") or payload
+
+        def _text(obj):
+            """Alliance wraps labels as {formatText, displayText}; unwrap them."""
+            if isinstance(obj, dict):
+                return obj.get("displayText") or obj.get("formatText")
+            return obj
+
+        taxon = data.get("taxon") or {}
+        taxon_species = taxon.get("species") or {}
+        # genomic location moved to geneGenomicLocationAssociations
+        locations = (
+            data.get("geneGenomicLocationAssociations")
+            or data.get("genomeLocations")
+            or []
+        )
+        loc_info = locations[0] if locations else {}
+
+        synonyms = [
+            _text(s) for s in (data.get("geneSynonyms") or data.get("synonyms") or [])
+        ]
+
+        # cross-references: new schema is a flat list of {referencedCurie, displayName}
+        cross_refs = data.get("crossReferences")
+        if cross_refs is None:
+            cross_refs = (data.get("crossReferenceMap") or {}).get("other", [])
+        xref_list = [
+            {
+                "name": x.get("displayName") or x.get("name"),
+                "curie": x.get("referencedCurie"),
+                "url": x.get("crossRefCompleteUrl"),
+            }
+            for x in cross_refs[:10]
+        ]
+
+        gene_type = data.get("geneType") or data.get("soTerm") or {}
+
+        return {
+            "status": "success",
+            "data": {
+                "id": data.get("primaryExternalId") or data.get("id"),
+                "symbol": _text(data.get("geneSymbol")) or data.get("symbol"),
+                "name": _text(data.get("geneFullName")) or data.get("name"),
+                "species": {
+                    "name": taxon.get("name") or taxon_species.get("fullName"),
+                    "short_name": taxon_species.get("displayName")
+                    or taxon_species.get("abbreviation"),
+                    "taxon_id": taxon.get("curie") or taxon.get("taxonId"),
+                    "data_provider": (data.get("dataProvider") or {}).get(
+                        "abbreviation"
+                    )
+                    if isinstance(data.get("dataProvider"), dict)
+                    else data.get("dataProvider"),
+                },
+                "gene_synopsis": data.get("geneSynopsis"),
+                "automated_gene_synopsis": data.get("automatedGeneSynopsis"),
+                "synonyms": synonyms,
+                "so_term": gene_type.get("name"),
+                "genomic_location": {
+                    "chromosome": loc_info.get("chromosome"),
+                    "start": loc_info.get("start"),
+                    "end": loc_info.get("end"),
+                    "assembly": loc_info.get("assembly"),
+                    "strand": loc_info.get("strand"),
+                },
+                "cross_references": xref_list,
+            },
+            "metadata": {
+                "query_gene_id": gene_id,
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _search_genes(
+        self,
+        arguments: Dict[str, Any],
+        species_prefix: str = "",
+        species_name: str = "",
+    ) -> Dict[str, Any]:
+        """Search genes via Alliance autocomplete, optionally filtered to one species."""
+        query = arguments.get("query", "")
+        if not query:
+            return {"status": "error", "error": "query parameter is required"}
+
+        limit = int(arguments.get("limit", 10))
+        # When filtering by species, fetch more candidates so client-side filtering
+        # still returns enough results (Alliance has no server-side species filter).
+        # The autocomplete endpoint no longer honours a `category=gene` query
+        # param (it returns zero results) and mixes gene/disease/dataset hits,
+        # so fetch a buffer unfiltered and keep gene hits client-side. The gene
+        # id is now in `curie` (was `primaryKey`).
+        _SPECIES_FETCH_MULTIPLIER = 5
+        fetch_limit = min(max(limit * _SPECIES_FETCH_MULTIPLIER, 25), 100)
+        params = {"q": query, "limit": fetch_limit}
+
+        response = requests.get(
+            f"{ALLIANCE_BASE}/search_autocomplete",
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        raw_results = response.json().get("results", [])
+
+        # Keep only gene hits (autocomplete also returns diseases, GO terms,
+        # datasets, …).
+        gene_results = [
+            r for r in raw_results if r.get("category") == "gene_search_result"
+        ]
+
+        if species_prefix:
+            gene_results = [
+                r
+                for r in gene_results
+                if str(r.get("curie", "")).startswith(species_prefix)
+            ]
+
+        genes = [
+            {
+                "symbol": r.get("symbol"),
+                "name": r.get("name"),
+                "gene_id": r.get("curie"),
+                "category": "gene",
+            }
+            for r in gene_results[:limit]
+        ]
+
+        metadata: Dict[str, Any] = {
+            "total_results": len(genes),
+            "query": query,
+            "source": "Alliance of Genome Resources",
+        }
+        if species_name:
+            metadata["species"] = species_name
+
+        # Alliance's autocomplete matches gene symbols/synonyms, not descriptive
+        # gene *names*: e.g. "insulin" returns GO terms and diseases but no gene,
+        # while the symbol "INS" returns the genes. When no gene matched but other
+        # entity types did, say so instead of an indistinguishable empty result.
+        if not genes and raw_results:
+            other = sorted(
+                {
+                    str(r.get("category", "")).replace("_search_result", "")
+                    for r in raw_results
+                }
+            )
+            metadata["note"] = (
+                f"No gene matched '{query}'. The Alliance autocomplete matches gene "
+                f"symbols/synonyms rather than descriptive names, and it instead "
+                f"matched: {', '.join(c for c in other if c)}. Try the official gene "
+                "symbol (e.g. 'INS' for insulin)."
+            )
+
+        return {"status": "success", "data": genes, "metadata": metadata}
+
+    def _search_genes_by_species(
+        self, arguments: Dict[str, Any], species_prefix: str, species_name: str
+    ) -> Dict[str, Any]:
+        return self._search_genes(
+            arguments, species_prefix=species_prefix, species_name=species_name
+        )
+
+    def _get_gene_phenotypes(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get phenotype annotations for a gene."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = arguments.get("limit", 20)
+        page = arguments.get("page", 1)
+        url = f"{ALLIANCE_BASE}/gene/{gene_id}/phenotypes"
+        params = {"limit": min(int(limit), 100), "page": int(page)}
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        total = data.get("total", 0)
+        results = data.get("results", [])
+        phenotypes = []
+        for r in results:
+            subject = r.get("subject", {})
+            # subject.geneSymbol is now a {formatText, displayText} object, not
+            # a plain `symbol` string — unwrap it (was returning null).
+            gene_symbol_obj = subject.get("geneSymbol")
+            gene_symbol = (
+                gene_symbol_obj.get("displayText") or gene_symbol_obj.get("formatText")
+                if isinstance(gene_symbol_obj, dict)
+                else subject.get("symbol")
+            )
+            phenotypes.append(
+                {
+                    "gene_symbol": gene_symbol,
+                    "gene_id": subject.get("primaryExternalId"),
+                    "phenotype_statement": _strip_html(r.get("phenotypeStatement")),
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": phenotypes,
+            "metadata": {
+                "total_results": total,
+                "returned": len(phenotypes),
+                "query_gene_id": gene_id,
+                "page": int(page),
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_disease_genes(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get genes associated with a disease by Disease Ontology ID."""
+        disease_id = arguments.get("disease_id", "")
+        if not disease_id:
+            return {
+                "status": "error",
+                "error": "disease_id parameter is required (e.g., 'DOID:162' for cancer)",
+            }
+
+        limit = arguments.get("limit", 20)
+        page = arguments.get("page", 1)
+        url = f"{ALLIANCE_BASE}/disease/{disease_id}/genes"
+        params = {"limit": min(int(limit), 100), "page": int(page)}
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        total = data.get("total", 0)
+        results = data.get("results", [])
+        genes = []
+        for r in results:
+            subject = r.get("subject", {})
+            species = subject.get("taxon", {})
+            disease_obj = r.get("object", {})
+            genes.append(
+                {
+                    "gene_symbol": subject.get("symbol")
+                    or subject.get("geneSymbol", {}).get("displayText"),
+                    "gene_id": subject.get("primaryExternalId") or subject.get("curie"),
+                    "species": species.get("curie"),
+                    "disease_name": disease_obj.get("name"),
+                    "disease_id": disease_obj.get("curie"),
+                    "association_type": r.get("associationType"),
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": genes,
+            "metadata": {
+                "total_results": total,
+                "returned": len(genes),
+                "query_disease_id": disease_id,
+                "page": int(page),
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_disease_detail(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get disease summary information by Disease Ontology ID."""
+        disease_id = arguments.get("disease_id", "")
+        if not disease_id:
+            return {
+                "status": "error",
+                "error": "disease_id parameter is required (e.g., 'DOID:162' for cancer)",
+            }
+
+        url = f"{ALLIANCE_BASE}/disease/{disease_id}"
+        response = requests.get(
+            url, headers={"Accept": "application/json"}, timeout=self.timeout
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        do_term = data.get("doTerm", {})
+        synonyms = do_term.get("synonyms", [])
+        synonym_names = [s.get("name") for s in synonyms if s.get("name")]
+
+        return {
+            "status": "success",
+            "data": {
+                "disease_id": do_term.get("curie"),
+                "name": do_term.get("name"),
+                "definition": do_term.get("definition"),
+                "synonyms": synonym_names,
+                "category": data.get("category"),
+            },
+            "metadata": {
+                "query_disease_id": disease_id,
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_orthologs(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get ortholog genes across species for a given gene."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = arguments.get("limit", 20)
+        page = arguments.get("page", 1)
+        stringency = arguments.get("stringency", "stringent")
+        url = f"{ALLIANCE_BASE}/gene/{gene_id}/orthologs"
+        params = {
+            "limit": min(int(limit), 100),
+            "page": int(page),
+            "filter.stringency": stringency,
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        total = data.get("total", 0)
+        results = data.get("results", [])
+        orthologs = []
+        for r in results:
+            orth = r.get("geneToGeneOrthologyGenerated", {})
+            subject = orth.get("subjectGene", {})
+            obj_gene = orth.get("objectGene", {})
+            methods = orth.get("predictionMethodsMatched", [])
+            orthologs.append(
+                {
+                    "subject_gene_id": subject.get("primaryExternalId"),
+                    "subject_symbol": subject.get("geneSymbol", {}).get("displayText"),
+                    "subject_species": subject.get("taxon", {}).get("name"),
+                    "ortholog_gene_id": obj_gene.get("primaryExternalId"),
+                    "ortholog_symbol": obj_gene.get("geneSymbol", {}).get(
+                        "displayText"
+                    ),
+                    "ortholog_species": obj_gene.get("taxon", {}).get("name"),
+                    "is_best_score": orth.get("isBestScore", {}).get("name"),
+                    "is_best_score_reverse": orth.get("isBestScoreReverse", {}).get(
+                        "name"
+                    ),
+                    "methods": [m.get("name") for m in methods],
+                    "method_count": len(methods),
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": orthologs,
+            "metadata": {
+                "total_results": total,
+                "returned": len(orthologs),
+                "query_gene_id": gene_id,
+                "stringency": stringency,
+                "page": int(page),
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_alleles(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get alleles and variants for a gene."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = arguments.get("limit", 20)
+        page = arguments.get("page", 1)
+        url = f"{ALLIANCE_BASE}/gene/{gene_id}/alleles"
+        params = {"limit": min(int(limit), 100), "page": int(page)}
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        total = data.get("total", 0)
+        results = data.get("results", [])
+        alleles = [_allele_summary(r) for r in results]
+
+        return {
+            "status": "success",
+            "data": alleles,
+            "metadata": {
+                "total_results": total,
+                "returned": len(alleles),
+                "query_gene_id": gene_id,
+                "page": int(page),
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_expression_summary(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get expression annotations for a gene.
+
+        Alliance retired the per-gene ``/gene/{id}/expression-summary`` ribbon
+        endpoint (now 404). Expression is served from ``POST /api/expression``
+        with a bare JSON array of gene curies; it returns per-annotation records
+        (developmental stage + anatomical location).
+        """
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        try:
+            limit = int(arguments.get("limit", 50))
+        except (TypeError, ValueError):
+            limit = 50
+        limit = max(1, min(limit, 100))
+
+        url = f"{ALLIANCE_BASE}/expression"
+        response = requests.post(
+            url,
+            json=[gene_id],
+            params={"limit": limit},
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        results = data.get("results", []) or []
+        annotations = []
+        for r in results:
+            ann = r.get("geneExpressionAnnotation", r) if isinstance(r, dict) else {}
+            provider = ann.get("dataProvider") or {}
+            evidence = ann.get("evidenceItem") or {}
+            annotations.append(
+                {
+                    "stage": ann.get("whenExpressedStageName"),
+                    "location": ann.get("whereExpressedStatement"),
+                    "data_provider": provider.get("abbreviation")
+                    if isinstance(provider, dict)
+                    else provider,
+                    "reference": evidence.get("curie")
+                    if isinstance(evidence, dict)
+                    else None,
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": {
+                "total_annotations": data.get("total", len(annotations)),
+                "returned": len(annotations),
+                "annotations": annotations,
+            },
+            "metadata": {
+                "query_gene_id": gene_id,
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_interactions(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get molecular or genetic interactions for a gene."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        interaction_type = arguments.get("interaction_type", "molecular")
+        limit = arguments.get("limit", 20)
+        page = arguments.get("page", 1)
+
+        if interaction_type == "genetic":
+            url = f"{ALLIANCE_BASE}/gene/{gene_id}/genetic-interactions"
+        else:
+            url = f"{ALLIANCE_BASE}/gene/{gene_id}/molecular-interactions"
+
+        params = {"limit": min(int(limit), 100), "page": int(page)}
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        total = data.get("total", 0)
+        results = data.get("results", [])
+        interactions = []
+        for r in results:
+            if interaction_type == "genetic":
+                gi = r.get("geneGeneticInteraction", {})
+                subject = gi.get("geneAssociationSubject", {})
+                obj = gi.get("geneGeneAssociationObject", {})
+                int_type = gi.get("interactionType", {}).get("name")
+            else:
+                gi = r.get("geneMolecularInteraction", {})
+                subject = gi.get("geneAssociationSubject", {})
+                obj = gi.get("geneGeneAssociationObject", {})
+                int_type = (
+                    gi.get("interactionType", {}).get("name")
+                    if gi.get("interactionType")
+                    else None
+                )
+
+            interactions.append(
+                {
+                    "subject_gene_id": subject.get("primaryExternalId"),
+                    "subject_symbol": subject.get("geneSymbol", {}).get("displayText"),
+                    "interactor_gene_id": obj.get("primaryExternalId") if obj else None,
+                    "interactor_symbol": obj.get("geneSymbol", {}).get("displayText")
+                    if obj
+                    else None,
+                    "interactor_species": obj.get("taxon", {}).get("name")
+                    if obj
+                    else None,
+                    "interaction_type": int_type,
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": interactions,
+            "metadata": {
+                "total_results": total,
+                "returned": len(interactions),
+                "query_gene_id": gene_id,
+                "interaction_type": interaction_type,
+                "page": int(page),
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_disease_models(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get disease models involving a gene."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = arguments.get("limit", 20)
+        page = arguments.get("page", 1)
+        url = f"{ALLIANCE_BASE}/gene/{gene_id}/models"
+        params = {"limit": min(int(limit), 100), "page": int(page)}
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        total = data.get("total", 0)
+        results = data.get("results", [])
+        models = []
+        for r in results:
+            model = r.get("model", {})
+            gene = r.get("gene", {})
+            disease_models = r.get("diseaseModels", [])
+            diseases = []
+            for dm in disease_models:
+                diseases.append(
+                    {
+                        "disease_name": dm.get("disease", {}).get("name"),
+                        "disease_id": dm.get("disease", {}).get("curie"),
+                        "association_type": dm.get("associationType"),
+                    }
+                )
+            models.append(
+                {
+                    "model_id": model.get("primaryExternalId"),
+                    "model_name": model.get("agmFullName", {}).get("displayText")
+                    if isinstance(model.get("agmFullName"), dict)
+                    else model.get("name"),
+                    "gene_symbol": gene.get("geneSymbol", {}).get("displayText"),
+                    "gene_id": gene.get("primaryExternalId"),
+                    "data_provider": r.get("dataProvider"),
+                    "diseases": diseases,
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": models,
+            "metadata": {
+                "total_results": total,
+                "returned": len(models),
+                "query_gene_id": gene_id,
+                "page": int(page),
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_allele_detail(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get detailed information about a specific allele."""
+        allele_id = arguments.get("allele_id", "")
+        if not allele_id:
+            return {"status": "error", "error": "allele_id parameter is required"}
+
+        url = f"{ALLIANCE_BASE}/allele/{allele_id}"
+        response = requests.get(
+            url, headers={"Accept": "application/json"}, timeout=self.timeout
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        allele = data.get("allele", {})
+        allele_of_gene = data.get("alleleOfGene", {})
+        synonyms = allele.get("alleleSynonyms", [])
+        synonym_list = [s.get("displayText") for s in synonyms if s.get("displayText")]
+
+        return {
+            "status": "success",
+            "data": {
+                "id": allele.get("primaryExternalId"),
+                "symbol": allele.get("alleleSymbol", {}).get("displayText"),
+                "species": allele.get("taxon", {}).get("name"),
+                "alteration_type": data.get("alterationType"),
+                "gene_id": allele_of_gene.get("primaryExternalId"),
+                "gene_symbol": allele_of_gene.get("geneSymbol", {}).get("displayText"),
+                "synonyms": synonym_list,
+            },
+            "metadata": {
+                "query_allele_id": allele_id,
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _alliance_get(self, gene_id: str, path: str, params: Dict[str, Any]) -> Dict:
+        """Helper: GET an Alliance gene sub-endpoint and return parsed JSON."""
+        url = f"{ALLIANCE_BASE}/gene/{gene_id}/{path}"
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _get_gene_orthologs_paralogs(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get orthologs and paralogs of a gene across model organisms."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = min(int(arguments.get("limit", 20)), 100)
+        stringency = arguments.get("stringency", "stringent")
+
+        orth_data = self._alliance_get(
+            gene_id,
+            "orthologs",
+            {"limit": limit, "page": 1, "filter.stringency": stringency},
+        )
+        orthologs = []
+        for r in orth_data.get("results", []):
+            orth = r.get("geneToGeneOrthologyGenerated", {})
+            obj_gene = orth.get("objectGene", {})
+            annotations = r.get("geneAnnotationsMap", {})
+            obj_id = obj_gene.get("primaryExternalId")
+            ann = annotations.get(obj_id, {}) if isinstance(annotations, dict) else {}
+            orthologs.append(
+                {
+                    "ortholog_gene_id": obj_id,
+                    "ortholog_symbol": (obj_gene.get("geneSymbol") or {}).get(
+                        "displayText"
+                    ),
+                    "ortholog_species": (obj_gene.get("taxon") or {}).get("name"),
+                    "stringency": r.get("stringencyFilter"),
+                    "has_disease_annotations": ann.get("hasDiseaseAnnotations"),
+                    "has_expression_annotations": ann.get("hasExpressionAnnotations"),
+                    "methods": [
+                        m.get("name")
+                        for m in orth.get("predictionMethodsMatched", [])
+                        if isinstance(m, dict)
+                    ],
+                }
+            )
+
+        para_data = self._alliance_get(gene_id, "paralogs", {"limit": limit, "page": 1})
+        paralogs = []
+        for r in para_data.get("results", []):
+            para = r.get("geneToGeneParalogy", {})
+            obj_gene = para.get("objectGene", {})
+            paralogs.append(
+                {
+                    "paralog_gene_id": obj_gene.get("primaryExternalId"),
+                    "paralog_symbol": (obj_gene.get("geneSymbol") or {}).get(
+                        "displayText"
+                    ),
+                    "paralog_species": (obj_gene.get("taxon") or {}).get("name"),
+                    "methods": [
+                        m.get("name")
+                        for m in para.get("predictionMethodsMatched", [])
+                        if isinstance(m, dict)
+                    ],
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": {
+                "ortholog_count": orth_data.get("total", len(orthologs)),
+                "orthologs": orthologs,
+                "paralog_count": para_data.get("total", len(paralogs)),
+                "paralogs": paralogs,
+            },
+            "metadata": {
+                "query_gene_id": gene_id,
+                "stringency": stringency,
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_molecular_interactions(
+        self, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Get molecular (physical) interactions for a gene with evidence refs."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = min(int(arguments.get("limit", 20)), 100)
+        page = int(arguments.get("page", 1))
+
+        data = self._alliance_get(
+            gene_id, "molecular-interactions", {"limit": limit, "page": page}
+        )
+
+        interactions = []
+        for r in data.get("results", []):
+            gmi = r.get("geneMolecularInteraction", {})
+            subject = gmi.get("geneAssociationSubject", {})
+            obj = gmi.get("geneGeneAssociationObject", {}) or {}
+            int_type = gmi.get("interactionType") or {}
+            references = []
+            for ev in gmi.get("evidence", []):
+                if isinstance(ev, dict):
+                    references.append(ev.get("pubModID") or ev.get("curie"))
+            interactions.append(
+                {
+                    "subject_gene_id": subject.get("primaryExternalId"),
+                    "subject_symbol": (subject.get("geneSymbol") or {}).get(
+                        "displayText"
+                    ),
+                    "interactor_gene_id": obj.get("primaryExternalId"),
+                    "interactor_symbol": (obj.get("geneSymbol") or {}).get(
+                        "displayText"
+                    ),
+                    "interactor_species": (obj.get("taxon") or {}).get("name"),
+                    "interaction_type": int_type.get("name")
+                    if isinstance(int_type, dict)
+                    else None,
+                    "references": [r for r in references if r],
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": interactions,
+            "metadata": {
+                "total_results": data.get("total", len(interactions)),
+                "returned": len(interactions),
+                "query_gene_id": gene_id,
+                "page": page,
+                "source": "Alliance of Genome Resources",
+            },
+        }
+
+    def _get_gene_alleles_and_models(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get alleles/variants and affected genomic models (mutant strains)."""
+        gene_id = self._normalize_gene_id(arguments.get("gene_id", ""))
+        if not gene_id:
+            return {"status": "error", "error": "gene_id parameter is required"}
+
+        limit = min(int(arguments.get("limit", 20)), 100)
+
+        allele_data = self._alliance_get(
+            gene_id, "alleles", {"limit": limit, "page": 1}
+        )
+        alleles = []
+        for r in allele_data.get("results", []):
+            summary = _allele_summary(r)
+            variant_list = r.get("variantList") or []
+            variant_locs = []
+            for v in variant_list[:3]:
+                for loc in v.get("curatedVariantGenomicLocations", [])[:1]:
+                    variant_locs.append(loc.get("hgvs"))
+            alleles.append(
+                {
+                    "allele_id": summary["id"],
+                    "symbol": summary["symbol"],
+                    "category": r.get("category"),
+                    "alteration_type": r.get("alterationType"),
+                    "has_disease": r.get("hasDisease"),
+                    "has_phenotype": r.get("hasPhenotype"),
+                    "variant_locations": [v for v in variant_locs if v],
+                }
+            )
+
+        model_data = self._alliance_get(gene_id, "models", {"limit": limit, "page": 1})
+        models = []
+        for r in model_data.get("results", []):
+            model = r.get("model") or {}
+            full_name = model.get("agmFullName") or {}
+            models.append(
+                {
+                    "model_id": model.get("primaryExternalId"),
+                    "model_name": full_name.get("displayText")
+                    if isinstance(full_name, dict)
+                    else model.get("name"),
+                    "subtype": (model.get("subtype") or {}).get("name"),
+                    "data_provider": (model.get("dataProvider") or {}).get(
+                        "abbreviation"
+                    ),
+                }
+            )
+
+        return {
+            "status": "success",
+            "data": {
+                "allele_count": allele_data.get("total", len(alleles)),
+                "alleles": alleles,
+                "model_count": model_data.get("total", len(models)),
+                "models": models,
+            },
+            "metadata": {
+                "query_gene_id": gene_id,
+                "source": "Alliance of Genome Resources",
+            },
+        }

@@ -1,0 +1,1165 @@
+[
+  {
+    "type": "ComposeTool",
+    "name": "DrugSafetyAnalyzer",
+    "description": "Comprehensive drug safety analysis combining adverse event data, literature review, and molecular information",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "description": "Name of the drug to analyze"
+        },
+        "patient_sex": {
+          "type": "string",
+          "enum": [
+            "Male",
+            "Female"
+          ],
+          "description": "Optional. Restricts the FAERS adverse-event counts to one sex. Omit it to analyse all reports; supplying it roughly halves the denominator. Must be 'Male' or 'Female', not the FAERS-native numeric encoding."
+        },
+        "serious_events_only": {
+          "type": "boolean",
+          "description": "Focus only on serious adverse events",
+          "default": false
+        }
+      },
+      "required": [
+        "drug_name"
+      ]
+    },
+    "auto_load_dependencies": true,
+    "fail_on_missing_tools": false,
+    "required_tools": [
+      "PubChem_get_CID_by_compound_name",
+      "PubChem_get_compound_properties_by_CID",
+      "EuropePMC_search_articles"
+    ],
+    "composition_file": "drug_safety_analyzer.py",
+    "composition_function": "compose",
+    "test_examples": [
+      {
+        "drug_name": "Aspirin",
+        "patient_sex": "Female",
+        "serious_events_only": true
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string"
+        },
+        "analysis_parameters": {
+          "type": "object",
+          "properties": {
+            "patient_sex_filter": {
+              "type": "string"
+            },
+            "serious_events_only": {
+              "type": "boolean"
+            }
+          }
+        },
+        "adverse_events": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term": {
+                    "type": "string"
+                  },
+                  "count": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "molecular_properties": {
+          "type": "null"
+        },
+        "safety_literature": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "abstract": {
+                    "type": "string"
+                  },
+                  "authors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "journal": {
+                    "type": "string"
+                  },
+                  "year": {
+                    "type": "string"
+                  },
+                  "doi": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "source_db": {
+                    "type": "string"
+                  },
+                  "article_id": {
+                    "type": "string"
+                  },
+                  "pmid": {
+                    "type": "string"
+                  },
+                  "pmcid": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "doi_url": {
+                    "type": "string"
+                  },
+                  "fulltext_xml_url": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "citations": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "open_access": {
+                    "type": "boolean"
+                  },
+                  "keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "data_quality": {
+                    "type": "object",
+                    "properties": {
+                      "has_abstract": {
+                        "type": "boolean"
+                      },
+                      "has_authors": {
+                        "type": "boolean"
+                      },
+                      "has_journal": {
+                        "type": "boolean"
+                      },
+                      "has_year": {
+                        "type": "boolean"
+                      },
+                      "has_doi": {
+                        "type": "boolean"
+                      },
+                      "has_citations": {
+                        "type": "boolean"
+                      },
+                      "has_keywords": {
+                        "type": "boolean"
+                      },
+                      "has_url": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "count": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "query": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "analysis_summary": {
+          "type": "object",
+          "properties": {
+            "has_adverse_events": {
+              "type": "boolean"
+            },
+            "has_molecular_data": {
+              "type": "boolean"
+            },
+            "literature_papers_found": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "ComposeTool",
+    "name": "LiteratureSearchTool",
+    "description": "Comprehensive literature search and summary tool that searches multiple databases (EuropePMC, OpenAlex, PubTator) and generates AI-powered summaries of research findings",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "research_topic": {
+          "type": "string",
+          "description": "The research topic or query to search for in the literature"
+        }
+      },
+      "required": [
+        "research_topic"
+      ]
+    },
+    "auto_load_dependencies": true,
+    "fail_on_missing_tools": false,
+    "required_tools": [
+      "EuropePMC_search_articles",
+      "openalex_literature_search",
+      "PubTator3_LiteratureSearch",
+      "MedicalLiteratureReviewer"
+    ],
+    "composition_file": "literature_tool.py",
+    "composition_function": "compose",
+    "test_examples": [
+      {
+        "research_topic": "cancer immunotherapy"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "result": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string",
+          "description": "Present only when success is false. Explains which step could not run."
+        },
+        "literature": {
+          "type": "object",
+          "description": "Raw per-source search results keyed by source (pmc, openalex, pubtator). Returned when the AI summarization step is unavailable so the retrieved literature is not lost."
+        },
+        "missing_tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tools this composition needed but could not load. Present only when the result is degraded."
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "prompt_used": {
+              "type": "string"
+            },
+            "input_arguments": {
+              "type": "object",
+              "properties": {
+                "research_topic": {
+                  "type": "string"
+                },
+                "literature_content": {
+                  "type": "string"
+                },
+                "focus_area": {
+                  "type": "string"
+                },
+                "study_types": {
+                  "type": "string"
+                },
+                "quality_level": {
+                  "type": "string"
+                },
+                "review_scope": {
+                  "type": "string"
+                }
+              }
+            },
+            "model_info": {
+              "type": "object",
+              "properties": {
+                "api_type": {
+                  "type": "string"
+                },
+                "model_id": {
+                  "type": "string"
+                },
+                "temperature": {
+                  "type": "number"
+                }
+              }
+            },
+            "execution_time_seconds": {
+              "type": "number"
+            },
+            "timestamp": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "ComposeTool",
+    "name": "ComprehensiveDrugDiscoveryPipeline",
+    "description": "Complete end-to-end drug discovery workflow from disease to optimized candidates. Identifies targets, discovers lead compounds, screens for ADMET properties, assesses safety, and validates with literature.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "disease_efo_id": {
+          "type": "string",
+          "description": "The EFO ID of the disease for drug discovery (e.g., 'EFO_0001074' for Alzheimer's disease)"
+        }
+      },
+      "required": [
+        "disease_efo_id"
+      ]
+    },
+    "auto_load_dependencies": true,
+    "fail_on_missing_tools": false,
+    "required_tools": [
+      "OpenTargets_get_associated_targets_by_disease_efoId",
+      "OpenTargets_get_associated_drugs_by_disease_efoId",
+      "ADMETAI_predict_BBB_penetrance",
+      "ADMETAI_predict_bioavailability",
+      "ADMETAI_predict_toxicity",
+      "PubChem_get_CID_by_compound_name",
+      "PubChem_get_compound_properties_by_CID",
+      "LiteratureSearchTool"
+    ],
+    "composition_file": "comprehensive_drug_discovery.py",
+    "composition_function": "compose",
+    "test_examples": [
+      {
+        "disease_efo_id": "EFO_0001074"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "target_selection": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "disease": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "associatedTargets": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": [
+                            "integer",
+                            "number"
+                          ]
+                        },
+                        "rows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "target": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "approvedSymbol": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "score": {
+                                "type": "number"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "lead_discovery": {
+          "type": "object",
+          "properties": {
+            "total_drugs": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "approved_drugs": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "drug_data": {
+              "type": "array"
+            }
+          }
+        },
+        "safety_assessment": {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          }
+        },
+        "literature_validation": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "result": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "prompt_used": {
+                  "type": "string"
+                },
+                "input_arguments": {
+                  "type": "object",
+                  "properties": {
+                    "research_topic": {
+                      "type": "string"
+                    },
+                    "literature_content": {
+                      "type": "string"
+                    },
+                    "focus_area": {
+                      "type": "string"
+                    },
+                    "study_types": {
+                      "type": "string"
+                    },
+                    "quality_level": {
+                      "type": "string"
+                    },
+                    "review_scope": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "model_info": {
+                  "type": "object",
+                  "properties": {
+                    "api_type": {
+                      "type": "string"
+                    },
+                    "model_id": {
+                      "type": "string"
+                    },
+                    "temperature": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "execution_time_seconds": {
+                  "type": "number"
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "ComposeTool",
+    "name": "BiomarkerDiscoveryWorkflow",
+    "description": "Discover and validate biomarkers for a specific disease condition using literature analysis, expression data, pathway enrichment, and clinical validation.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "disease_condition": {
+          "type": "string",
+          "description": "The disease condition to discover biomarkers for (e.g., 'breast cancer', 'Alzheimer's disease')"
+        },
+        "sample_type": {
+          "type": "string",
+          "description": "The type of sample to analyze (e.g., 'blood', 'tissue', 'plasma')",
+          "default": "blood"
+        }
+      },
+      "required": [
+        "disease_condition"
+      ]
+    },
+    "auto_load_dependencies": true,
+    "fail_on_missing_tools": false,
+    "required_tools": [
+      "LiteratureSearchTool",
+      "HPA_search_genes_by_query",
+      "HPA_get_comprehensive_gene_details_by_ensembl_id",
+      "HPA_get_biological_processes_by_gene",
+      "HPA_get_contextual_biological_process_analysis",
+      "HPA_get_protein_interactions_by_gene",
+      "HPA_get_cancer_prognostics_by_gene",
+      "FDA_get_drug_names_by_clinical_pharmacology"
+    ],
+    "composition_file": "biomarker_discovery.py",
+    "composition_function": "compose",
+    "test_examples": [
+      {
+        "disease_condition": "breast cancer",
+        "sample_type": "tissue"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "disease": {
+          "type": "string"
+        },
+        "sample_type": {
+          "type": "string"
+        },
+        "literature_evidence": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "result": {
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "prompt_used": {
+                  "type": "string"
+                },
+                "input_arguments": {
+                  "type": "object",
+                  "properties": {
+                    "research_topic": {
+                      "type": "string"
+                    },
+                    "literature_content": {
+                      "type": "string"
+                    },
+                    "focus_area": {
+                      "type": "string"
+                    },
+                    "study_types": {
+                      "type": "string"
+                    },
+                    "quality_level": {
+                      "type": "string"
+                    },
+                    "review_scope": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "model_info": {
+                  "type": "object",
+                  "properties": {
+                    "api_type": {
+                      "type": "string"
+                    },
+                    "model_id": {
+                      "type": "string"
+                    },
+                    "temperature": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "execution_time_seconds": {
+                  "type": "number"
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "expression_data": {
+          "type": "object",
+          "properties": {
+            "search_query": {
+              "type": "string"
+            },
+            "genes_found": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "search_strategy": {
+              "type": "string"
+            },
+            "gene_details": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                },
+                "error_details": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "retriable": {
+                      "type": "boolean"
+                    },
+                    "next_steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "validation_error": {
+                          "type": "string"
+                        },
+                        "path": {
+                          "type": "array"
+                        },
+                        "schema": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            },
+                            "properties": {
+                              "type": "object",
+                              "properties": {
+                                "ensembl_id": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "include_images": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "include_antibodies": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "include_expression": {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string"
+                                    },
+                                    "description": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "required": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "parameter": {
+                          "type": "string"
+                        },
+                        "expected": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "all_candidates": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "gene_name": {
+                    "type": "string"
+                  },
+                  "ensembl_id": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "pathway_analysis": {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          }
+        },
+        "clinical_validation": {
+          "type": "object",
+          "properties": {
+            "meta": {
+              "type": "object",
+              "properties": {
+                "skip": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "limit": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "total": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                }
+              }
+            },
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "clinical_pharmacology": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "openfda.brand_name": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "openfda.generic_name": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "set_id": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "protein_information": {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "ComposeTool",
+    "name": "ToolMetadataGenerationPipeline",
+    "description": "Generates standardized metadata for a batch of ToolUniverse tool configurations by calling ToolMetadataGenerator, LabelGenerator, and ToolMetadataStandardizer for sources and tags.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "tool_configs": {
+          "type": "array",
+          "description": "List of raw tool configuration JSON objects to extract and standardize metadata for",
+          "items": {
+            "type": "object"
+          }
+        },
+        "tool_type_mappings": {
+          "type": "object",
+          "description": "Mapping of simplified toolType (keys) to lists of tool 'type' values belonging to each simplified category (e.g., {'Databases': ['XMLTool']})",
+          "default": {}
+        },
+        "add_existing_tooluniverse_labels": {
+          "type": "boolean",
+          "description": "Whether to include labels from existing ToolUniverse tools when labeling the metadata configs of the new tools. It is strongly recommended that this is set to true to minimize the number of new labels created and the possibility of redundant labels.",
+          "default": true
+        },
+        "max_new_tooluniverse_labels": {
+          "type": "integer",
+          "description": "The maximum number of new ToolUniverse labels to use in the metadata configs of the new tools. The existing ToolUniverse labels will be used first, and then new labels will be created as needed up to this limit. If the limit is reached, the least relevant new labels will be discarded. Please try to use as few new labels as possible to avoid excessive labels.",
+          "default": 0
+        }
+      },
+      "required": [
+        "tool_configs"
+      ]
+    },
+    "auto_load_dependencies": true,
+    "fail_on_missing_tools": false,
+    "required_tools": [
+      "ToolMetadataGenerator",
+      "LabelGenerator",
+      "ToolMetadataStandardizer"
+    ],
+    "composition_file": "tool_metadata_generator.py",
+    "composition_function": "compose",
+    "test_examples": [
+      {
+        "tool_configs": [
+          {
+            "type": "XMLTool",
+            "name": "ExampleXMLTool",
+            "description": "Parses XML files",
+            "parameter": {}
+          }
+        ],
+        "tool_type_mappings": {
+          "Database": [
+            "XMLTool"
+          ],
+          "Embedding Store": [
+            "EmbeddingDatabase"
+          ],
+          "Scientific Software Package": [
+            "PackageTool"
+          ],
+          "AI Agent": [
+            "AgenticTool"
+          ],
+          "ML Model": [
+            "ADMETAITool",
+            "AlphaFoldRESTTool",
+            "boltz2_docking",
+            "compute_depmap24q2_gene_correlations",
+            "run_compass_prediction",
+            "run_pinnacle_ppi_retrieval",
+            "run_transcriptformer_embedding_retrieval",
+            "get_abstract_from_patent_app_number",
+            "get_claims_from_patent_app_number",
+            "get_full_text_from_patent_app_number"
+          ],
+          "Human Expert Feedback": [
+            "mcp_auto_loader_human_expert",
+            "consult_human_expert",
+            "get_expert_response",
+            "get_expert_status",
+            "list_pending_expert_requests",
+            "submit_expert_response"
+          ],
+          "MCP": [
+            "MCPAutoLoaderTool",
+            "MCPClientTool",
+            "MCPProxyTool"
+          ],
+          "Compositional Tool": [
+            "ComposeTool"
+          ],
+          "Tool Finder Tool": [
+            "ToolFinderEmbedding",
+            "ToolFinderLLM",
+            "ToolFinderKeyword"
+          ],
+          "Special Tool": [
+            "Finish",
+            "CallAgent"
+          ]
+        }
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "detailed_description": {
+            "type": "string"
+          },
+          "toolType": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array"
+          },
+          "category": {
+            "type": "string"
+          },
+          "lab": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "reviewed": {
+            "type": "boolean"
+          },
+          "isValidated": {
+            "type": "boolean"
+          },
+          "usageStats": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array"
+          },
+          "limitations": {
+            "type": "array"
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "inputSchema": {
+            "type": "object"
+          },
+          "exampleInput": {
+            "type": "object"
+          },
+          "apiEndpoints": {
+            "type": "array"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "ComposeTool",
+    "name": "ToolGraphGenerationPipeline",
+    "description": "Generates a directed tool relationship graph among provided tool configs using ToolRelationshipDetector to infer data-flow compatibility.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "tool_configs": {
+          "type": "array",
+          "description": "List of tool configuration objects",
+          "items": {
+            "type": "object"
+          }
+        },
+        "max_tools": {
+          "type": "integer",
+          "description": "Optional max number of tools to process (debug)"
+        },
+        "output_path": {
+          "type": "string",
+          "description": "Path for output graph JSON",
+          "default": "./tool_relationship_graph.json"
+        },
+        "save_intermediate_every": {
+          "type": "integer",
+          "description": "Checkpoint every N processed pairs",
+          "default": 5000
+        }
+      },
+      "required": [
+        "tool_configs"
+      ]
+    },
+    "auto_load_dependencies": true,
+    "fail_on_missing_tools": false,
+    "required_tools": [
+      "ToolRelationshipDetector"
+    ],
+    "composition_file": "tool_graph_generation.py",
+    "composition_function": "compose",
+    "test_examples": [
+      {
+        "tool_configs": [
+          {
+            "type": "SampleTool",
+            "name": "ExampleTool",
+            "description": "A sample tool configuration"
+          }
+        ],
+        "max_tools": 10,
+        "output_path": "./tool_relationship_graph.json",
+        "save_intermediate_every": 5000
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "output_file": {
+          "type": "string"
+        },
+        "graph": {
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "edges": {
+              "type": "array"
+            },
+            "stats": {
+              "type": "object",
+              "properties": {
+                "tools": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "pairs_evaluated": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "edges": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "llm_calls": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "runtime_sec": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

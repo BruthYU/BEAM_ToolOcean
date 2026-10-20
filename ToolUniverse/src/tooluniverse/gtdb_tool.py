@@ -1,0 +1,411 @@
+"""
+GTDB Tool - Genome Taxonomy Database
+
+GTDB provides a standardized genome-based taxonomy for prokaryotes (Bacteria
+and Archaea). The taxonomy is built from phylogenomic analysis of genome
+sequences, resolving polyphyletic groups in NCBI taxonomy and providing a
+consistent, genome-based classification system.
+
+API base: https://gtdb-api.ecogenomic.org
+No authentication required.
+
+GTDB taxon naming convention: prefix__name
+  d__ (domain), p__ (phylum), c__ (class), o__ (order),
+  f__ (family), g__ (genus), s__ (species)
+
+Reference: Parks et al., Nature Biotechnology 2018, 36:996-1004
+"""
+
+import requests
+from typing import Dict, Any, Optional
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+
+GTDB_BASE_URL = "https://gtdb-api.ecogenomic.org"
+
+
+@register_tool("GTDBTool")
+class GTDBTool(BaseTool):
+    """
+    Tool for querying the Genome Taxonomy Database (GTDB).
+
+    GTDB is a genome-based taxonomy for prokaryotes, maintained by the
+    Ecogenomics lab at the University of Queensland.
+
+    Supported operations:
+    - search_taxon: Search for taxa by partial name
+    - get_species: Get species cluster details with genomes
+    - get_taxon_info: Get taxon card info (rank, genome count, lineage)
+    - search_genomes: Search genomes by organism name
+    - get_genome: Get detailed genome metadata
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        self.parameter = tool_config.get("parameter", {})
+        self.required = self.parameter.get("required", [])
+        self.session = requests.Session()
+        self.timeout = 30
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the GTDB API tool with given arguments."""
+        operation = arguments.get("operation")
+        if not operation:
+            return {"status": "error", "error": "Missing required parameter: operation"}
+
+        operation_handlers = {
+            "search_taxon": self._search_taxon,
+            "get_species": self._get_species,
+            "get_taxon_info": self._get_taxon_info,
+            "search_genomes": self._search_genomes,
+            "get_genome": self._get_genome,
+        }
+
+        handler = operation_handlers.get(operation)
+        if not handler:
+            return {
+                "status": "error",
+                "error": "Unknown operation: {}. Available: {}".format(
+                    operation, list(operation_handlers.keys())
+                ),
+            }
+
+        try:
+            return handler(arguments)
+        except requests.exceptions.Timeout:
+            return {"status": "error", "error": "GTDB API request timed out"}
+        except requests.exceptions.ConnectionError:
+            return {"status": "error", "error": "Failed to connect to GTDB API"}
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": "GTDB operation failed: {}".format(str(e)),
+            }
+
+    def _make_request(self, path: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+        """Make GET request to GTDB API."""
+        url = "{}/{}".format(GTDB_BASE_URL, path)
+        response = self.session.get(url, params=params or {}, timeout=self.timeout)
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                return {"ok": True, "data": data}
+            except ValueError:
+                ct = response.headers.get("content-type", "")
+                return {
+                    "ok": False,
+                    "error": "Invalid JSON response from GTDB API",
+                    "content_type": ct,
+                    "response_snippet": response.text[:200],
+                    "retryable": "text/html" in ct
+                    or response.text.lstrip().startswith("<"),
+                    "suggestion": "GTDB API may be under maintenance. Retry in a few minutes.",
+                }
+        elif response.status_code == 400:
+            try:
+                err = response.json()
+                return {"ok": False, "error": err.get("detail", "Bad request")}
+            except ValueError:
+                return {
+                    "ok": False,
+                    "error": "Bad request",
+                    "response_snippet": response.text[:200],
+                }
+        elif response.status_code == 404:
+            return {"ok": False, "error": "Taxon or resource not found in GTDB"}
+        else:
+            return {
+                "ok": False,
+                "error": "GTDB API returned status {}".format(response.status_code),
+            }
+
+    def _search_taxon(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Search for taxa by partial name."""
+        query = arguments.get("query")
+        if not query:
+            return {"status": "error", "error": "query parameter is required"}
+
+        limit = arguments.get("limit", 20)
+        result = self._make_request(
+            "taxon/search/{}".format(query),
+            params={"limit": min(limit, 100)},
+        )
+
+        if not result["ok"]:
+            return {"status": "error", "error": result["error"]}
+
+        matches = result["data"].get("matches", [])
+        return {
+            "status": "success",
+            "data": {
+                "query": query,
+                "matches": matches,
+                "count": len(matches),
+            },
+        }
+
+    def _get_species(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get species cluster details."""
+        species = arguments.get("species")
+        if not species:
+            return {"status": "error", "error": "species parameter is required"}
+
+        # Fix-R15E-1: GTDB's own /species/search endpoint rejects the
+        # "s__" rank prefix outright (confirmed live: HTTP 400 "No genomes
+        # found for species s__..." with the prefix, HTTP 200 without it) --
+        # but GTDB_search_taxon, the natural upstream discovery tool for
+        # finding a species name, returns names WITH that exact prefix
+        # (e.g. "s__Faecalibacterium prausnitzii"), breaking the natural
+        # search -> get_species chaining workflow. Strip it here so output
+        # from the sibling tool can be passed straight in.
+        if species.startswith("s__"):
+            species = species[3:]
+
+        # Fix-R23: GTDB's species/search endpoint is also case-sensitive on
+        # binomial capitalization (confirmed live: lowercase "akkermansia
+        # muciniphila" 404s while "Akkermansia muciniphila" succeeds),
+        # unlike the sibling genomes/search endpoint which is
+        # case-insensitive. Normalize to the standard Genus-capitalized/
+        # species-lowercase convention so callers aren't tripped up by an
+        # inconsistency within this same tool family.
+        parts = species.split()
+        if parts:
+            parts[0] = parts[0].capitalize()
+            parts[1:] = [p.lower() for p in parts[1:]]
+            species = " ".join(parts)
+
+        result = self._make_request("species/search/{}".format(species))
+        if not result["ok"]:
+            return {"status": "error", "error": result["error"]}
+
+        data = result["data"]
+        # Limit genomes list to avoid huge responses
+        genomes = data.get("genomes", [])
+        total_genomes = len(genomes)
+        max_genomes = arguments.get("max_genomes", 20)
+        if total_genomes > max_genomes:
+            genomes = genomes[:max_genomes]
+
+        return {
+            "status": "success",
+            "data": {
+                "species_name": data.get("name", species),
+                "total_genomes": total_genomes,
+                "genomes_shown": len(genomes),
+                "genomes": genomes,
+            },
+        }
+
+    def _get_taxon_info(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get taxon card info (rank, genome count, higher ranks)."""
+        taxon = arguments.get("taxon")
+        if not taxon:
+            return {"status": "error", "error": "taxon parameter is required"}
+
+        # Ensure taxon has a GTDB prefix
+        prefixes = ["d__", "p__", "c__", "o__", "f__", "g__", "s__"]
+        has_prefix = any(taxon.startswith(p) for p in prefixes)
+
+        # Get card info
+        result = self._make_request("taxon/{}/card".format(taxon))
+        if not result["ok"]:
+            # If the original failed and we don't have a prefix, try with common prefixes
+            if not has_prefix:
+                for prefix in prefixes:
+                    result = self._make_request("taxon/{}{}/card".format(prefix, taxon))
+                    if result["ok"]:
+                        taxon = prefix + taxon
+                        break
+            if not result["ok"]:
+                return {"status": "error", "error": result["error"]}
+
+        card = result["data"]
+
+        # Also get the full lineage
+        lineage_result = self._make_request("taxonomy/partial/{}".format(taxon))
+        lineage = lineage_result["data"] if lineage_result["ok"] else None
+
+        return {
+            "status": "success",
+            "data": {
+                "taxon": taxon,
+                "rank": card.get("rank"),
+                "n_genomes": card.get("nGenomes"),
+                "higher_ranks": card.get("higherRanks", []),
+                "in_releases": card.get("inReleases", []),
+                "lineage": lineage,
+            },
+        }
+
+    def _search_genomes(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Search genomes by organism name."""
+        query = arguments.get("query")
+        if not query:
+            return {"status": "error", "error": "query parameter is required"}
+
+        page = arguments.get("page", 1)
+        items_per_page = arguments.get("items_per_page", 10)
+
+        # Fix-R29: GTDB's /search/gtdb endpoint ORs the terms of a multi-word
+        # query rather than requiring all of them, so a binomial silently
+        # degrades to a genus-wide match. Confirmed live against
+        # https://gtdb-api.ecogenomic.org/search/gtdb :
+        #   search=xyzzyplop                 -> totalRows 0
+        #   search=Mycobacterium             -> totalRows 13027
+        #   search=Mycobacterium xyzzyplop   -> totalRows 13027 (identical rows)
+        #   search=Mycobacterium tuberculosis-> totalRows 13381, first row
+        #                                       "Mycobacterium leprae Br4923"
+        # i.e. an unmatchable second term is discarded entirely, and the
+        # reported total is the union count for the broader taxon, not for the
+        # species the caller named.
+        #
+        # The endpoint's documented `filterText` parameter applies an
+        # additional case-insensitive literal-substring test that must hold for
+        # every returned row, which is the precise lookup we want (confirmed
+        # live: search+filterText="Mycobacterium tuberculosis" -> totalRows
+        # 7869, all M. tuberculosis; filterText="Mycobacterium xyzzyplop" -> 0).
+        # It is order- and whitespace-literal ("tuberculosis Mycobacterium" and
+        # a double space both return 0), so collapse internal whitespace first.
+        normalized_query = " ".join(query.split())
+        base_params = {
+            "search": normalized_query,
+            "page": page,
+            "itemsPerPage": min(items_per_page, 50),
+        }
+
+        # Precise lookup first: every row must contain the whole query.
+        result = self._make_request(
+            "search/gtdb",
+            params=dict(base_params, filterText=normalized_query),
+        )
+
+        match_type = "exact"
+        note = None
+
+        precise_total = 0
+        if result["ok"]:
+            precise_rows = result["data"].get("rows", [])
+            precise_total = result["data"].get("totalRows", len(precise_rows))
+
+        if not result["ok"] or precise_total == 0:
+            # Either the precise filter is unavailable on this GTDB deployment,
+            # or nothing matches the full query. Fall back to GTDB's loose
+            # union search -- but say so, because those rows are a different
+            # (usually broader) entity than the one that was asked for.
+            precise_failed = not result["ok"]
+            precise_error = result.get("error") if precise_failed else None
+
+            fallback = self._make_request("search/gtdb", params=base_params)
+            if not fallback["ok"]:
+                return {"status": "error", "error": precise_error or fallback["error"]}
+
+            fb_rows = fallback["data"].get("rows", [])
+            fb_total = fallback["data"].get("totalRows", len(fb_rows))
+
+            if fb_total or fb_rows:
+                result = fallback
+                match_type = "broad"
+                if precise_failed:
+                    note = (
+                        "GTDB rejected the precise (all-terms) filter for "
+                        "'{q}' ({err}), so these results come from GTDB's "
+                        "loose search, which matches ANY term of the query. "
+                        "They may belong to a different species or a broader "
+                        "taxon than '{q}', and total_results ({n}) is the "
+                        "count for that looser match, not for '{q}'. Check "
+                        "each result's gtdbTaxonomy before relying on it."
+                    ).format(q=normalized_query, err=precise_error, n=fb_total)
+                else:
+                    note = (
+                        "No GTDB genome matches the full query '{q}'. GTDB's "
+                        "genome search unions the terms of a multi-word query, "
+                        "so these results match only PART of '{q}' (e.g. its "
+                        "genus) and are NOT '{q}'. total_results ({n}) is the "
+                        "count for that broader match, not for '{q}'. Check "
+                        "each result's gtdbTaxonomy before relying on it."
+                    ).format(q=normalized_query, n=fb_total)
+            elif not result["ok"]:
+                return {"status": "error", "error": precise_error}
+            else:
+                match_type = "none"
+
+        data = result["data"]
+        rows = data.get("rows", [])
+        total = data.get("totalRows", len(rows))
+
+        if match_type == "exact":
+            scope = "Number of GTDB genomes matching every term of '{}'.".format(
+                normalized_query
+            )
+        elif match_type == "broad":
+            scope = (
+                "Number of GTDB genomes matching only SOME terms of '{}' -- a "
+                "broader set than '{}' itself, which matched no genome."
+            ).format(normalized_query, normalized_query)
+        else:
+            scope = "No GTDB genome matched '{}'.".format(normalized_query)
+            note = (
+                "GTDB holds no genome matching '{}', either as a whole or by "
+                "any of its terms.".format(normalized_query)
+            )
+
+        # GTDB's search matches against the whole taxonomic clade, not just
+        # organism-name substrings (confirmed live: querying "Akkermansia
+        # muciniphila" returns unrelated family-mates like "Roseibacillus sp.
+        # TMED18" ranked above the exact species) -- boost rows whose own
+        # ncbiOrgName actually matches the query so the requested organism
+        # isn't buried under broader clade results within this page.
+        query_lower = normalized_query.lower()
+
+        def _relevance(row):
+            name = (row.get("ncbiOrgName") or "").lower()
+            if name == query_lower:
+                return 0
+            if name.startswith(query_lower):
+                return 1
+            return 2
+
+        rows = sorted(rows, key=_relevance)
+
+        payload = {
+            "query": query,
+            "match_type": match_type,
+            "total_results": total,
+            "total_results_scope": scope,
+            "page": page,
+            "results": rows,
+            "count": len(rows),
+        }
+        if note:
+            payload["note"] = note
+
+        return {"status": "success", "data": payload}
+
+    def _get_genome(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get detailed genome metadata by accession."""
+        accession = arguments.get("accession")
+        if not accession:
+            return {"status": "error", "error": "accession parameter is required"}
+
+        result = self._make_request("genome/{}/card".format(accession))
+        if not result["ok"]:
+            return {"status": "error", "error": result["error"]}
+
+        data = result["data"]
+
+        # Also get taxon history
+        history_result = self._make_request("genome/{}/taxon-history".format(accession))
+        taxon_history = history_result["data"] if history_result["ok"] else []
+
+        return {
+            "status": "success",
+            "data": {
+                "genome": data.get("genome", {}),
+                "metadata_nucleotide": data.get("metadata_nucleotide", {}),
+                "metadata_gene": data.get("metadata_gene", {}),
+                "metadata_ncbi": data.get("metadata_ncbi", {}),
+                "gtdb_taxonomy": data.get("metadata_taxonomy", {}),
+                "taxon_history": taxon_history,
+            },
+        }

@@ -1,0 +1,300 @@
+[
+  {
+    "name": "nhanes_get_dataset_info",
+    "description": "Get information about NHANES (National Health and Nutrition Examination Survey) datasets. NHANES data is typically available as downloadable files (SAS, XPT formats) from the CDC website. This tool provides information about available datasets, years, and download links. Note: Actual data retrieval may require downloading and converting files.",
+    "type": "NHANESTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "string",
+          "enum": [
+            "2021-2023",
+            "2017-2018",
+            "2015-2016",
+            "2013-2014",
+            "2011-2012",
+            "2009-2010",
+            "2007-2008",
+            "2005-2006",
+            "2003-2004",
+            "2001-2002",
+            "1999-2000"
+          ],
+          "description": "NHANES cycle. Omit for the two most recent. There is no standalone 2019-2020 cycle -- COVID-19 cut that field period short and the data ship as the '2017-2020 pre-pandemic' files."
+        },
+        "component": {
+          "type": "string",
+          "enum": [
+            "Demographics",
+            "Dietary",
+            "Examination",
+            "Laboratory",
+            "Questionnaire"
+          ],
+          "description": "Optional component type to filter datasets"
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "dataset_info",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "datasets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Dataset name"
+                  },
+                  "year": {
+                    "type": "string",
+                    "description": "NHANES cycle"
+                  },
+                  "component": {
+                    "type": "string"
+                  },
+                  "download_url": {
+                    "type": "string",
+                    "description": "CDC listing page for this component and cycle"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "count": {
+              "type": "integer",
+              "description": "Number of component/cycle entries returned"
+            },
+            "cycles_covered": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The NHANES cycles these entries describe"
+            },
+            "note": {
+              "type": "string",
+              "description": "Information about data format and access"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string",
+              "description": "Reason the request failed, e.g. an unrecognised NHANES cycle"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "year": "2017-2018",
+        "component": "Demographics"
+      },
+      {
+        "year": "2021-2023",
+        "component": "Laboratory"
+      }
+    ]
+  },
+  {
+    "name": "nhanes_search_datasets",
+    "description": "Search for NHANES datasets by keyword. Returns information about matching datasets including download links. Note: NHANES data files are typically in SAS/XPT format and may require conversion tools.",
+    "type": "NHANESTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "search_term": {
+          "type": "string",
+          "description": "Search term to find datasets (e.g., 'glucose', 'blood pressure', 'diabetes')"
+        },
+        "year": {
+          "type": "string",
+          "description": "Optional NHANES cycle to filter (e.g., '2017-2018'). If omitted, searches the two most recent cycles (matching nhanes_get_dataset_info's default) rather than a single fixed cycle -- a dataset renamed or dropped in one cycle can still be found via the other."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results (default: 20)",
+          "default": 20
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "search",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "datasets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file_name": {
+                "type": "string"
+              },
+              "cycle": {
+                "type": "string"
+              },
+              "download_url": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "cycles_searched": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Which NHANES cycles were actually searched"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "search_term": "diabetes",
+        "year": "2017-2018",
+        "limit": 1
+      }
+    ]
+  },
+  {
+    "name": "NHANES_download_and_parse",
+    "description": "Download and parse NHANES XPT data files from CDC into structured JSON (DataFrame-ready). Bridges dataset discovery to analysis by handling XPT download, parsing, optional variable selection, and age filtering. For standard components (Demographics, Dietary, Examination/BodyMeasures, Questionnaire), the tool auto-resolves the filename from the cycle suffix. For Laboratory data, provide the exact dataset_name (e.g., 'CBC', 'BIOPRO', 'GHB', 'GLU', 'TRIGLY', 'HDL', 'TCHOL'). Returns column metadata, summary statistics, and the first 5000 rows as JSON records. Use nhanes_search_datasets first to discover available dataset names if unsure.",
+    "type": "NHANESTool",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string",
+          "enum": [
+            "Demographics",
+            "Dietary",
+            "DietaryDay2",
+            "Examination",
+            "Laboratory",
+            "Questionnaire",
+            "BodyMeasures"
+          ],
+          "description": "NHANES component category. 'Dietary' = Day 1 intake totals (DR1TOT), 'DietaryDay2' = Day 2 (DR2TOT), 'BodyMeasures' = BMX, 'Examination' = general exam. For Laboratory, also provide dataset_name."
+        },
+        "cycle": {
+          "type": "string",
+          "description": "NHANES survey cycle (e.g., '2017-2018', '2015-2016', '2013-2014', '2011-2012')"
+        },
+        "dataset_name": {
+          "type": "string",
+          "description": "Exact NHANES dataset filename prefix (without cycle suffix). Required for Laboratory (e.g., 'CBC', 'BIOPRO', 'GHB', 'GLU', 'TRIGLY', 'HDL', 'TCHOL'). Optional for other components to override the default filename."
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of variable names to select (e.g., ['SEQN', 'DR1TIRON', 'DR1TKCAL']). SEQN is always included. If omitted, all variables are returned."
+        },
+        "age_min": {
+          "type": "number",
+          "description": "Minimum age filter (inclusive). Filters by RIDAGEYR from Demographics. Auto-merges with DEMO file if the requested component is not Demographics."
+        },
+        "age_max": {
+          "type": "number",
+          "description": "Maximum age filter (inclusive). Filters by RIDAGEYR from Demographics."
+        },
+        "max_rows": {
+          "type": "integer",
+          "description": "Maximum number of data rows to return (default: 5000). Set lower for faster responses.",
+          "default": 5000
+        }
+      },
+      "required": [
+        "component",
+        "cycle"
+      ]
+    },
+    "fields": {
+      "endpoint": "download_and_parse",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array"
+        },
+        "dtypes": {
+          "type": "object"
+        },
+        "total_rows": {
+          "type": "integer"
+        },
+        "returned_rows": {
+          "type": "integer"
+        },
+        "records": {
+          "type": "array"
+        },
+        "summary_statistics": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "columns",
+        "total_rows",
+        "records"
+      ]
+    },
+    "test_examples": [
+      {
+        "component": "Dietary",
+        "cycle": "2017-2018",
+        "variables": [
+          "SEQN",
+          "DR1TIRON",
+          "DR1TKCAL"
+        ],
+        "age_min": 60,
+        "max_rows": 50
+      },
+      {
+        "component": "Demographics",
+        "cycle": "2017-2018",
+        "variables": [
+          "SEQN",
+          "RIDAGEYR",
+          "RIAGENDR"
+        ],
+        "max_rows": 50
+      },
+      {
+        "component": "Laboratory",
+        "cycle": "2017-2018",
+        "dataset_name": "GHB",
+        "max_rows": 50
+      }
+    ]
+  }
+]

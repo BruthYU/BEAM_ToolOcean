@@ -1,0 +1,187 @@
+name: Weekly Tool Health Check
+
+# Runs the full tool sweep (scripts/test_all_tools.py) against the live
+# external APIs once a week. This is a CANARY, not a gate: external APIs
+# drift (endpoints move, response schemas change, tokens expire) and that
+# breaks tools silently — this surfaces it so we can fix it proactively.
+#
+# It does NOT fail the workflow on tool failures; the value is the uploaded
+# report + the job summary. API-key-gated tools are expected to "fail" in
+# CI unless the corresponding repo secret is provided (see `env:` below).
+#
+# The sweep is SHARDED. As a single job it wrote its report only after the
+# last category, and an evicted runner never reaches the upload step, so
+# nothing survived: 10 of 12 consecutive weekly runs ended that way (exit
+# code 143, "the runner has received a shutdown signal"), one of them after
+# 636 of 638 categories. Sharding bounds both the blast radius of an eviction
+# and the memory one job holds; `summarize` merges whatever shards finished.
+
+on:
+  schedule:
+    # 06:00 UTC every Monday
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      pattern:
+        description: "Optional category pattern to scope the run (e.g. 'uniprot'). Empty = all tools."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-tool-healthcheck
+  cancel-in-progress: false
+
+env:
+  SHARD_COUNT: "8"
+
+jobs:
+  sweep:
+    name: Tool sweep shard ${{ matrix.shard }} (live APIs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # A lost shard must not paint the run red. The sweep step is already
+    # continue-on-error, but an evicted runner kills the job rather than the
+    # step (exit 143), and one failed matrix leg fails the workflow -- which is
+    # why every run since August has been red regardless of tool health, and
+    # why nobody could tell a lost shard from a real regression. `summarize`
+    # runs with `if: always()` and exits non-zero when it can parse nothing, so
+    # the run still goes red when the sweep genuinely produced no results.
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false # a lost shard must not cancel the other seven
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+
+    # Optional API keys. Tools that need a key will be skipped/failed unless
+    # the matching repo secret exists. Add more here as needed — an unset
+    # secret resolves to an empty string and is handled gracefully.
+    env:
+      NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      WAQI_API_KEY: ${{ secrets.WAQI_API_KEY }}
+      ONCOKB_API_KEY: ${{ secrets.ONCOKB_API_KEY }}
+      SEMANTIC_SCHOLAR_API_KEY: ${{ secrets.SEMANTIC_SCHOLAR_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libffi-dev libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libncurses5-dev libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev libjpeg-dev libpng-dev libtiff-dev libwebp-dev libopenjp2-7-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libfontconfig1-dev libblas-dev liblapack-dev libatlas-base-dev gfortran libpoppler-cpp-dev libpoppler-dev libhdf5-dev libnetcdf-dev libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 libcairo2-dev libpango1.0-dev libpangocairo-1.0-0 libgdk-pixbuf2.0-dev shared-mime-info graphviz libgraphviz-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install project
+        run: uv pip install -e .[dev] --system
+
+      - name: Generate SDK
+        run: python scripts/build_tools.py
+
+      - name: Run tool sweep (live APIs, does not fail the job)
+        id: sweep
+        continue-on-error: true
+        run: |
+          PATTERN_ARG=""
+          if [ -n "${{ github.event.inputs.pattern }}" ]; then
+            PATTERN_ARG="--pattern ${{ github.event.inputs.pattern }}"
+          fi
+          # Tee to a per-shard log. The .md report is only written when the
+          # shard finishes; the progress log is what survives a shard killed
+          # part-way, and `summarize` reads whichever exists.
+          set -o pipefail
+          python scripts/test_all_tools.py \
+            --skip-remote --skip-mcp --parallel \
+            --shard ${{ matrix.shard }}/${{ env.SHARD_COUNT }} \
+            --output TOOL_TEST_REPORT_${{ matrix.shard }}.md $PATTERN_ARG \
+            --json-output TOOL_TEST_RESULTS_${{ matrix.shard }}.json \
+            2>&1 | tee sweep_output_${{ matrix.shard }}.log
+
+      - name: Upload shard results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-shard-${{ matrix.shard }}
+          # The JSON carries each test's own error message; the .md and the log
+          # carry only counts. Without it a failure that happens only in CI --
+          # a missing package, a datacenter IP an upstream refuses -- cannot be
+          # diagnosed from the run at all.
+          path: |
+            TOOL_TEST_REPORT_${{ matrix.shard }}.md
+            TOOL_TEST_RESULTS_${{ matrix.shard }}.json
+            sweep_output_${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 90
+
+  summarize:
+    name: Summarize and record history
+    runs-on: ubuntu-latest
+    needs: sweep
+    if: always() # summarize whatever shards did finish
+    permissions:
+      contents: write # appends one row to .github/tool-health-history.jsonl
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download shard results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sweep-shard-*
+          path: shards
+
+      - name: Summarize
+        run: |
+          python scripts/summarize_health_sweep.py \
+            --logs 'shards/*/sweep_output_*.log' \
+            --results 'shards/*/TOOL_TEST_RESULTS_*.json' \
+            --baseline .github/known_failing_categories.txt \
+            --history .github/tool-health-history.jsonl \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --run-id "${{ github.run_id }}" \
+            --sha "${{ github.sha }}" \
+            --shard-count "${SHARD_COUNT}"
+
+      # Artifacts and run logs expire, so nothing outlived a quarter and decay
+      # over any longer window could not be measured at all. One line per run,
+      # committed to the repository, is the entire history.
+      - name: Commit history row
+        if: github.event_name == 'schedule'
+        run: |
+          set -euo pipefail
+          # Stage first, then compare the index. `git diff` ignores untracked
+          # files, and this file starts untracked -- so on every run since the
+          # check was sharded it reported "no history change" for a file the
+          # summarizer had just written, exited 0, and never added it. The file
+          # therefore never became tracked, and the next run repeated it. The
+          # history has been empty since August for that reason alone.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/tool-health-history.jsonl
+          if git diff --cached --quiet -- .github/tool-health-history.jsonl; then
+            echo "no history change"
+            exit 0
+          fi
+          git commit -m "chore: record weekly tool health check (run ${{ github.run_id }})"
+          # Another workflow may have pushed since checkout. Rebase rather than
+          # fail; if the branch has genuinely diverged, leave it for next week
+          # rather than forcing anything.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || exit 0
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -1,0 +1,198 @@
+[
+  {
+    "name": "OpenTargets_get_disease_ids_by_name",
+    "description": "Given a disease or phenotype name, find candidate diseases and their cross-referenced external IDs (e.g., OMIM, MONDO, MeSH, ICD10, UMLS, MedDRA, NCIt, Orphanet) using Open Targets GraphQL full-text search. Returns up to 5 ranked candidates, not a single guaranteed match -- OpenTargets' relevance ranking can surface an unrelated top hit for multi-word or qualified phrasing (e.g. 'localized prostate cancer' or 'high-risk prostate cancer' rank an unrelated disease/trait above 'prostate cancer' itself). Always check each hit's 'name' against the disease you intended before using its dbXRefs; prefer a plain, unqualified disease name (e.g. 'prostate cancer' rather than 'localized prostate cancer') if the top hit's name looks wrong.",
+    "label": [
+      "Disease",
+      "Phenotype",
+      "External ID",
+      "Cross-reference",
+      "OpenTarget",
+      "GraphQL"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the disease or phenotype (e.g. 'rheumatoid arthritis')."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "query_schema": "query getDiseaseDbXRefsByName($name: String!) {\n  search(queryString: $name, entityNames: [\"disease\"], page: { index: 0, size: 5 }) {\n    hits {\n      id\n      name\n      score\n      object {\n        ... on Disease {\n          id\n          name\n          dbXRefs\n        }\n      }\n    }\n  }\n}",
+    "type": "OpenTarget",
+    "test_examples": [
+      {
+        "name": "rheumatoid arthritis"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "search": {
+              "type": "object",
+              "properties": {
+                "hits": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number",
+                        "description": "Open Targets' own relevance score for this candidate, in the order it was ranked. Not comparable across different queries -- use it only to judge whether the top hit clearly dominates the rest, not as an absolute confidence value."
+                      },
+                      "object": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "dbXRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "OpenTargets_get_disease_ids_by_efoId",
+    "description": "Given a disease ID (e.g. a MONDO ID), retrieve all cross-referenced external disease IDs including EFO, OMIM, MeSH, MedDRA, NCIt, ICD10, Orphanet, UMLS.",
+    "label": [
+      "Disease",
+      "EFO",
+      "ID Mapping",
+      "Cross-reference",
+      "OpenTarget",
+      "GraphQL"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "efoId": {
+          "type": "string",
+          "description": "The disease ID (e.g. a MONDO ID such as MONDO_0008383). Legacy EFO disease IDs no longer resolve in OpenTargets."
+        }
+      },
+      "required": [
+        "efoId"
+      ]
+    },
+    "query_schema": "query getDiseaseDbXRefs($efoId: String!) {\n  disease(efoId: $efoId) {\n    id\n    name\n    dbXRefs\n  }\n}",
+    "type": "OpenTarget",
+    "test_examples": [
+      {
+        "efoId": "MONDO_0008383"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "disease": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "dbXRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "OpenTargets_map_any_disease_id_to_all_other_ids",
+    "description": "Given any known disease or phenotype ID (EFO, OMIM, MONDO, UMLS, ICD10, MedDRA, etc.), return all known cross-referenced IDs including the EFO ID.",
+    "label": [
+      "Disease",
+      "Phenotype",
+      "Cross-reference",
+      "ID Mapping",
+      "OpenTarget",
+      "GraphQL"
+    ],
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "inputId": {
+          "type": "string",
+          "description": "Any known disease ID (e.g. OMIM:604302, UMLS:C0003873, ICD10:M05, MONDO_0008383, etc.)"
+        }
+      },
+      "required": [
+        "inputId"
+      ]
+    },
+    "query_schema": "query mapAnyDiseaseIdToDbXRefs($inputId: String!) {\n  mapIds(queryTerms: [$inputId], entityNames: [\"disease\"]) {\n    mappings {\n      term\n      hits {\n        id\n        name\n        object {\n          ... on Disease {\n            id\n            name\n            dbXRefs\n          }\n        }\n      }\n    }\n  }\n}",
+    "type": "OpenTarget",
+    "test_examples": [
+      {
+        "inputId": "MONDO_0004975"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "mapIds": {
+              "type": "object",
+              "properties": {
+                "mappings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "term": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

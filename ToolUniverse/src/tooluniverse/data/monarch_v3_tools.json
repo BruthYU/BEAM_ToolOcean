@@ -1,0 +1,453 @@
+[
+  {
+    "name": "MonarchV3_get_entity",
+    "description": "Look up detailed information about any biomedical entity in the Monarch Initiative knowledge graph by its CURIE identifier. Supports genes (HGNC), diseases (MONDO, OMIM), phenotypes (HP), variants, and more. Returns the entity name, category, description, synonyms, cross-references, and species. Example: HGNC:11998 returns TP53 gene with cross-refs to ENSEMBL, OMIM; MONDO:0005148 returns type 2 diabetes mellitus with detailed description.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "description": "Entity CURIE identifier. Examples: 'HGNC:11998' (TP53), 'HGNC:1100' (BRCA1), 'MONDO:0005148' (type 2 diabetes), 'HP:0001250' (seizure), 'OMIM:191170' (Li-Fraumeni syndrome)."
+        }
+      },
+      "required": [
+        "entity_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "entity"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "entity_id": "HGNC:11998"
+      },
+      {
+        "entity_id": "MONDO:0005148"
+      }
+    ],
+    "return_schema": {
+      "type": "object"
+    }
+  },
+  {
+    "name": "MonarchV3_get_associations",
+    "description": "Query cross-species associations between biomedical entities in the Monarch Initiative knowledge graph. Find gene-phenotype, disease-phenotype, gene-disease, or gene-pathway associations. Uses Biolink model categories to specify association type. Integrates data from OMIM, ClinVar, HPO, MGI, ZFIN, FlyBase, WormBase. Associations are DIRECTED: every category has a fixed subject side and object side, so anchor your entity on the correct side. Supply 'subject', 'object', or both (at least one is required). Example: HGNC:11998 (TP53) as subject with category GeneToPhenotypicFeatureAssociation returns phenotypes like hepatocellular carcinoma; MONDO:0006559 as OBJECT with category CausalGeneToDiseaseAssociation returns the genes that cause that disease (NCSTN, PSENEN, PSEN1).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "Subject-side entity CURIE, i.e. the entity on the LEFT of the association (the arrow's source). For gene->disease categories (CausalGeneToDiseaseAssociation, CorrelatedGeneToDiseaseAssociation) the subject is the GENE; for gene->phenotype and gene->pathway the subject is the gene; for DiseaseToPhenotypicFeatureAssociation the subject is the disease. Examples: 'HGNC:11998' (TP53), 'MONDO:0005148' (type 2 diabetes), 'HP:0001250' (seizure). Optional, but at least one of 'subject' / 'object' must be supplied."
+        },
+        "object": {
+          "type": "string",
+          "description": "Object-side entity CURIE, i.e. the entity on the RIGHT of the association (the arrow's target). Use this to query the association backwards. For gene->disease categories the object is the DISEASE, so 'which genes cause this disease?' is object='MONDO:0006559' with category='biolink:CausalGeneToDiseaseAssociation'; for gene/disease->phenotype categories the object is the HP phenotype term. Optional, but at least one of 'subject' / 'object' must be supplied. Supplying both narrows to associations linking exactly that pair."
+        },
+        "category": {
+          "type": "string",
+          "description": "Biolink association category, written as subject->object. Options: 'biolink:GeneToPhenotypicFeatureAssociation' (gene->phenotypes), 'biolink:DiseaseToPhenotypicFeatureAssociation' (disease->phenotypes), 'biolink:CorrelatedGeneToDiseaseAssociation' (gene->diseases, correlated), 'biolink:CausalGeneToDiseaseAssociation' (gene->diseases, causal), 'biolink:GeneToPathwayAssociation' (gene->pathways), 'biolink:VariantToDiseaseAssociation' (variant->diseases), 'biolink:GeneToExpressionSiteAssociation' (gene->expression sites/tissues). The left-hand side goes in 'subject' and the right-hand side goes in 'object'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of associations to return (default: 20, max: 200)."
+        }
+      },
+      "required": [
+        "category"
+      ]
+    },
+    "fields": {
+      "endpoint": "associations"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "subject": "HGNC:11998",
+        "category": "biolink:GeneToPhenotypicFeatureAssociation"
+      },
+      {
+        "subject": "MONDO:0005148",
+        "category": "biolink:DiseaseToPhenotypicFeatureAssociation"
+      },
+      {
+        "object": "MONDO:0006559",
+        "category": "biolink:CausalGeneToDiseaseAssociation"
+      }
+    ],
+    "return_schema": {
+      "type": "array"
+    }
+  },
+  {
+    "name": "MonarchV3_search",
+    "description": "Search the Monarch Initiative knowledge graph for biomedical entities by name or keyword. Returns genes, diseases, phenotypes, and other entities matching the query, with their CURIE identifiers and categories. Useful for finding entity IDs to use with MonarchV3_get_entity and MonarchV3_get_associations. Example: searching 'BRCA1' returns HGNC:1100 (gene), 'Alzheimer' returns MONDO disease entries.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query. Can be gene names, disease names, phenotype terms, etc. Examples: 'BRCA1', 'breast cancer', 'seizure', 'insulin resistance'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum results to return (default: 10, max: 50)."
+        },
+        "category": {
+          "type": "string",
+          "description": "Filter by entity category. Options: 'biolink:Gene', 'biolink:Disease', 'biolink:PhenotypicFeature', 'biolink:NamedThing'. Default: all categories."
+        },
+        "q": {
+          "type": "string",
+          "description": "Alias for query parameter."
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "search"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "query": "BRCA1"
+      },
+      {
+        "query": "type 2 diabetes",
+        "category": "biolink:Disease",
+        "limit": 5
+      }
+    ],
+    "return_schema": {
+      "type": "array"
+    },
+    "aliases": [
+      "Monarch_search_diseases"
+    ]
+  },
+  {
+    "name": "MonarchV3_get_histopheno",
+    "description": "Get the phenotype profile of a disease grouped by body system from the Monarch Initiative. Returns counts of phenotypic features (HPO terms) organized by anatomical system (e.g., nervous_system, skeletal_system, eye, cardiovascular_system). Only systems with at least one phenotype are returned, sorted by count descending. Useful for understanding which organ systems are most affected by a disease. Example: MONDO:0007947 (Marfan syndrome) returns high counts for head_neck (58), musculature (58), skeletal_system (56), eye (31).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "description": "Disease CURIE identifier. Examples: 'MONDO:0007947' (Marfan syndrome), 'MONDO:0005148' (type 2 diabetes), 'MONDO:0004975' (Alzheimer disease), 'MONDO:0005015' (diabetes mellitus)."
+        }
+      },
+      "required": [
+        "entity_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "histopheno"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "entity_id": "MONDO:0007947"
+      },
+      {
+        "entity_id": "MONDO:0005148"
+      }
+    ],
+    "return_schema": {
+      "type": "array"
+    }
+  },
+  {
+    "name": "MonarchV3_get_mappings",
+    "description": "Get cross-ontology mappings for a biomedical entity from the Monarch Initiative. Returns equivalence mappings between ontology identifiers, such as MONDO to OMIM, ICD10, SNOMED CT, NCIT, MESH, DOID, and Orphanet. Useful for translating disease identifiers across coding systems (e.g., for clinical data integration, ICD-10 billing codes, or linking to OMIM entries). Example: MONDO:0005148 (type 2 diabetes) maps to ICD10CM:E11, DOID:9352, OMIM:125853, MESH:D003924.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "description": "Entity CURIE identifier to find mappings for. Examples: 'MONDO:0005148' (type 2 diabetes), 'MONDO:0007947' (Marfan syndrome), 'HP:0001250' (seizure)."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of mappings to return (default: 20, max: 100)."
+        }
+      },
+      "required": [
+        "entity_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "mappings"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "entity_id": "MONDO:0005148"
+      },
+      {
+        "entity_id": "MONDO:0007947",
+        "limit": 10
+      }
+    ],
+    "return_schema": {
+      "type": "array"
+    }
+  },
+  {
+    "name": "MonarchV3_phenotype_similarity_search",
+    "description": "Find diseases that best match a set of phenotypes (HPO terms) using semantic similarity from the Monarch Initiative. Given a patient phenotype profile as a list of HPO IDs, returns diseases ranked by phenotype overlap score. Uses information content-based similarity (AncestorInformationContent metric). Essential for rare disease differential diagnosis: input observed phenotypes, get ranked candidate diseases. Example: [HP:0001250 (seizure), HP:0001249 (intellectual disability), HP:0002353 (EEG abnormality)] returns diseases like intellectual disability AR 31, Dravet syndrome ranked by semantic similarity score.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "phenotypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of HPO term CURIEs representing observed phenotypes. Examples: ['HP:0001250', 'HP:0001249', 'HP:0002353'] for seizure + intellectual disability + EEG abnormality."
+        },
+        "group": {
+          "type": "string",
+          "description": "Entity group to search against. Default: 'Human Diseases'. Options: 'Human Diseases', 'Mouse', 'Rat', 'Zebrafish', 'C. elegans', 'Drosophila'."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of matching diseases to return (default: 10, max: 50)."
+        }
+      },
+      "required": [
+        "phenotypes"
+      ]
+    },
+    "fields": {
+      "endpoint": "semsim_search"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "phenotypes": [
+          "HP:0001250",
+          "HP:0001249",
+          "HP:0002353"
+        ],
+        "limit": 5
+      },
+      {
+        "phenotypes": [
+          "HP:0001166",
+          "HP:0000545",
+          "HP:0001519"
+        ],
+        "group": "Human Diseases",
+        "limit": 5
+      }
+    ],
+    "return_schema": {
+      "type": "array"
+    }
+  },
+  {
+    "name": "MonarchV3_phenotype_profile_compare",
+    "description": "Compare two explicit phenotype profiles (HPO term sets) pairwise using Monarch Initiative semantic similarity. Given a subject term set (e.g., a patient's observed phenotypes) and an object term set (e.g., a candidate disease's known phenotypes), returns the overall similarity scores (average_score, best_score, metric) plus the per-term best matches in BOTH directions, each match including the matched phenotype, the shared ancestor term, Jaccard similarity, and Phenodigm score. Unlike MonarchV3_phenotype_similarity_search (which ranks diseases against a profile), this compares two specific profiles directly. Example: subjects=[HP:0001250 (Seizure), HP:0004322 (Short stature)] vs objects=[HP:0001263 (Global developmental delay), HP:0000252 (Microcephaly)] returns average_score ~8.16, best_score ~8.70, metric 'AncestorInformationContent', with HP:0001250 best-matching HP:0001263 at score ~8.03. Keyless HTTP 200.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Subject phenotype profile: list of HPO term CURIEs (e.g., ['HP:0001250', 'HP:0004322']). A comma-separated string is also accepted."
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Object phenotype profile to compare against: list of HPO term CURIEs (e.g., ['HP:0001263', 'HP:0000252']). A comma-separated string is also accepted."
+        }
+      },
+      "required": [
+        "subjects",
+        "objects"
+      ]
+    },
+    "fields": {
+      "endpoint": "semsim_compare"
+    },
+    "type": "MonarchV3Tool",
+    "test_examples": [
+      {
+        "subjects": [
+          "HP:0001250",
+          "HP:0004322"
+        ],
+        "objects": [
+          "HP:0001263",
+          "HP:0000252"
+        ]
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "average_score": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "best_score": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "metric": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subject_best_matches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "query_phenotype": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "query_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "matched_phenotype": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "matched_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "score": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "ancestor_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "ancestor_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "jaccard_similarity": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "phenodigm_score": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "object_best_matches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "query_phenotype": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "query_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "matched_phenotype": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "matched_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "score": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "ancestor_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "ancestor_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "jaccard_similarity": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "phenodigm_score": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

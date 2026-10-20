@@ -1,0 +1,322 @@
+[
+  {
+    "name": "ProteomeXchange_get_dataset",
+    "description": "Get detailed metadata for a ProteomeXchange proteomics dataset by PX identifier. Returns title, species, instruments, publications (PubMed/DOI), file count, and cross-references to partner repositories (PRIDE, MassIVE, PeptideAtlas, jPOST). ProteomeXchange is the central hub for proteomics data sharing. Example: PXD000001 returns the first ProteomeXchange dataset (Erwinia carotovora TMT LC-MS/MS from Cambridge).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "px_id": {
+          "type": "string",
+          "description": "ProteomeXchange dataset identifier (PXD format). Examples: 'PXD000001' (first PX dataset), 'PXD000561' (human proteome map)."
+        }
+      },
+      "required": [
+        "px_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "get_dataset"
+    },
+    "type": "ProteomeXchangeTool",
+    "test_examples": [
+      {
+        "px_id": "PXD000001"
+      },
+      {
+        "px_id": "PXD000561"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "px_id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "species": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "identifiers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "instruments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "publications": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pubmed_id": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "doi": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                }
+              }
+            },
+            "file_count": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "px_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "ProteomeXchange_search_datasets",
+    "description": "Search ProteomeXchange proteomics datasets via the MassIVE PROXI interface. Returns dataset accessions, titles, and species. ProteomeXchange aggregates data from PRIDE, MassIVE, PeptideAtlas, jPOST, and iProX. Useful for finding proteomics studies related to specific organisms, diseases, or proteins.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional search filter (dataset accession or keyword). Examples: 'MSV000091816', 'PXD'. Leave empty to list recent datasets."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum results to return (1-50, default 10)."
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint_type": "search_datasets"
+    },
+    "type": "ProteomeXchangeTool",
+    "test_examples": [
+      {
+        "limit": 5
+      },
+      {
+        "query": "PXD",
+        "limit": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accession": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "species": {
+                "type": "string"
+              },
+              "contact": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "ProteomeXchange_get_spectrum_by_usi",
+    "description": "Retrieve a single mass spectrum (PSM) from ProteomeXchange by Universal Spectrum Identifier (USI) via the PROXI v0.1 interface. Unlike the dataset-level tools, this returns spectrum/peak-level data: scan number, charge state, precursor m/z, peptide sequence, all CV-term attributes, and the peak list (m/z + intensity pairs, capped to the first 200 peaks). A USI has the form 'mzspec:<PXD accession>:<file>:scan:<scan>:<peptide>/<charge>'. Use ProteomeXchange_get_dataset or ProteomeXchange_search_datasets first to find dataset accessions and construct USIs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "usi": {
+          "type": "string",
+          "description": "Universal Spectrum Identifier. Example: 'mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555:VLHPLEGAVVIIFK/2'."
+        },
+        "resultType": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Level of detail returned by PROXI: 'full' (default, includes peak arrays) or 'compact'."
+        }
+      },
+      "required": [
+        "usi"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "get_spectrum_by_usi"
+    },
+    "type": "ProteomeXchangeTool",
+    "test_examples": [
+      {
+        "usi": "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555:VLHPLEGAVVIIFK/2"
+      },
+      {
+        "usi": "mzspec:PXD000561:Adult_Frontalcortex_bRP_Elite_85_f09:scan:17555:VLHPLEGAVVIIFK/2",
+        "resultType": "full"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "usi": {
+              "type": "string"
+            },
+            "scan_number": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "charge": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "precursor_mz": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "peptide_sequence": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "attributes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "accession": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {}
+                }
+              }
+            },
+            "total_peaks": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "returned_peaks": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "peaks_truncated": {
+              "type": "boolean"
+            },
+            "peaks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "mz": {
+                    "type": [
+                      "number",
+                      "integer"
+                    ]
+                  },
+                  "intensity": {
+                    "type": [
+                      "number",
+                      "integer"
+                    ]
+                  }
+                }
+              }
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "usi"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]
