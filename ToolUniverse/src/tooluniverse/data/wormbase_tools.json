@@ -1,0 +1,653 @@
+[
+  {
+    "name": "WormBase_get_gene",
+    "description": "Get detailed gene overview from WormBase for C. elegans (nematode worm) by WormBase gene ID. Returns gene name, sequence name, species, description, gene type, and status. C. elegans is one of the most important model organisms for genetics, neuroscience, and developmental biology. Example: WBGene00006763 returns unc-26 (synaptojanin, a polyphosphoinositide phosphatase required for synaptic vesicle recycling). NOTE: rest.wormbase.org currently serves a Cloudflare bot challenge to automated clients, so this tool returns HTTP 403; ToolUniverse does not attempt to bypass it. For C. elegans genes use the Alliance of Genome Resources tools (Alliance_get_gene with a 'WB:WBGene...' ID, Alliance_get_gene_phenotypes, Alliance_get_gene_orthologs, Alliance_get_disease) instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "WormBase gene identifier (WBGene format). Examples: 'WBGene00006763' (unc-26), 'WBGene00006789' (unc-52), 'WBGene00000898' (daf-2)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_overview"
+    },
+    "type": "WormBaseTool",
+    "test_examples": [
+      {
+        "gene_id": "WBGene00006763"
+      },
+      {
+        "gene_id": "WBGene00000898"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wormbase_id": {
+              "type": "string"
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sequence_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "species": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gene_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WormBase_get_phenotypes",
+    "description": "Get phenotype annotations for a C. elegans gene from WormBase. Returns observed phenotypes (from RNAi, mutation, transgene experiments), phenotypes not observed, and total counts. Phenotype data uses the WormBase Phenotype Ontology (WPO). Example: WBGene00006763 (unc-26) has 125+ observed phenotypes including locomotion defects, synaptic vesicle recycling abnormalities, and pharyngeal pumping defects. NOTE: rest.wormbase.org currently serves a Cloudflare bot challenge to automated clients, so this tool returns HTTP 403; ToolUniverse does not attempt to bypass it. For C. elegans genes use the Alliance of Genome Resources tools (Alliance_get_gene with a 'WB:WBGene...' ID, Alliance_get_gene_phenotypes, Alliance_get_gene_orthologs, Alliance_get_disease) instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "WormBase gene identifier. Examples: 'WBGene00006763' (unc-26), 'WBGene00000898' (daf-2)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_phenotypes"
+    },
+    "type": "WormBaseTool",
+    "test_examples": [
+      {
+        "gene_id": "WBGene00006763"
+      },
+      {
+        "gene_id": "WBGene00000898"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wormbase_id": {
+              "type": "string"
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "phenotype_count": {
+              "type": "integer"
+            },
+            "phenotypes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "phenotype_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phenotype_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evidence_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "not_observed_count": {
+              "type": "integer"
+            },
+            "phenotypes_not_observed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "phenotype_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phenotype_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WormBase_get_expression",
+    "description": "Get expression data for a C. elegans gene from WormBase. Returns tissues where the gene is expressed, developmental stages, subcellular localization, and expression clusters. Expression data is curated from GFP reporters, antibody staining, RNA in situ, and microarray experiments. Example: WBGene00006763 (unc-26) is expressed in 38 tissues including neurons, pharynx, and body wall muscle. NOTE: rest.wormbase.org currently serves a Cloudflare bot challenge to automated clients, so this tool returns HTTP 403; ToolUniverse does not attempt to bypass it. For C. elegans genes use the Alliance of Genome Resources tools (Alliance_get_gene with a 'WB:WBGene...' ID, Alliance_get_gene_phenotypes, Alliance_get_gene_orthologs, Alliance_get_disease) instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "WormBase gene identifier. Examples: 'WBGene00006763' (unc-26), 'WBGene00000898' (daf-2)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_expression"
+    },
+    "type": "WormBaseTool",
+    "test_examples": [
+      {
+        "gene_id": "WBGene00006763"
+      },
+      {
+        "gene_id": "WBGene00000898"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wormbase_id": {
+              "type": "string"
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "expressed_in_count": {
+              "type": "integer"
+            },
+            "expressed_in": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "term_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "expressed_during": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "term_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "subcellular_localization": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "term_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "expression_clusters_count": {
+              "type": "integer"
+            },
+            "expression_clusters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "cluster_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "cluster_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WormBase_get_orthologs",
+    "description": "Get orthologs and homologs of a C. elegans gene across species from WormBase (Inparanoid/EnsEMBL-Compara/OrthoFinder etc.), plus nematode orthologs and within-worm paralogs. Accepts a WBGene ID or gene name (auto-resolved). Example: WBGene00006818 (unc-86) returns cross-species orthologs like zebrafish pou4f4 and nematode orthologs like CSP40.g8217 (c_tribulationis). NOTE: rest.wormbase.org currently serves a Cloudflare bot challenge to automated clients, so this tool returns HTTP 403; ToolUniverse does not attempt to bypass it. For C. elegans genes use the Alliance of Genome Resources tools (Alliance_get_gene with a 'WB:WBGene...' ID, Alliance_get_gene_phenotypes, Alliance_get_gene_orthologs, Alliance_get_disease) instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "WBGene identifier or gene name. Examples: 'WBGene00006818', 'unc-86'."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_orthologs"
+    },
+    "type": "WormBaseTool",
+    "timeout": 30,
+    "test_examples": [
+      {
+        "gene_id": "WBGene00006818"
+      },
+      {
+        "gene_id": "unc-86"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wormbase_id": {
+              "type": "string"
+            },
+            "cross_species_ortholog_count": {
+              "type": "integer"
+            },
+            "cross_species_orthologs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ortholog_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "ortholog_label": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "species": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "methods": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "nematode_ortholog_count": {
+              "type": "integer"
+            },
+            "nematode_orthologs": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "paralog_count": {
+              "type": "integer"
+            },
+            "paralogs": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WormBase_get_interactions",
+    "description": "Get physical and genetic interactions for a C. elegans gene from WormBase, split into physical and genetic lists with interactor names, IDs, interaction type, and citation. Accepts a WBGene ID or gene name. Example: WBGene00006818 (unc-86) has a physical interactor die-1 (WBGene00000995) and a genetic interactor ttx-3 (WBGene00006654). NOTE: rest.wormbase.org currently serves a Cloudflare bot challenge to automated clients, so this tool returns HTTP 403; ToolUniverse does not attempt to bypass it. For C. elegans genes use the Alliance of Genome Resources tools (Alliance_get_gene with a 'WB:WBGene...' ID, Alliance_get_gene_phenotypes, Alliance_get_gene_orthologs, Alliance_get_disease) instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "WBGene identifier or gene name. Examples: 'WBGene00006818', 'unc-86'."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_interactions"
+    },
+    "type": "WormBaseTool",
+    "timeout": 30,
+    "test_examples": [
+      {
+        "gene_id": "WBGene00006818"
+      },
+      {
+        "gene_id": "unc-86"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wormbase_id": {
+              "type": "string"
+            },
+            "total_interactions": {
+              "type": "integer"
+            },
+            "physical_count": {
+              "type": "integer"
+            },
+            "physical_interactions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "interactor_1": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interactor_1_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interactor_2": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interactor_2_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interaction_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "citation": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "genetic_count": {
+              "type": "integer"
+            },
+            "genetic_interactions": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WormBase_get_human_diseases",
+    "description": "Get human disease models (Disease Ontology / DOID) for a C. elegans gene from WormBase, inferred by orthology to human disease genes. Accepts a WBGene ID or gene name. Example: WBGene00006818 (unc-86) is a potential model for DOID:0110546 'autosomal dominant nonsyndromic deafness 15', inferred by orthology to human HGNC:9220. NOTE: rest.wormbase.org currently serves a Cloudflare bot challenge to automated clients, so this tool returns HTTP 403; ToolUniverse does not attempt to bypass it. For C. elegans genes use the Alliance of Genome Resources tools (Alliance_get_gene with a 'WB:WBGene...' ID, Alliance_get_gene_phenotypes, Alliance_get_gene_orthologs, Alliance_get_disease) instead.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "WBGene identifier or gene name. Examples: 'WBGene00006818', 'unc-86'."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_human_diseases"
+    },
+    "type": "WormBaseTool",
+    "timeout": 30,
+    "test_examples": [
+      {
+        "gene_id": "WBGene00006818"
+      },
+      {
+        "gene_id": "unc-86"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "wormbase_id": {
+              "type": "string"
+            },
+            "human_gene_ids": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "disease_count": {
+              "type": "integer"
+            },
+            "diseases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "disease_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "disease_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

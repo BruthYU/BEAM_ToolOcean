@@ -1,0 +1,163 @@
+[
+  {
+    "type": "CompoundVariantAnnotationTool",
+    "name": "annotate_variant_multi_source",
+    "description": "Annotate a genetic variant from ClinVar, gnomAD, CIViC, and UniProt in a single call. Returns pathogenicity classification, population constraints, clinical evidence, and protein function. Use when you need comprehensive variant interpretation from multiple databases at once.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "variant": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Variant name (e.g., 'BRAF V600E', 'TP53 R175H'). Gene symbol + amino acid change."
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Gene symbol (e.g., 'BRCA1'). Used for gnomAD/CIViC lookup."
+        },
+        "rsid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "dbSNP rsID (e.g., 'rs113488022')."
+        }
+      },
+      "required": []
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "Unwrapped payload (result['data']) of a successful call.",
+      "properties": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gene": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "rsid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "sources_queried": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Subset of clinvar, gnomad, civic, uniprot that were actually queried (a source is skipped entirely if no gene could be resolved)."
+        },
+        "sources_failed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "summary": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sources_with_data": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "clinvar_classification": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Present when ClinVar returned gene-level variants; null when none matched the queried variant exactly."
+            },
+            "clinvar_classifications": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Present only when multiple distinct classifications matched (e.g. a multi-allelic rsid)."
+            },
+            "clinvar_note": {
+              "type": "string",
+              "description": "Present only to explain an ambiguous or missing exact ClinVar match."
+            },
+            "gnomad_gene_id": {
+              "type": "string",
+              "description": "Present only when gnomAD returned gene data."
+            },
+            "civic_variants_matched": {
+              "type": "integer",
+              "description": "Present only when CIViC matched at least one variant."
+            }
+          },
+          "required": [
+            "query",
+            "sources_with_data"
+          ]
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Per-source parsed results, keyed by source name (clinvar, gnomad, civic, uniprot); a source is present only if it was queried, and its inner shape differs per source (or may fall back to {\"raw\": \"<string>\"} on an unparseable response).",
+          "properties": {
+            "clinvar": {
+              "type": "object",
+              "description": "Typically {total_gene_variants, matched, exact_match, variants: [{name, classification, review_status}]}."
+            },
+            "gnomad": {
+              "type": "object",
+              "description": "Typically {gene_id, symbol, name, chromosome, canonical_transcript}, or {} if gnomAD had no record."
+            },
+            "civic": {
+              "type": "object",
+              "description": "Typically {total_gene_variants, matched, exact_match, variants: [{name, civic_id, feature}]}."
+            },
+            "uniprot": {
+              "type": "object",
+              "description": "Typically {accession, protein_name, gene_name, function}."
+            }
+          }
+        }
+      },
+      "required": [
+        "query",
+        "sources_queried",
+        "sources_failed",
+        "summary",
+        "annotations"
+      ]
+    },
+    "test_examples": [
+      {
+        "variant": "BRAF V600E"
+      },
+      {
+        "gene": "BRCA1"
+      },
+      {
+        "rsid": "rs113488022"
+      }
+    ]
+  }
+]

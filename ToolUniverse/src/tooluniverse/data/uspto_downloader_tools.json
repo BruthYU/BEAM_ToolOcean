@@ -1,0 +1,28 @@
+[
+  {
+    "name": "mcp_auto_loader_uspto_downloader",
+    "description": "Download USPTO patent documents (abstract, claims, and full application text) using MCP protocol",
+    "type": "MCPAutoLoaderTool",
+    "server_url": "http://${USPTO_MCP_SERVER_HOST}:8081/mcp",
+    "required_api_keys": [
+      "USPTO_MCP_SERVER_HOST"
+    ],
+    "api_key_info": {
+      "USPTO_MCP_SERVER_HOST": {
+        "domain": "Models & Infrastructure",
+        "type": "endpoint",
+        "register_url": "https://developer.uspto.gov/",
+        "purpose": "URL of a self-hosted USPTO MCP server.",
+        "without": "Leave blank unless you run your own USPTO server."
+      }
+    },
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "type": "object",
+      "description": "Output of the tool execution.",
+      "properties": {}
+    }
+  }
+]

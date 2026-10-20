@@ -1,0 +1,641 @@
+[
+  {
+    "name": "PomBase_get_gene",
+    "description": "Get detailed gene information from PomBase for fission yeast (S. pombe) by systematic ID. Returns gene name, protein product, InterPro domain annotations, deletion viability, UniProt cross-reference, and transmembrane domain coordinates. S. pombe is a key model organism for cell cycle, chromosome biology, and RNA processing research. Example: SPBC11B10.09 returns cdc2 (cyclin-dependent kinase), essential for cell division.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "PomBase systematic gene identifier. Examples: 'SPBC11B10.09' (cdc2), 'SPAC2F7.03c' (pom1), 'SPAC1002.17c' (ase1)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_detail"
+    },
+    "type": "PomBaseTool",
+    "test_examples": [
+      {
+        "gene_id": "SPBC11B10.09"
+      },
+      {
+        "gene_id": "SPAC2F7.03c"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "systematic_id": {
+              "type": "string"
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "product": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "taxon_id": {
+              "type": "integer"
+            },
+            "uniprot_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "deletion_viability": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "biogrid_id": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "interpro_domains": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "db": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interpro_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "start": {
+                    "type": "integer"
+                  },
+                  "end": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "PomBase_search_genes",
+    "description": "Search PomBase for fission yeast (S. pombe) genes by name, systematic ID, or protein product keyword. Searches across 12,600+ gene entries. Returns matching genes with systematic IDs, gene names, and protein products. Example: searching 'kinase' returns CDK and other kinase genes; searching 'cdc' returns cell division cycle genes.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query - gene name, systematic ID prefix, or product keyword. Examples: 'cdc2', 'kinase', 'SPAC', 'pom1'."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum results to return (1-50, default 10)."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_summary_search"
+    },
+    "type": "PomBaseTool",
+    "test_examples": [
+      {
+        "query": "cdc2",
+        "limit": 5
+      },
+      {
+        "query": "kinase",
+        "limit": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "systematic_id": {
+                "type": "string"
+              },
+              "gene_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "product": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "uniprot_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "PomBase_get_gene_phenotypes",
+    "description": "Get phenotype annotations for a fission yeast (S. pombe) gene from PomBase. Returns deletion viability, FYPO (Fission Yeast Phenotype Ontology) term annotations with evidence codes. S. pombe phenotypes are a key resource for understanding gene function in cell biology. Example: SPBC11B10.09 (cdc2) is inviable when deleted, reflecting its essential role in cell division.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "PomBase systematic gene identifier. Examples: 'SPBC11B10.09' (cdc2), 'SPAC2F7.03c' (pom1)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_phenotypes"
+    },
+    "type": "PomBaseTool",
+    "test_examples": [
+      {
+        "gene_id": "SPBC11B10.09"
+      },
+      {
+        "gene_id": "SPAC2F7.03c"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "systematic_id": {
+              "type": "string"
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "deletion_viability": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "phenotype_count": {
+              "type": "integer"
+            },
+            "phenotypes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "term_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evidence": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "cv_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "PomBase_get_orthologs",
+    "description": "Get human and S. cerevisiae orthologs of a fission-yeast (S. pombe) gene from PomBase. Returns ortholog IDs with taxon (9606=human via HGNC, 4932=budding yeast via systematic name). Example: SPBC11B10.09 (cdc2) returns human CDKs HGNC:1722/1771/1772 (taxon 9606) and S. cerevisiae CDC28 / YBR160W (taxon 4932).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "PomBase systematic ID. Examples: 'SPBC11B10.09' (cdc2), 'SPAC1006.03c' (red1)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_orthologs"
+    },
+    "type": "PomBaseTool",
+    "timeout": 30,
+    "test_examples": [
+      {
+        "gene_id": "SPBC11B10.09"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "systematic_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ortholog_count": {
+              "type": "integer"
+            },
+            "orthologs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ortholog_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "ortholog_taxon_id": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "ortholog_species": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "PomBase_get_interactions",
+    "description": "Get physical and genetic interactions for a fission-yeast (S. pombe) gene from PomBase, each with evidence method, reference (PMID), throughput, and source database. Example: SPBC11B10.09 (cdc2) has ~100 physical interactions (e.g. SPAC1006.03c/red1 via Affinity Capture-MS, PMID:24713849, BIOGRID) and ~118 genetic interactions.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "PomBase systematic ID. Examples: 'SPBC11B10.09' (cdc2)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_interactions"
+    },
+    "type": "PomBaseTool",
+    "timeout": 30,
+    "test_examples": [
+      {
+        "gene_id": "SPBC11B10.09"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "systematic_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "physical_interaction_count": {
+              "type": "integer"
+            },
+            "physical_interactions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "interactor_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interactor_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evidence": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "throughput": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_database": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "genetic_interaction_count": {
+              "type": "integer"
+            },
+            "genetic_interactions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "interactor_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interactor_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "interaction_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "reference": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "throughput": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "source_database": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "PomBase_get_go_annotations",
+    "description": "Get Gene Ontology annotations (biological_process / molecular_function / cellular_component) for a fission-yeast (S. pombe) gene from PomBase, with per-aspect counts and resolved term names. Example: SPBC11B10.09 (cdc2) returns BP terms like GO:0000082 'G1/S transition of mitotic cell cycle', plus MF and CC terms.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "PomBase systematic ID. Examples: 'SPBC11B10.09' (cdc2)."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "gene_go_annotations"
+    },
+    "type": "PomBaseTool",
+    "timeout": 30,
+    "test_examples": [
+      {
+        "gene_id": "SPBC11B10.09"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "systematic_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gene_name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "aspect_counts": {
+              "type": "object"
+            },
+            "go_term_count": {
+              "type": "integer"
+            },
+            "go_terms": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "term_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "term_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "aspect": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "aspect_code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "is_not": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

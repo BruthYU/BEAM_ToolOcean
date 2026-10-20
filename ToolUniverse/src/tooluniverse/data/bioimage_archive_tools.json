@@ -1,0 +1,404 @@
+[
+  {
+    "name": "BioImageArchive_search_studies",
+    "description": "Search the BioImage Archive (EBI BioStudies) for biological imaging datasets. The BioImage Archive hosts open microscopy, imaging, and visualization data from life sciences research. Search by imaging modality (cryo-EM, fluorescence, confocal), organism, technique, or scientific topic. Returns study accessions, titles, and metadata. Example: 'fluorescence microscopy cell' finds fluorescence imaging studies.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query - imaging modality, organism, technique, or topic. Examples: 'cryo-EM', 'fluorescence microscopy', 'cell segmentation', 'brain imaging', 'protein localization'."
+        },
+        "page_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of results per page. Default: 10. Max: 100."
+        },
+        "page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Page number (1-indexed). Default: 1."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "action": "search"
+    },
+    "type": "BioImageArchiveTool",
+    "test_examples": [
+      {
+        "query": "fluorescence microscopy cell",
+        "page_size": 5
+      },
+      {
+        "query": "cryo-EM",
+        "page_size": 3
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accession": {
+                "type": "string",
+                "description": "Study accession (e.g., S-BIAD634)"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Study title"
+              },
+              "author": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Author(s)"
+              },
+              "release_date": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Release date"
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Study type"
+              },
+              "links": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Number of linked resources"
+              },
+              "files": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Number of files"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BioImageArchive_get_study",
+    "description": "Get detailed information about a specific BioImage Archive study by accession number. Returns comprehensive metadata including title, description, imaging methods, organism, and file information. Example: 'S-BIAD634' returns an annotated fluorescence image dataset.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "BioImage Archive study accession number. Format: S-BIAD#### or S-BSST#### or S-EPMC#######. Examples: 'S-BIAD634', 'S-BIAD928'."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "action": "get_study"
+    },
+    "type": "BioImageArchiveTool",
+    "test_examples": [
+      {
+        "accession": "S-BIAD634"
+      },
+      {
+        "accession": "S-BIAD928"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "release_date": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "organism": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "imaging_method": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "attributes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "section_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BioImageArchive_search_bioimages",
+    "description": "Search the BioImage Archive specifically for biological image datasets (BioImages collection). This targets the BioImages-specific collection at EBI, returning imaging studies with microscopy-specific metadata. Example: 'cell division' finds imaging datasets of cell division processes.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for biological imaging data. Examples: 'cell division', 'neuron morphology', 'tissue section', 'live cell imaging'."
+        },
+        "page_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of results per page. Default: 10. Max: 100."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "action": "search_bioimages"
+    },
+    "type": "BioImageArchiveTool",
+    "test_examples": [
+      {
+        "query": "cell division",
+        "page_size": 5
+      },
+      {
+        "query": "neuron morphology",
+        "page_size": 3
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accession": {
+                "type": "string"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "author": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "release_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BioImageArchive_list_study_files",
+    "description": "List the file/image manifest of a BioImage Archive study, giving per-file download paths and per-image experimental annotations. Unlike BioImageArchive_get_study (which returns study-level metadata), this returns the actual files: image Name, relative download path (append to the study's FTP/HTTPS root), file size, and any annotation columns the submitters attached to each image (e.g. staining, cells, treatment, channels, timepoint). Use limit/offset to page through large manifests; metadata.records_total gives the full file count. Example: S-BIAD144 has 223 files; the first is 'experimentA_01_WT_PDMP.czi' (path experiments/experimentA_01_WT_PDMP.czi) with annotations staining='click chemistry and IF', cells='WT', treatment='20 uM PDMP', Channel_1='pacSph', Channel_2='Lamp1'.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "BioImage Archive study accession. Format S-BIAD#### / S-BSST#### (e.g. 'S-BIAD144'). Obtain from BioImageArchive_search_studies."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of files to return (default 25, max 500)."
+        },
+        "offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of files to skip for pagination (default 0)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "action": "list_study_files"
+    },
+    "type": "BioImageArchiveTool",
+    "test_examples": [
+      {
+        "accession": "S-BIAD144",
+        "limit": 5
+      },
+      {
+        "accession": "S-BIAD144",
+        "limit": 3,
+        "offset": 2
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "Name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "path": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "size": {
+                "type": [
+                  "integer",
+                  "number",
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "section": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "annotations": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

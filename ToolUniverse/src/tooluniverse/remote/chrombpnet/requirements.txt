@@ -1,0 +1,5 @@
+tensorflow>=2.16
+numpy
+# Configure one administrator-reviewed Keras v3 .keras artifact through
+# CHROMBPNET_MODEL_PATH. The remote service intentionally rejects legacy .h5
+# deserialization and caller-selected model paths. GPU recommended for throughput.

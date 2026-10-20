@@ -1,0 +1,299 @@
+[
+  {
+    "name": "EnsemblLD_get_ld_variants",
+    "description": "Get linkage disequilibrium (LD) data for a variant from the Ensembl REST API. Returns variants in LD with the query variant in a specified 1000 Genomes population, with r-squared and D' statistics. LD measures the non-random association of alleles at different loci, critical for GWAS interpretation and fine-mapping. Results are sorted by r2 (strongest first) and capped at `limit` (default 200); `total_ld_count` always reports how many partners passed the thresholds and `truncated` flags whether any were withheld -- raise `limit` to retrieve them all. Example: rs1042779 in KHV population returns 708 LD partners with r2 and D' values.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "variant_id": {
+          "type": "string",
+          "description": "rs ID of the variant. Examples: 'rs1042779', 'rs429358', 'rs7903146', 'rs6792369'."
+        },
+        "population": {
+          "type": "string",
+          "description": "1000 Genomes population. Format: '1000GENOMES:phase_3:<POP>'. Common populations: 'KHV' (Kinh Vietnamese), 'CEU' (CEPH Utah), 'YRI' (Yoruba), 'CHB' (Han Chinese Beijing), 'GBR' (British), 'JPT' (Japanese Tokyo), 'ASW' (African SW US). Example: '1000GENOMES:phase_3:CEU'."
+        },
+        "r2_threshold": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Minimum r-squared threshold to report. Default: 0.05. Set higher (e.g., 0.8) for strong LD only."
+        },
+        "d_prime_threshold": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Minimum D' threshold. Default: none. Set e.g., 0.8 for high D' only."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Maximum number of LD partners to return, strongest r2 first. Default: 200. Increase to retrieve every partner when `truncated` is true."
+        }
+      },
+      "required": [
+        "variant_id",
+        "population"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "ld_variants"
+    },
+    "type": "EnsemblLDTool",
+    "test_examples": [
+      {
+        "variant_id": "rs1042779",
+        "population": "1000GENOMES:phase_3:KHV"
+      },
+      {
+        "variant_id": "rs429358",
+        "population": "1000GENOMES:phase_3:CEU",
+        "r2_threshold": 0.5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "query_variant": {
+              "type": "string"
+            },
+            "population": {
+              "type": "string"
+            },
+            "total_ld_count": {
+              "type": "integer",
+              "description": "Total LD partners passing the thresholds, before truncation"
+            },
+            "ld_count": {
+              "type": "integer",
+              "description": "Number of LD partners actually returned in ld_variants"
+            },
+            "truncated": {
+              "type": "boolean",
+              "description": "True when total_ld_count exceeds ld_count; raise `limit` to retrieve the rest"
+            },
+            "ld_variants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "variant1": {
+                    "type": "string"
+                  },
+                  "variant2": {
+                    "type": "string"
+                  },
+                  "r2": {
+                    "type": "number"
+                  },
+                  "d_prime": {
+                    "type": "number"
+                  },
+                  "population_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EnsemblLD_get_ld_pairwise",
+    "description": "Get pairwise linkage disequilibrium (LD) statistics between two specific variants from the Ensembl REST API. Returns r-squared and D' across ALL 1000 Genomes populations, allowing comparison of LD patterns across ancestries. Useful for assessing whether two GWAS signals are correlated or independent. Example: rs6792369 vs rs1042779 shows r2=1.0 in East Asian populations but r2=0.84 in African populations.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "variant1": {
+          "type": "string",
+          "description": "rs ID of the first variant. Examples: 'rs6792369', 'rs429358'."
+        },
+        "variant2": {
+          "type": "string",
+          "description": "rs ID of the second variant. Examples: 'rs1042779', 'rs7412'."
+        }
+      },
+      "required": [
+        "variant1",
+        "variant2"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "ld_pairwise"
+    },
+    "type": "EnsemblLDTool",
+    "test_examples": [
+      {
+        "variant1": "rs6792369",
+        "variant2": "rs1042779"
+      },
+      {
+        "variant1": "rs429358",
+        "variant2": "rs7412"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "variant1": {
+              "type": "string"
+            },
+            "variant2": {
+              "type": "string"
+            },
+            "population_count": {
+              "type": "integer"
+            },
+            "ld_by_population": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "population_name": {
+                    "type": "string"
+                  },
+                  "r2": {
+                    "type": "number"
+                  },
+                  "d_prime": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EnsemblLD_get_ld_region",
+    "description": "Get region-wide pairwise linkage disequilibrium (LD) from the Ensembl REST API: every r-squared and D' pair among ALL variants inside a chromosomal window for one 1000 Genomes Phase 3 population. This is the LD matrix used as input to statistical fine-mapping (e.g. SuSiE, FINEMAP) and LD-aware clumping at a GWAS locus. The window must be <= 1 Mb (Ensembl limit). Region format: 'chr:start..end'. Example: region '6:25837556..25840000' in CEU returns 4 LD pairs, e.g. rs62394274/rs62394275 with r2=1.0 and d_prime=1.0.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "Chromosomal window as 'chr:start..end' (1-based, GRCh38), max 1 Mb. Example: '6:25837556..25840000'."
+        },
+        "population": {
+          "type": "string",
+          "description": "1000 Genomes population. Format: '1000GENOMES:phase_3:<POP>'. Common populations: 'CEU' (CEPH Utah), 'YRI' (Yoruba), 'CHB' (Han Chinese Beijing), 'GBR' (British), 'JPT' (Japanese Tokyo), 'KHV' (Kinh Vietnamese). Example: '1000GENOMES:phase_3:CEU'."
+        },
+        "r2_threshold": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Minimum r-squared threshold to report. Set higher (e.g., 0.8) for strong LD only."
+        },
+        "d_prime_threshold": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Minimum D' threshold to report. Set e.g., 0.8 for high D' only."
+        }
+      },
+      "required": [
+        "region",
+        "population"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "ld_region"
+    },
+    "type": "EnsemblLDTool",
+    "test_examples": [
+      {
+        "region": "6:25837556..25840000",
+        "population": "1000GENOMES:phase_3:CEU"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "region": {
+              "type": "string"
+            },
+            "population": {
+              "type": "string"
+            },
+            "ld_count": {
+              "type": "integer"
+            },
+            "ld_pairs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "variant1": {
+                    "type": "string"
+                  },
+                  "variant2": {
+                    "type": "string"
+                  },
+                  "r2": {
+                    "type": "number"
+                  },
+                  "d_prime": {
+                    "type": "number"
+                  },
+                  "population_name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,552 @@
+[
+  {
+    "name": "BMRB_get_entry",
+    "description": "Get NMR data entry from the Biological Magnetic Resonance Data Bank (BMRB). Returns the full NMR-STAR data for a BMRB entry including chemical shifts, coupling constants, relaxation data, structure restraints, and experimental conditions. BMRB archives NMR spectroscopy data for biological macromolecules (proteins, nucleic acids, carbohydrates) and small molecules. Entry IDs are integers (e.g., 15000 for villin headpiece, 4020 for ubiquitin).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "description": "BMRB entry ID (e.g., '15000', '4020', '11086')"
+        }
+      },
+      "required": [
+        "entry_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/entry/{entry_id}"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "entry_id": "15000"
+      },
+      {
+        "entry_id": "4020"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "BMRB entry NMR-STAR data",
+          "properties": {
+            "entry_id": {
+              "type": "string",
+              "description": "BMRB entry identifier"
+            },
+            "saveframes": {
+              "type": "object",
+              "description": "NMR-STAR saveframes containing experimental data by category"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_get_entry_citation",
+    "description": "Get the citation/publication information for a BMRB NMR entry in BibTeX format. Returns author list, title, journal, DOI, and year. Useful for citing NMR data sources.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "description": "BMRB entry ID (e.g., '15000', '4020')"
+        }
+      },
+      "required": [
+        "entry_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/entry/{entry_id}/citation"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "entry_id": "15000"
+      },
+      {
+        "entry_id": "11086"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "BibTeX citation string for the BMRB entry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_search_by_keyword",
+    "description": "Search BMRB (Biological Magnetic Resonance Data Bank) entries by keyword or molecule name. Returns matching BMRB entries with their IDs and summary information. Use the 'database' parameter to search either macromolecules (proteins, nucleic acids) or metabolomics small molecules.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "term": {
+          "type": "string",
+          "description": "Search term (protein name, molecule name, or keyword). Examples: 'ubiquitin', 'calmodulin', 'insulin'"
+        },
+        "database": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Database to search: 'macromolecules' (proteins/nucleic acids) or 'metabolomics' (small molecules). Default searches both."
+        }
+      },
+      "required": [
+        "term"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/search/instant"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "term": "ubiquitin",
+        "database": "macromolecules"
+      },
+      {
+        "term": "caffeine",
+        "database": "metabolomics"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of matching BMRB entries",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bmrb_id": {
+                "type": "string",
+                "description": "BMRB entry identifier"
+              },
+              "title": {
+                "type": "string"
+              },
+              "authors": {
+                "type": "array"
+              },
+              "link": {
+                "type": "string"
+              },
+              "sub_date": {
+                "type": "string"
+              },
+              "pdb_ids": {
+                "type": "array"
+              },
+              "formula": {
+                "type": "string"
+              },
+              "smiles": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_get_entries_by_pdb_id",
+    "description": "Find BMRB NMR entries associated with a PDB structure. Returns BMRB entry IDs linked to a given PDB accession, with match type (BLAST or author-provided). Useful for finding NMR chemical shift data for a protein with known crystal structure.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "pdb_id": {
+          "type": "string",
+          "description": "PDB entry ID (e.g., '1ubq', '1d3z', '2k39')"
+        }
+      },
+      "required": [
+        "pdb_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/search/get_bmrb_ids_from_pdb_id/{pdb_id}"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "pdb_id": "1ubq"
+      },
+      {
+        "pdb_id": "1d3z"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of BMRB entries linked to the PDB ID",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bmrb_id": {
+                "type": "string"
+              },
+              "match_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "How the link was established: 'BLAST Match' or 'Author Provided'"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_search_by_sequence",
+    "description": "Search ALL BMRB entries by protein or nucleic-acid sequence similarity (FASTA/BLAST). Given a single-letter sequence, returns every deposited NMR entry whose macromolecule aligns to it, ranked by similarity, with percent identity, alignment length, mismatches, gap openings, query/subject coordinates, e-value, and bit score. This is an archive-wide sequence search you cannot get from a single-entry fetch: e.g. the 76-residue ubiquitin sequence returns ~235 hits including a 100% identity match. Use the 'type' parameter to choose 'polymer' (proteins/nucleic acids) or 'macromolecules'.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "sequence": {
+          "type": "string",
+          "description": "Single-letter amino-acid or nucleotide sequence to search (no FASTA header line). Example ubiquitin: 'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG'"
+        },
+        "type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Sequence database to search: 'polymer' (default; proteins and nucleic acids) or 'macromolecules'.",
+          "default": "polymer"
+        }
+      },
+      "required": [
+        "sequence"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/search/fasta/{sequence}",
+      "headers": {
+        "Application": "tooluniverse"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "sequence": "MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG",
+        "type": "polymer"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of matching BMRB entries ranked by similarity",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entry_id": {
+                "type": "string",
+                "description": "BMRB entry identifier"
+              },
+              "entity_id": {
+                "type": "string",
+                "description": "Entity (molecule) identifier within the entry"
+              },
+              "entry_title": {
+                "type": "string"
+              },
+              "percent_id": {
+                "type": "number",
+                "description": "Percent sequence identity of the alignment"
+              },
+              "alignment_length": {
+                "type": "integer"
+              },
+              "mismatches": {
+                "type": "integer"
+              },
+              "gap_openings": {
+                "type": "integer"
+              },
+              "e-value": {
+                "type": "number",
+                "description": "BLAST expectation value"
+              },
+              "bit_score": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_search_chemical_shifts",
+    "description": "Query the distribution of assigned NMR chemical-shift values for a given residue/atom across ALL BMRB entries (archive-wide statistics, not a single entry). Given a residue 3-letter code (comp_id, e.g. 'HIS') and an atom name (atom_id, e.g. 'CA'), returns every assigned shift in the archive as a table: each row carries Entry_ID, entity/assembly/comp index IDs, Comp_ID, Atom_ID, Atom_type, the shift value (ppm), value error, ambiguity code, plus sample pH and temperature. Optionally bound the values with shift_low/shift_high. Example: comp_id=HIS atom_id=CA returns ~26,000 rows across 13 columns.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "comp_id": {
+          "type": "string",
+          "description": "Residue/compound 3-letter code (e.g. 'HIS', 'ALA', 'GLY'). Nucleotides use 'A','C','G','U','DT' etc."
+        },
+        "atom_id": {
+          "type": "string",
+          "description": "Atom name within the residue (e.g. 'CA', 'CB', 'N', 'HA', 'H')."
+        },
+        "shift_low": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Optional lower bound (ppm) on the chemical-shift value to filter results."
+        },
+        "shift_high": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Optional upper bound (ppm) on the chemical-shift value to filter results."
+        }
+      },
+      "required": [
+        "comp_id",
+        "atom_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/search/chemical_shifts",
+      "headers": {
+        "Application": "tooluniverse"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "comp_id": "HIS",
+        "atom_id": "CA"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "description": "Column names for each row (e.g. Atom_chem_shift.Entry_ID, .Comp_ID, .Atom_ID, .Val, Sample_conditions.pH, .Temperature_K)",
+              "items": {
+                "type": "string"
+              }
+            },
+            "data": {
+              "type": "array",
+              "description": "Rows of chemical-shift records across all BMRB entries",
+              "items": {
+                "type": "array"
+              }
+            }
+          },
+          "required": [
+            "columns"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_get_validation",
+    "description": "Get the BMRB-computed NMR assignment validation report for an entry (AVS and PANAV analyses). Unlike fetching raw deposited shifts, this returns per-residue assignment-consistency scoring: AVS (Assignment Validation Software) flags anomalous vs consistent backbone/sidechain assignments, and PANAV (Probabilistic Approach for protein NMR Assignment Validation) reports reference chemical-shift offsets and lists deviant/suspicious assignments. Result is keyed by the entry ID and contains 'avs' and 'panav' categories. Example: entry 15000.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "entry_id": {
+          "type": "string",
+          "description": "BMRB entry ID (e.g. '15000', '4020'). Must be an entry with assigned chemical shifts."
+        }
+      },
+      "required": [
+        "entry_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/entry/{entry_id}/validate",
+      "headers": {
+        "Application": "tooluniverse"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "entry_id": "15000"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Map of entry_id -> {avs, panav} validation results",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "avs": {
+                "type": "object",
+                "description": "Assignment Validation Software per-residue consistency analysis"
+              },
+              "panav": {
+                "type": "object",
+                "description": "PANAV reference-offset and anomalous-shift analysis"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "BMRB_get_entries_by_uniprot",
+    "description": "Find BMRB NMR entries for a protein using its UniProt accession. Returns NMR data entries associated with the protein, allowing cross-referencing between sequence databases and NMR spectroscopy data.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "uniprot_id": {
+          "type": "string",
+          "description": "UniProt accession (e.g., 'P04637' for human p53, 'P00533' for EGFR; an accession with no BMRB entry returns an empty list, e.g. 'P62988')"
+        }
+      },
+      "required": [
+        "uniprot_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.bmrb.io/v2/protein/uniprot/{uniprot_id}"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "uniprot_id": "P04637"
+      },
+      {
+        "uniprot_id": "P0CG48"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of BMRB entries for the UniProt protein",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bmrb_id": {
+                "type": "string"
+              },
+              "pdb_id": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

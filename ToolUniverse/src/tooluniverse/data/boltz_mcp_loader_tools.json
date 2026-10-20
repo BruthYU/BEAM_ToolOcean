@@ -1,0 +1,28 @@
+[
+  {
+    "name": "mcp_auto_loader_boltz",
+    "description": "Run Boltz2 docking and affinity prediction using MCP protocol",
+    "type": "MCPAutoLoaderTool",
+    "server_url": "http://${BOLTZ_MCP_SERVER_HOST}:8080/mcp",
+    "required_api_keys": [
+      "BOLTZ_MCP_SERVER_HOST"
+    ],
+    "api_key_info": {
+      "BOLTZ_MCP_SERVER_HOST": {
+        "domain": "Models & Infrastructure",
+        "type": "endpoint",
+        "register_url": "https://github.com/jwohlwend/boltz",
+        "purpose": "URL of a self-hosted Boltz structure-prediction MCP server.",
+        "without": "Leave blank unless you run your own Boltz server."
+      }
+    },
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "type": "object",
+      "description": "Output of the tool execution.",
+      "properties": {}
+    }
+  }
+]

@@ -1,0 +1,349 @@
+[
+  {
+    "type": "GEOSearchDatasets",
+    "name": "geo_search_datasets",
+    "description": "Search GEO datasets by query terms, organism, study type, or platform. Returns dataset IDs and basic information.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query terms (e.g., 'cancer', 'diabetes', 'microarray')"
+        },
+        "organism": {
+          "type": "string",
+          "description": "Organism name (e.g., 'Homo sapiens', 'Mus musculus')",
+          "default": ""
+        },
+        "study_type": {
+          "type": "string",
+          "description": "Type of study (e.g., 'Expression profiling by array', 'Expression profiling by high throughput sequencing')",
+          "default": ""
+        },
+        "platform": {
+          "type": "string",
+          "description": "Platform used (e.g., 'GPL570', 'GPL96')",
+          "default": ""
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of results to return",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "/esearch.fcgi",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "GEO dataset search results",
+      "properties": {
+        "esearchresult": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "string",
+              "description": "Number of datasets found"
+            },
+            "idlist": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of GEO dataset IDs"
+            },
+            "querytranslation": {
+              "type": "string",
+              "description": "Translated search query"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "query": "cancer",
+        "organism": "Homo sapiens",
+        "limit": 10
+      },
+      {
+        "query": "diabetes",
+        "study_type": "Expression profiling by array",
+        "limit": 5
+      }
+    ],
+    "label": [
+      "GEO",
+      "Dataset",
+      "Search"
+    ],
+    "metadata": {
+      "tags": [
+        "expression",
+        "microarray",
+        "search"
+      ],
+      "difficulty_level": "easy",
+      "estimated_execution_time": "< 3 seconds"
+    }
+  },
+  {
+    "type": "GEOGetDatasetInfo",
+    "name": "geo_get_dataset_info",
+    "description": "Get detailed information about a specific GEO dataset including title, summary, and metadata.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "GEO dataset ID (e.g., 'GDS1234', 'GSE12345')"
+        }
+      },
+      "required": [
+        "dataset_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "/esummary.fcgi",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "GEO dataset information",
+      "properties": {
+        "result": {
+          "type": "object",
+          "description": "Dataset information from GEO",
+          "properties": {
+            "uid": {
+              "type": "string",
+              "description": "Dataset UID"
+            },
+            "title": {
+              "type": "string",
+              "description": "Dataset title"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Dataset summary"
+            },
+            "taxon": {
+              "type": "string",
+              "description": "Organism taxon (e.g., 'Homo sapiens')"
+            },
+            "gpl": {
+              "type": "string",
+              "description": "Platform accession (e.g., 'GPL570')"
+            },
+            "samples": {
+              "type": "string",
+              "description": "Number of samples"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "dataset_id": "GDS1234"
+      },
+      {
+        "dataset_id": "GSE12345"
+      }
+    ],
+    "label": [
+      "GEO",
+      "Dataset",
+      "Information"
+    ],
+    "metadata": {
+      "tags": [
+        "dataset",
+        "metadata",
+        "expression"
+      ],
+      "difficulty_level": "easy",
+      "estimated_execution_time": "< 3 seconds"
+    }
+  },
+  {
+    "type": "GEOGetSampleInfo",
+    "name": "geo_get_sample_info",
+    "description": "Get sample information for a GEO dataset including sample characteristics and experimental conditions.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "GEO dataset ID (e.g., 'GDS1234', 'GSE12345')"
+        }
+      },
+      "required": [
+        "dataset_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "/esummary.fcgi",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "GEO sample information",
+      "properties": {
+        "result": {
+          "type": "object",
+          "description": "Sample information from GEO",
+          "properties": {
+            "uid": {
+              "type": "string",
+              "description": "Dataset UID"
+            },
+            "n_samples": {
+              "type": "string",
+              "description": "Number of samples in the dataset"
+            },
+            "title": {
+              "type": "string",
+              "description": "Dataset title"
+            },
+            "summary": {
+              "type": "string",
+              "description": "Dataset summary text"
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "dataset_id": "GDS1234"
+      },
+      {
+        "dataset_id": "GSE12345"
+      }
+    ],
+    "label": [
+      "GEO",
+      "Sample",
+      "Information"
+    ],
+    "metadata": {
+      "tags": [
+        "sample",
+        "characteristics",
+        "expression"
+      ],
+      "difficulty_level": "easy",
+      "estimated_execution_time": "< 3 seconds"
+    }
+  },
+  {
+    "type": "GEORESTTool",
+    "name": "geo_list_supplementary_files",
+    "description": "List the actual downloadable supplementary/raw files of a GEO Series (GSE) or Sample (GSM), with per-file name, byte size, type, modification time, and a direct download URL. GEO's E-utilities esummary only reports a type code and the base FTP directory, never the per-file manifest. For a Series this reads the structured suppl/filelist.txt TSV (Archive/File, Name, Time, Size, Type); for a Sample (no filelist.txt) it parses the suppl/ directory listing. Example: GSE42657 returns GSE42657_RAW.tar (TAR, 71680 bytes) and GPL8179_humanMI_V2_R0_XS0000124-MAP.txt.gz (TXT). Keyless; no NCBI API key required.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "GEO Series (GSE...) or Sample (GSM...) accession. Examples: 'GSE42657', 'GSE1000', 'GSM1045442'."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "mode": "supplementary_files"
+    },
+    "test_examples": [
+      {
+        "accession": "GSE42657"
+      },
+      {
+        "accession": "GSE1000"
+      }
+    ],
+    "label": [
+      "GEO",
+      "Supplementary",
+      "Download"
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "suppl_url": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "modified": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": [
+                      "integer",
+                      "string"
+                    ]
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "download_url": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "file_count": {
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "metadata": {
+      "tags": [
+        "geo",
+        "supplementary",
+        "download",
+        "raw-files"
+      ],
+      "difficulty_level": "easy",
+      "estimated_execution_time": "< 3 seconds"
+    }
+  }
+]

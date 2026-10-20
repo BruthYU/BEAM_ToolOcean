@@ -1,0 +1,332 @@
+[
+  {
+    "type": "DBLPTool",
+    "name": "DBLP_search_publications",
+    "description": "Search DBLP Computer Science Bibliography for publications. Returns publications with title, authors, year, venue, URL, and electronic edition link. NOTE: dblp.org currently serves an anti-bot challenge page (\"Making sure you're not a bot!\") on this endpoint, so this tool can return an HTML-instead-of-data error; ToolUniverse does not attempt to bypass it. Alternatives: Crossref_search_works, SemanticScholar_search_papers, openalex_search_works.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for DBLP publications. Use keywords separated by spaces to refine your search."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Number of publications to return. This sets the maximum number of publications retrieved from DBLP.",
+          "default": 10
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "abstract": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "@pid": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "year": {
+            "type": "integer"
+          },
+          "venue": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "ee": {
+            "type": "string"
+          },
+          "doi": {
+            "type": "string"
+          },
+          "citations": {
+            "type": "integer"
+          },
+          "open_access": {
+            "type": "boolean"
+          },
+          "keywords": {
+            "type": "string"
+          },
+          "article_type": {
+            "type": "string"
+          },
+          "publisher": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "data_quality": {
+            "type": "object",
+            "properties": {
+              "has_abstract": {
+                "type": "boolean"
+              },
+              "has_authors": {
+                "type": "boolean"
+              },
+              "has_journal": {
+                "type": "boolean"
+              },
+              "has_year": {
+                "type": "boolean"
+              },
+              "has_doi": {
+                "type": "boolean"
+              },
+              "has_citations": {
+                "type": "boolean"
+              },
+              "has_keywords": {
+                "type": "boolean"
+              },
+              "has_url": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "query": "computer science",
+        "limit": 2
+      },
+      {
+        "query": "machine learning",
+        "limit": 1
+      }
+    ]
+  },
+  {
+    "name": "DBLP_search_authors",
+    "description": "Search and disambiguate authors in the DBLP Computer Science Bibliography by name. Resolves an author name to canonical DBLP author records, each with a stable PID URL (e.g., https://dblp.org/pid/l/JureLeskovec) plus, when available, affiliation notes, name aliases, and awards (e.g., 'Turing Award'). The PID is the gateway to that author's deduplicated publication list. Use this to identify the correct author before fetching their bibliography; DBLP_search_publications only searches papers, not authors. NOTE: dblp.org currently serves an anti-bot challenge page (\"Making sure you're not a bot!\") on this endpoint, so this tool can return an HTML-instead-of-data error; ToolUniverse does not attempt to bypass it.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Author name to search for (e.g., 'jure leskovec', 'yann lecun', 'Geoffrey Hinton'). Spaces are treated as prefix-matched terms by DBLP."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of author hits to return (default 10, max 1000).",
+          "default": 10
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://dblp.org/search/author/api",
+      "param_mapping": {
+        "query": "q",
+        "limit": "h"
+      },
+      "params": {
+        "format": "json"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "query": "jure leskovec",
+        "limit": 1
+      },
+      {
+        "query": "yann lecun",
+        "limit": 3
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "DBLP author search response",
+          "properties": {
+            "result": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "object"
+                },
+                "hits": {
+                  "type": "object",
+                  "description": "Matched author records",
+                  "properties": {
+                    "@total": {
+                      "type": "string"
+                    },
+                    "hit": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "@id": {
+                            "type": "string"
+                          },
+                          "@score": {
+                            "type": "string"
+                          },
+                          "info": {
+                            "type": "object",
+                            "description": "Author info including 'author' name, 'url' (PID URL), optional 'aliases', 'notes' (affiliations/awards)"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "result"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "DBLP_search_venues",
+    "description": "Search DBLP for a publication VENUE (conference or journal) by acronym or full name, resolving it to its canonical DBLP venue record. For example 'ICML' resolves to 'International Conference on Machine Learning (ICML)' and 'neurips' resolves to 'Conference on Neural Information Processing Systems (NeurIPS)'. Each hit includes the venue name, acronym, type (Conference/Journal), and a DBLP venue URL for browsing its proceedings. DBLP_search_publications only searches papers, not venues. NOTE: dblp.org currently serves an anti-bot challenge page (\"Making sure you're not a bot!\") on this endpoint, so this tool can return an HTML-instead-of-data error; ToolUniverse does not attempt to bypass it.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Venue acronym or name to search for (e.g., 'ICML', 'neurips', 'VLDB', 'Nature Machine Intelligence')."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of venue hits to return (default 10, max 1000).",
+          "default": 10
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://dblp.org/search/venue/api",
+      "param_mapping": {
+        "query": "q",
+        "limit": "h"
+      },
+      "params": {
+        "format": "json"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "query": "ICML",
+        "limit": 1
+      },
+      {
+        "query": "neurips",
+        "limit": 1
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "DBLP venue search response",
+          "properties": {
+            "result": {
+              "type": "object",
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "object"
+                },
+                "hits": {
+                  "type": "object",
+                  "description": "Matched venue records",
+                  "properties": {
+                    "@total": {
+                      "type": "string"
+                    },
+                    "hit": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "@id": {
+                            "type": "string"
+                          },
+                          "@score": {
+                            "type": "string"
+                          },
+                          "info": {
+                            "type": "object",
+                            "description": "Venue info including 'venue' name, optional 'acronym', 'type' (Conference/Journal), and 'url'"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "result"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

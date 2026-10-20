@@ -1,0 +1,702 @@
+"""
+BRENDA Enzyme Database API tool for ToolUniverse.
+
+BRENDA is the largest enzyme database containing functional data like
+Km, Vmax, turnover numbers, and inhibitor information.
+
+API: BRENDA SOAP web service (zeep client) + ExPASy ENZYME (REST, no auth)
+Auth: BRENDA_EMAIL + BRENDA_PASSWORD environment variables required for
+      SOAP-only operations (get_km, get_kcat, get_inhibitors, get_enzyme_info).
+      The get_enzyme_kinetics operation works WITHOUT credentials by using
+      ExPASy ENZYME + SABIO-RK as primary data sources.
+Register for free at: https://www.brenda-enzymes.org/register.php
+WSDL: https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl
+"""
+
+import hashlib
+from typing import Any, Dict, List, Optional
+
+import requests
+
+from .base_tool import BaseTool
+from .sabiork_tool import parse_solr_kinetic_law
+from .tool_registry import register_tool
+
+BRENDA_WSDL = "https://www.brenda-enzymes.org/soap/brenda_zeep.wsdl"
+
+
+try:
+    from zeep.exceptions import Fault
+except ImportError:  # zeep is optional; _get_client() reports that clearly
+
+    class Fault(Exception):
+        """Placeholder so ``except Fault`` stays valid when zeep is not installed."""
+
+
+def _get_client():
+    """Return a zeep SOAP client for BRENDA."""
+    try:
+        from zeep import Client, Settings
+
+        return Client(BRENDA_WSDL, settings=Settings(strict=False))
+    except ImportError:
+        raise RuntimeError(
+            "zeep is required for BRENDA SOAP access. Install with: pip install zeep"
+        )
+
+
+def _hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def _parse_rows(raw) -> List[Dict[str, Any]]:
+    """Parse a zeep response object into a list of plain dicts."""
+    if raw is None:
+        return []
+    items = raw if isinstance(raw, list) else [raw]
+    result = []
+    for item in items:
+        if hasattr(item, "__dict__"):
+            result.append(
+                {k: v for k, v in item.__dict__.items() if not k.startswith("_")}
+            )
+        elif isinstance(item, dict):
+            result.append(item)
+    return result
+
+
+@register_tool("BRENDATool")
+class BRENDATool(BaseTool):
+    """
+    Tool for querying BRENDA enzyme database via SOAP API.
+
+    Supports Km, kcat, inhibitor, and general enzyme info queries.
+    Requires BRENDA_EMAIL and BRENDA_PASSWORD environment variables.
+    Register for free at https://www.brenda-enzymes.org/register.php
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+
+    def _credentials(self) -> Optional[tuple]:
+        email = self.credential("BRENDA_EMAIL") or ""
+        password = self.credential("BRENDA_PASSWORD") or ""
+        if not email or not password:
+            return None
+        return email, _hash_password(password)
+
+    def _auth_error(self) -> Dict[str, Any]:
+        return {
+            "status": "error",
+            "error": (
+                "BRENDA requires authentication. "
+                "Set BRENDA_EMAIL and BRENDA_PASSWORD environment variables. "
+                "Register for free at https://www.brenda-enzymes.org/register.php"
+            ),
+        }
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        # Feature-111B-006: enzyme_id as alias for ec_number
+        if not arguments.get("ec_number") and arguments.get("enzyme_id"):
+            arguments = dict(arguments, ec_number=arguments["enzyme_id"])
+
+        operation = arguments.get("operation", "") or self.get_schema_const_operation()
+
+        dispatch = {
+            "get_km": self._get_km,
+            "get_kcat": self._get_kcat,
+            "get_inhibitors": self._get_inhibitors,
+            "get_enzyme_info": self._get_enzyme_info,
+            "get_enzyme_kinetics": self._get_enzyme_kinetics,
+        }
+        handler = dispatch.get(operation)
+        if handler is None:
+            return {
+                "status": "error",
+                "error": f"Unknown operation: {operation}. Supported: {', '.join(dispatch)}",
+            }
+        return handler(arguments)
+
+    def _get_km(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        ec_number = arguments.get("ec_number", "")
+        if not ec_number:
+            return {"status": "error", "error": "Missing required parameter: ec_number"}
+        creds = self._credentials()
+        if not creds:
+            return self._auth_error()
+        email, pw_hash = creds
+        organism = arguments.get("organism", "")
+
+        try:
+            client = _get_client()
+            raw = client.service.getKmValue(
+                email=email,
+                password=pw_hash,
+                ecNumber=ec_number,
+                organism=organism,
+                kmValue="",
+                kmValueMaximum="",
+                substrate="",
+                commentary="",
+                ligandStructureId="",
+                literature="",
+            )
+            rows = _parse_rows(raw)
+            km_values = [
+                {
+                    "km_value": str(r.get("kmValue", "")),
+                    "substrate": str(r.get("substrate", "")),
+                    "organism": str(r.get("organism", "")),
+                    "comment": str(r.get("commentary", "")),
+                }
+                for r in rows
+                if r.get("kmValue")
+            ]
+            return {
+                "status": "success",
+                "data": {
+                    "ec_number": ec_number,
+                    "organism": organism or "all",
+                    "km_values": km_values,
+                    "count": len(km_values),
+                },
+                "metadata": {"source": "BRENDA SOAP", "parameter": "Km", "unit": "mM"},
+            }
+        except Fault as f:
+            msg = str(f)
+            if "wrong" in msg.lower() or "password" in msg.lower():
+                return {
+                    "status": "error",
+                    "error": "Invalid BRENDA credentials. Check BRENDA_EMAIL and BRENDA_PASSWORD.",
+                }
+            return {"status": "error", "error": f"BRENDA SOAP fault: {msg}"}
+        except Exception as e:
+            return {"status": "error", "error": f"BRENDA query failed: {str(e)}"}
+
+    def _get_kcat(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        ec_number = arguments.get("ec_number", "")
+        if not ec_number:
+            return {"status": "error", "error": "Missing required parameter: ec_number"}
+        creds = self._credentials()
+        if not creds:
+            return self._auth_error()
+        email, pw_hash = creds
+        organism = arguments.get("organism", "")
+
+        try:
+            client = _get_client()
+            raw = client.service.getTurnoverNumber(
+                email=email,
+                password=pw_hash,
+                ecNumber=ec_number,
+                organism=organism,
+                turnoverNumber="",
+                turnoverNumberMaximum="",
+                substrate="",
+                commentary="",
+                ligandStructureId="",
+                literature="",
+            )
+            rows = _parse_rows(raw)
+            kcat_values = [
+                {
+                    "kcat_value": str(r.get("turnoverNumber", "")),
+                    "substrate": str(r.get("substrate", "")),
+                    "organism": str(r.get("organism", "")),
+                    "comment": str(r.get("commentary", "")),
+                }
+                for r in rows
+                if r.get("turnoverNumber")
+            ]
+            return {
+                "status": "success",
+                "data": {
+                    "ec_number": ec_number,
+                    "organism": organism or "all",
+                    "kcat_values": kcat_values,
+                    "count": len(kcat_values),
+                },
+                "metadata": {
+                    "source": "BRENDA SOAP",
+                    "parameter": "kcat",
+                    "unit": "1/s",
+                },
+            }
+        except Fault as f:
+            msg = str(f)
+            if "wrong" in msg.lower() or "password" in msg.lower():
+                return {
+                    "status": "error",
+                    "error": "Invalid BRENDA credentials. Check BRENDA_EMAIL and BRENDA_PASSWORD.",
+                }
+            return {"status": "error", "error": f"BRENDA SOAP fault: {msg}"}
+        except Exception as e:
+            return {"status": "error", "error": f"BRENDA query failed: {str(e)}"}
+
+    def _get_inhibitors(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        ec_number = arguments.get("ec_number", "")
+        if not ec_number:
+            return {"status": "error", "error": "Missing required parameter: ec_number"}
+        creds = self._credentials()
+        if not creds:
+            return self._auth_error()
+        email, pw_hash = creds
+        organism = arguments.get("organism", "")
+
+        try:
+            client = _get_client()
+            raw = client.service.getInhibitors(
+                email=email,
+                password=pw_hash,
+                ecNumber=ec_number,
+                organism=organism,
+                inhibitor="",
+                commentary="",
+                ligandStructureId="",
+                literature="",
+            )
+            rows = _parse_rows(raw)
+            inhibitors = [
+                {
+                    "inhibitor": str(r.get("inhibitor", "")),
+                    "organism": str(r.get("organism", "")),
+                    "comment": str(r.get("commentary", "")),
+                }
+                for r in rows
+                if r.get("inhibitor")
+            ]
+            return {
+                "status": "success",
+                "data": {
+                    "ec_number": ec_number,
+                    "organism": organism or "all",
+                    "inhibitors": inhibitors,
+                    "count": len(inhibitors),
+                },
+                "metadata": {"source": "BRENDA SOAP"},
+            }
+        except Fault as f:
+            msg = str(f)
+            if "wrong" in msg.lower() or "password" in msg.lower():
+                return {
+                    "status": "error",
+                    "error": "Invalid BRENDA credentials. Check BRENDA_EMAIL and BRENDA_PASSWORD.",
+                }
+            return {"status": "error", "error": f"BRENDA SOAP fault: {msg}"}
+        except Exception as e:
+            return {"status": "error", "error": f"BRENDA query failed: {str(e)}"}
+
+    def _get_enzyme_info(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        ec_number = arguments.get("ec_number", "")
+        if not ec_number:
+            return {"status": "error", "error": "Missing required parameter: ec_number"}
+        creds = self._credentials()
+        if not creds:
+            return self._auth_error()
+        email, pw_hash = creds
+
+        try:
+            client = _get_client()
+            raw = client.service.getSystematicName(
+                email=email,
+                password=pw_hash,
+                ecNumber=ec_number,
+                organism="",
+                systematicName="",
+            )
+            rows = _parse_rows(raw)
+            info = [
+                {
+                    "systematic_name": str(r.get("systematicName", "")),
+                    "organism": str(r.get("organism", "")),
+                }
+                for r in rows
+                if r.get("systematicName")
+            ]
+            return {
+                "status": "success",
+                "data": {
+                    "ec_number": ec_number,
+                    "info": info or [{"note": "No systematic name data found"}],
+                    "count": len(info),
+                },
+                "metadata": {"source": "BRENDA SOAP"},
+            }
+        except Fault as f:
+            msg = str(f)
+            if "wrong" in msg.lower() or "password" in msg.lower():
+                return {
+                    "status": "error",
+                    "error": "Invalid BRENDA credentials. Check BRENDA_EMAIL and BRENDA_PASSWORD.",
+                }
+            return {"status": "error", "error": f"BRENDA SOAP fault: {msg}"}
+        except Exception as e:
+            return {"status": "error", "error": f"BRENDA query failed: {str(e)}"}
+
+    # ---- get_enzyme_kinetics: NO AUTH REQUIRED ----
+    # Uses ExPASy ENZYME (enzyme info) + SABIO-RK (kinetic parameters)
+    # Optionally enriched with BRENDA SOAP if credentials are available.
+
+    def _resolve_ec_from_name(
+        self, enzyme_name: str, failures: Optional[list] = None
+    ) -> Optional[str]:
+        """Resolve enzyme name to EC number via UniProt search.
+
+        A failed request appends its reason to `failures` and returns None, so
+        the caller can tell "UniProt did not answer" from "no EC number".
+        """
+        try:
+            url = (
+                "https://rest.uniprot.org/uniprotkb/search"
+                f"?query=protein_name:{enzyme_name}+AND+ec:*"
+                "&fields=ec&format=json&size=5"
+            )
+            resp = requests.get(url, timeout=15)
+            if resp.status_code != 200:
+                if failures is not None:
+                    failures.append(f"UniProt HTTP {resp.status_code}")
+                return None
+            data = resp.json()
+            for result in data.get("results", []):
+                desc = result.get("proteinDescription", {})
+                rec_name = desc.get("recommendedName", {})
+                for ec_entry in rec_name.get("ecNumbers", []):
+                    val = ec_entry.get("value", "")
+                    if val and not val.endswith("-"):
+                        return val
+            return None
+        except Exception as e:
+            if failures is not None:
+                failures.append(str(e) or type(e).__name__)
+            return None
+
+    def _fetch_expasy_enzyme(self, ec_number: str) -> Dict[str, Any]:
+        """Fetch enzyme info from ExPASy ENZYME database (no auth)."""
+        url = f"https://enzyme.expasy.org/EC/{ec_number}.txt"
+        resp = requests.get(url, timeout=15)
+        if resp.status_code != 200:
+            return {}
+
+        data: Dict[str, Any] = {}
+        for line in resp.text.strip().split("\n"):
+            if line.startswith("ID   "):
+                data["ec_number"] = line[5:].strip()
+            elif line.startswith("DE   "):
+                data["name"] = line[5:].strip().rstrip(".")
+            elif line.startswith("AN   "):
+                data.setdefault("alternative_names", []).append(
+                    line[5:].strip().rstrip(".")
+                )
+            elif line.startswith("CA   "):
+                data.setdefault("catalytic_activity", []).append(line[5:].strip())
+            elif line.startswith("CC   "):
+                data.setdefault("comments", []).append(line[5:].strip())
+        return data
+
+    def _fetch_sabiork_kinetics(
+        self, ec_number: str, organism: str = "", limit: int = 20
+    ) -> Dict[str, Any]:
+        """Fetch kinetic parameters from SABIO-RK (no auth).
+
+        Fix-R73A-1: the legacy /sabioRestWebServices/searchKineticLaws/
+        entryIDs REST endpoint this used to call was retired by SABIO-RK in
+        2025 -- every request now 302-redirects to the sabiork.h-its.org
+        SPA's 404 page (confirmed live via raw curl), and the old status-
+        code/XML-parse checks below silently swallowed that as "0 entries,
+        success" instead of surfacing a failure. Confirmed live for EC
+        1.1.1.1 (alcohol dehydrogenase, one of the most-studied enzymes):
+        silently reported 0 SABIO-RK entries when the real count is 768.
+        Ports the same Solr-backed endpoint sabiork_tool.py's SABIORKTool
+        already migrated to (see its _search_reactions docstring) instead
+        of reimplementing a second copy of the fix. The numeric Km/kcat/Ki
+        values are in each doc's ``Json`` field, not in a field of their own;
+        parse_solr_kinetic_law extracts them.
+        """
+        query_parts = [f"ECNumber:{ec_number}"]
+        if organism:
+            query_parts.append(f'Organism:"{organism}"')
+        query = " AND ".join(query_parts)
+
+        resp = requests.get(
+            "https://sabiork.h-its.org/api/ft/proxy-select",
+            params={
+                "q": query,
+                "df": "Everything",
+                "wt": "json",
+                "rows": limit,
+                "fl": "EntryID,ECNumber,EnzymeName,Organism,Tissue,Substrate,"
+                "Product,ParameterType,PubMedID,Json",
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        response = resp.json().get("response", {}) or {}
+        total_count = response.get("numFound", 0)
+        docs = response.get("docs", []) or []
+
+        def _first(v):
+            return v[0] if isinstance(v, list) and v else v
+
+        kinetic_laws = []
+        for d in docs:
+            law = parse_solr_kinetic_law(d.get("Json"))
+            kinetic_laws.append(
+                {
+                    "sabiork_entry_id": str(_first(d.get("EntryID")) or ""),
+                    "ec_number": _first(d.get("ECNumber")),
+                    "enzyme_name": _first(d.get("EnzymeName")),
+                    "organism": _first(d.get("Organism")),
+                    "tissue": _first(d.get("Tissue")),
+                    "substrates": d.get("Substrate")
+                    if isinstance(d.get("Substrate"), list)
+                    else [],
+                    "products": d.get("Product")
+                    if isinstance(d.get("Product"), list)
+                    else [],
+                    "parameter_types": d.get("ParameterType")
+                    if isinstance(d.get("ParameterType"), list)
+                    else [],
+                    "parameters": law["parameters"],
+                    "conditions": law["conditions"],
+                    "pubmed_id": _first(d.get("PubMedID")),
+                }
+            )
+        return {"kinetic_laws": kinetic_laws, "total_count": total_count}
+
+    def _get_enzyme_kinetics(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Retrieve comprehensive enzyme kinetics WITHOUT requiring BRENDA credentials.
+
+        Uses ExPASy ENZYME for enzyme info + SABIO-RK for kinetic parameters.
+        If BRENDA credentials are set, adds BRENDA data as enhancement.
+        """
+        ec_number = arguments.get("ec_number", "")
+        enzyme_name = arguments.get("enzyme_name", "")
+        organism = arguments.get("organism", "")
+        limit = int(arguments.get("limit", 20))
+
+        # Resolve enzyme name to EC number if needed
+        if not ec_number and enzyme_name:
+            failures: list = []
+            ec_number = self._resolve_ec_from_name(enzyme_name, failures) or ""
+            if not ec_number and failures:
+                return {
+                    "status": "error",
+                    "error": (
+                        f"Could not resolve enzyme name '{enzyme_name}': UniProt, "
+                        f"which maps names to EC numbers, did not answer "
+                        f"({failures[0]}). Retry later, or pass ec_number directly."
+                    ),
+                }
+            if not ec_number:
+                return {
+                    "status": "error",
+                    "error": (
+                        f"Could not resolve enzyme name '{enzyme_name}' to an EC number. "
+                        "Try providing the EC number directly (e.g., ec_number='1.1.1.1')."
+                    ),
+                }
+
+        if not ec_number:
+            return {
+                "status": "error",
+                "error": "Provide ec_number (e.g., '1.1.1.1') or enzyme_name (e.g., 'alcohol dehydrogenase')",
+            }
+
+        sources_used = []
+        result: Dict[str, Any] = {"ec_number": ec_number}
+        sabiork_error: Optional[str] = None
+
+        # 1. ExPASy ENZYME: enzyme identity and catalytic activity
+        try:
+            expasy = self._fetch_expasy_enzyme(ec_number)
+            if expasy:
+                result["enzyme_name"] = expasy.get("name", "")
+                result["alternative_names"] = expasy.get("alternative_names", [])
+                result["catalytic_activity"] = expasy.get("catalytic_activity", [])
+                result["comments"] = expasy.get("comments", [])
+                sources_used.append("ExPASy ENZYME")
+        except Exception:
+            pass  # Non-fatal, continue with kinetics
+
+        # 2. SABIO-RK: kinetic parameters (Km, kcat, Ki, Vmax)
+        # Fix-R14D-1: this whole block used to be one bare `except Exception:
+        # pass`, so any failure here (confirmed live: sabiork.h-its.org
+        # connection timeouts) silently dropped "kinetic_parameters" from
+        # the response entirely -- the tool's own headline capability --
+        # while still returning status:"success" with no indication that
+        # SABIO-RK was even attempted, let alone that it failed. Record the
+        # failure instead of erasing all trace of it.
+        try:
+            sabio = self._fetch_sabiork_kinetics(ec_number, organism, limit)
+            result["kinetic_parameters"] = sabio.get("kinetic_laws", [])
+            result["sabiork_total_entries"] = sabio.get("total_count", 0)
+            if sabio.get("kinetic_laws"):
+                sources_used.append("SABIO-RK")
+
+                # Aggregate on SABIO-RK's SI-normalised values: reported units
+                # differ between entries (Km in mM or uM, kcat in s^-1 or
+                # min^-1). SABIO-RK normalises Vmax to katal*g^(-1) in some
+                # entries and mol*s^(-1)*g^(-1) in others; 1 katal = 1 mol/s, so
+                # those are merged. Values in any other unit than the type's
+                # most common one are counted but not mixed into the stats.
+                buckets: Dict[str, Dict[str, list]] = {}
+                for law in sabio.get("kinetic_laws", []):
+                    for p in law.get("parameters", []):
+                        ptype = p.get("type", "")
+                        pval = p.get("value_si")
+                        if isinstance(pval, (int, float)) and ptype in (
+                            "Km",
+                            "kcat",
+                            "Ki",
+                            "Vmax",
+                            "kcat/Km",
+                        ):
+                            unit = (p.get("unit_si") or "").replace(
+                                "katal", "mol*s^(-1)"
+                            )
+                            buckets.setdefault(ptype, {}).setdefault(unit, []).append(
+                                pval
+                            )
+
+                summary: Dict[str, Any] = {}
+                for ptype, by_unit in buckets.items():
+                    unit, vals = max(by_unit.items(), key=lambda kv: len(kv[1]))
+                    s = sorted(vals)
+                    entry: Dict[str, Any] = {
+                        "count": len(s),
+                        "min": s[0],
+                        "max": s[-1],
+                        "median": s[len(s) // 2],
+                        "unit": unit,
+                    }
+                    skipped = sum(len(v) for v in by_unit.values()) - len(s)
+                    if skipped:
+                        entry["values_in_other_units"] = skipped
+                    summary[ptype] = entry
+                if summary:
+                    result["parameter_summary"] = summary
+        except Exception as e:
+            result.setdefault("kinetic_parameters", [])
+            result.setdefault("sabiork_total_entries", 0)
+            sabiork_error = (
+                "SABIO-RK kinetics fetch timed out"
+                if isinstance(e, requests.exceptions.Timeout)
+                else f"SABIO-RK kinetics fetch failed: {type(e).__name__}: {e}"
+            )
+
+        # 3. Optional BRENDA SOAP enrichment (if credentials available)
+        creds = self._credentials()
+        if creds:
+            try:
+                email, pw_hash = creds
+                client = _get_client()
+
+                # Fetch optimal pH
+                try:
+                    raw = client.service.getPhOptimum(
+                        email=email,
+                        password=pw_hash,
+                        ecNumber=ec_number,
+                        organism=organism or "",
+                        phOptimum="",
+                        phOptimumMaximum="",
+                        commentary="",
+                        literature="",
+                    )
+                    rows = _parse_rows(raw)
+                    ph_data = [
+                        {
+                            "ph_optimum": str(r.get("phOptimum", "")),
+                            "organism": str(r.get("organism", "")),
+                        }
+                        for r in rows
+                        if r.get("phOptimum")
+                    ]
+                    if ph_data:
+                        result["ph_optima"] = ph_data
+                except Exception:
+                    pass
+
+                # Fetch optimal temperature
+                try:
+                    raw = client.service.getTemperatureOptimum(
+                        email=email,
+                        password=pw_hash,
+                        ecNumber=ec_number,
+                        organism=organism or "",
+                        temperatureOptimum="",
+                        temperatureOptimumMaximum="",
+                        commentary="",
+                        literature="",
+                    )
+                    rows = _parse_rows(raw)
+                    temp_data = [
+                        {
+                            "temperature_optimum_C": str(
+                                r.get("temperatureOptimum", "")
+                            ),
+                            "organism": str(r.get("organism", "")),
+                        }
+                        for r in rows
+                        if r.get("temperatureOptimum")
+                    ]
+                    if temp_data:
+                        result["temperature_optima"] = temp_data
+                except Exception:
+                    pass
+
+                # Fetch specific activity
+                try:
+                    raw = client.service.getSpecificActivity(
+                        email=email,
+                        password=pw_hash,
+                        ecNumber=ec_number,
+                        organism=organism or "",
+                        specificActivity="",
+                        specificActivityMaximum="",
+                        substrate="",
+                        commentary="",
+                        ligandStructureId="",
+                        literature="",
+                    )
+                    rows = _parse_rows(raw)
+                    sa_data = [
+                        {
+                            "specific_activity": str(r.get("specificActivity", "")),
+                            "substrate": str(r.get("substrate", "")),
+                            "organism": str(r.get("organism", "")),
+                        }
+                        for r in rows
+                        if r.get("specificActivity")
+                    ]
+                    if sa_data:
+                        result["specific_activity"] = sa_data
+                except Exception:
+                    pass
+
+                sources_used.append("BRENDA SOAP")
+            except Exception:
+                pass  # BRENDA enrichment is optional
+
+        if not sources_used:
+            return {
+                "status": "error",
+                "error": f"No data found for EC {ec_number}. Verify the EC number is correct.",
+            }
+
+        metadata: Dict[str, Any] = {
+            "sources": sources_used,
+            "note": (
+                "ExPASy ENZYME and SABIO-RK data require no authentication. "
+                "Set BRENDA_EMAIL/BRENDA_PASSWORD for additional pH, temperature, "
+                "and specific activity data from BRENDA."
+            ),
+        }
+        if sabiork_error:
+            metadata["sabiork_error"] = sabiork_error
+        return {
+            "status": "success",
+            "data": result,
+            "metadata": metadata,
+        }

@@ -1,0 +1,110 @@
+name: Auto-release plugin
+#
+# Auto-bump version + tag + release when plugin files change AND the commit
+# message subject contains a release marker. This keeps regular plugin merges (typo
+# fixes, doc updates, refactors) from auto-releasing — only deliberate
+# releases fire.
+#
+# How to trigger:
+#
+#   A) Commit-subject marker (preferred — automatic on push to main):
+#        git commit -m "Add tooluniverse-foo skill [release:minor]"
+#        git push origin main
+#      This workflow runs scripts/release-plugin.sh minor, which creates a
+#      Release vX.Y.Z commit + tag and pushes both. The tag push then
+#      triggers release-plugin.yml to build the zip and create the GitHub
+#      Release.
+#
+#      Markers: [release:patch] [release:minor] [release:major]
+#
+#   B) Manual via Actions UI (workflow_dispatch):
+#        Go to Actions → Auto-release plugin → Run workflow → choose level
+#
+# Why path-filter + marker (not just path-filter):
+#   The plugin folder gets routine commits — typo fixes, comment cleanups,
+#   refactors. Those should NOT release. The marker is opt-in to releasing.
+#   This also prevents the loop where the release-bump commit (which also
+#   touches plugin/.claude-plugin/) would re-trigger this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugin/**'
+      - '.claude-plugin/**'
+      - '.github/workflows/auto-release.yml'
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'Version bump level'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine release level
+        id: level
+        run: |
+          LEVEL=""
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            LEVEL=$(jq -r '.inputs.level // ""' "$GITHUB_EVENT_PATH")
+            case "$LEVEL" in
+              major|minor|patch) ;;
+              *) echo "::error::Invalid release level: $LEVEL"; exit 1 ;;
+            esac
+            echo "Triggered manually with level=$LEVEL"
+          else
+            # Read untrusted commit text as data instead of interpolating it
+            # into this shell script. The checkout step intentionally runs only
+            # when a release marker is present.
+            MSG=$(jq -r '.head_commit.message // ""' "$GITHUB_EVENT_PATH")
+            SUBJECT=${MSG%%$'\n'*}
+            case "$SUBJECT" in
+              *'[release:major]'*) LEVEL=major ;;
+              *'[release:minor]'*) LEVEL=minor ;;
+              *'[release:patch]'*) LEVEL=patch ;;
+              *) echo "No [release:X] marker in commit subject; skipping." ;;
+            esac
+          fi
+          echo "level=$LEVEL" >> "$GITHUB_OUTPUT"
+
+      - name: Stop if no release level
+        if: steps.level.outputs.level == ''
+        run: exit 0
+
+      - name: Checkout repository
+        if: steps.level.outputs.level != ''
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        if: steps.level.outputs.level != ''
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run release script
+        if: steps.level.outputs.level != ''
+        env:
+          RELEASE_LEVEL: ${{ steps.level.outputs.level }}
+        run: bash scripts/release-plugin.sh "$RELEASE_LEVEL"
+
+      - name: Summary
+        if: steps.level.outputs.level != ''
+        run: |
+          NEW=$(python3 -c "import json; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
+          echo "## Released v${NEW}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tag push triggered the build/release workflow:" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${{ github.repository }}/actions/workflows/release-plugin.yml" >> "$GITHUB_STEP_SUMMARY"

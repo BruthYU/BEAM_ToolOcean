@@ -1,0 +1,829 @@
+[
+  {
+    "name": "MGnify_get_genome",
+    "description": "Get detailed genome information from the MGnify genome catalog. Returns assembly quality metrics (completeness, contamination, N50), taxonomy, geographic origin, rRNA counts, protein count, pangenome statistics, and cross-references to ENA. Example: MGYG000000001 returns a high-quality Firmicutes isolate genome with 98.6% completeness.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "genome_id": {
+          "type": "string",
+          "description": "MGnify genome accession. Examples: 'MGYG000000001', 'MGYG000535630'."
+        }
+      },
+      "required": [
+        "genome_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "genome",
+      "query_mode": "detail"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "genome_id": "MGYG000000001"
+      },
+      {
+        "genome_id": "MGYG000535630"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "genome_id": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "description": "Isolate or MAG"
+            },
+            "taxonomy": {
+              "type": "string",
+              "description": "Full taxonomic lineage"
+            },
+            "completeness": {
+              "type": "number"
+            },
+            "contamination": {
+              "type": "number"
+            },
+            "length": {
+              "type": "integer"
+            },
+            "num_proteins": {
+              "type": "integer"
+            },
+            "gc_content": {
+              "type": "number"
+            },
+            "n50": {
+              "type": "integer"
+            },
+            "geographic_origin": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MGnify_search_genomes",
+    "description": "Search the MGnify genome catalog for metagenome-assembled genomes (MAGs) and isolate genomes. Filter by taxonomy lineage. Returns quality metrics, taxonomy, and protein counts. Useful for finding reference genomes from specific microbial lineages. Taxonomy names follow GTDB, not NCBI: use 'Bacteroidota' (not 'Bacteroidetes'), 'Bacillota' (not 'Firmicutes'), 'Pseudomonadota' (not 'Proteobacteria') -- an NCBI-style name usually returns 0 hits rather than an error.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "taxonomy": {
+          "type": "string",
+          "description": "GTDB taxonomy lineage filter, matched anywhere in the lineage. Examples: 'Bacteroidota' (phylum), 'Bacteroides' (genus), 'Bacillota', 'Pseudomonadota'. NCBI-style phylum names such as 'Bacteroidetes' or 'Firmicutes' return few or no hits -- use the GTDB spelling."
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number (default 1)."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Results per page (default 25, max 100)."
+        }
+      }
+    },
+    "fields": {
+      "endpoint_type": "genome",
+      "query_mode": "search"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "page": 1,
+        "page_size": 5
+      },
+      {
+        "taxonomy": "Bacteria",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "genome_id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "taxonomy": {
+                "type": "string"
+              },
+              "completeness": {
+                "type": "number"
+              },
+              "contamination": {
+                "type": "number"
+              },
+              "length": {
+                "type": "integer"
+              },
+              "num_proteins": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MGnify_list_biomes",
+    "description": "Browse the MGnify biome hierarchy. Returns biome identifiers, names, and sample counts. Biomes range from engineered environments (bioreactors) to natural habitats (ocean, soil, host-associated). Useful for discovering what metagenomic data is available for specific environments.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "depth": {
+          "type": "integer",
+          "description": "Depth of the biome lineage to keep, counting 'root' as 1 (so 'root:Engineered' is 2 and 'root:Host-associated:Human' is 3). Filtered client-side because the MGnify API has no depth filter."
+        },
+        "lineage": {
+          "type": "string",
+          "description": "List this biome and all biomes below it, e.g. 'root:Host-associated:Human' (uses /biomes/{lineage}/children, which returns the biome itself plus every descendant, not only direct children). Combine with depth to keep one level. Omit to list all biomes."
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number (default 1)."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Results per page (default 25, max 100)."
+        }
+      }
+    },
+    "fields": {
+      "endpoint_type": "biome",
+      "query_mode": "list"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "page_size": 10
+      },
+      {
+        "page": 2,
+        "page_size": 10
+      },
+      {
+        "depth": 3,
+        "page_size": 5
+      },
+      {
+        "lineage": "root:Host-associated:Human",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "biome_id": {
+                "type": "string"
+              },
+              "biome_name": {
+                "type": "string"
+              },
+              "samples_count": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MGnify_get_study_detail",
+    "description": "Get detailed information about a specific MGnify metagenomics study. Returns study name, abstract, associated BioProject, centre, public/private status, sample count, and biomes. Complementary to MGnify_search_studies which lists studies; use MGnify_list_analyses / MGnify_list_analysis_downloads for exact analyses/downloads counts (this endpoint does not provide them). Example: MGYS00002008 is a Tara Oceans marine metagenomics study.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "study_accession": {
+          "type": "string",
+          "description": "MGnify study accession. Examples: 'MGYS00002008', 'MGYS00005292'."
+        }
+      },
+      "required": [
+        "study_accession"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "study",
+      "query_mode": "detail"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "study_accession": "MGYS00002008"
+      },
+      {
+        "study_accession": "MGYS00005292"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "study_id": {
+              "type": "string"
+            },
+            "study_name": {
+              "type": "string"
+            },
+            "study_abstract": {
+              "type": "string"
+            },
+            "bioproject": {
+              "type": "string"
+            },
+            "centre_name": {
+              "type": "string"
+            },
+            "biomes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "is_public": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "samples_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "MGnify_get_taxonomy",
+    "description": "Get taxonomic composition from a MGnify metagenomics analysis. Returns organisms detected with their abundance counts, taxonomic lineage (domain/phylum/class/order/family/genus/species), and rank. Supports SSU (16S/18S) and LSU (23S/28S) rRNA marker genes. Use MGnify_list_analyses to find analysis IDs for a study. Example: MGYA00585482 returns Bacteria, Proteobacteria, Firmicutes lineages with counts.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "analysis_id": {
+          "type": "string",
+          "description": "MGnify analysis accession (e.g., 'MGYA00585482'). Find IDs via MGnify_list_analyses."
+        },
+        "rna_type": {
+          "type": "string",
+          "description": "rRNA marker type: 'ssu' for 16S/18S (default) or 'lsu' for 23S/28S.",
+          "default": "ssu"
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Number of taxa to return per page (default 25, max 100).",
+          "default": 25
+        }
+      },
+      "required": [
+        "analysis_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "analysis",
+      "query_mode": "taxonomy"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "analysis_id": "MGYA00585482",
+        "page_size": 10
+      },
+      {
+        "analysis_id": "MGYA00585482",
+        "rna_type": "lsu",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "organism_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "string"
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "type": "integer"
+          },
+          "lineage": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "label": [
+      "MGnify",
+      "Microbiome",
+      "Taxonomy",
+      "Metagenomics"
+    ],
+    "metadata": {
+      "tags": [
+        "taxonomy",
+        "microbiome",
+        "16S",
+        "metagenomics",
+        "community_composition"
+      ],
+      "estimated_execution_time": "< 5 seconds"
+    }
+  },
+  {
+    "name": "MGnify_get_go_terms",
+    "description": "Get Gene Ontology (GO) functional annotations from a MGnify metagenomics analysis. Returns GO terms with their accession, description, gene count, and category (biological_process, molecular_function, or cellular_component). Use to understand the functional capacity of a microbial community. Example: MGYA00585482 returns GO:0055114 oxidation-reduction process (count=1507).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "analysis_id": {
+          "type": "string",
+          "description": "MGnify analysis accession (e.g., 'MGYA00585482'). Find IDs via MGnify_list_analyses."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Number of GO terms to return per page (default 25, max 100).",
+          "default": 25
+        }
+      },
+      "required": [
+        "analysis_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "analysis",
+      "query_mode": "go_terms"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "analysis_id": "MGYA00585482",
+        "page_size": 10
+      },
+      {
+        "analysis_id": "MGYA00585482",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "go_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "label": [
+      "MGnify",
+      "Microbiome",
+      "GO Terms",
+      "Functional Annotation"
+    ],
+    "metadata": {
+      "tags": [
+        "go_terms",
+        "functional_annotation",
+        "microbiome",
+        "metagenomics"
+      ],
+      "estimated_execution_time": "< 5 seconds"
+    }
+  },
+  {
+    "name": "MGnify_get_interpro",
+    "description": "Get InterPro protein domain annotations from a MGnify metagenomics analysis. Returns InterPro identifiers with description and gene counts, ranked by abundance. Useful for understanding the protein family composition of a microbial community. Example: MGYA00585482 returns IPR036388 Winged helix-like DNA-binding domain (count=360).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "analysis_id": {
+          "type": "string",
+          "description": "MGnify analysis accession (e.g., 'MGYA00585482'). Find IDs via MGnify_list_analyses."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Number of InterPro entries to return per page (default 25, max 100).",
+          "default": 25
+        }
+      },
+      "required": [
+        "analysis_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "analysis",
+      "query_mode": "interpro"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "analysis_id": "MGYA00585482",
+        "page_size": 10
+      },
+      {
+        "analysis_id": "MGYA00585482",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "interpro_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "label": [
+      "MGnify",
+      "Microbiome",
+      "InterPro",
+      "Protein Domains"
+    ],
+    "metadata": {
+      "tags": [
+        "interpro",
+        "protein_domains",
+        "functional_annotation",
+        "microbiome",
+        "metagenomics"
+      ],
+      "estimated_execution_time": "< 5 seconds"
+    }
+  },
+  {
+    "name": "MGnify_get_samples",
+    "description": "List biological SAMPLES in MGnify (EBI Metagenomics) with full geographic/host/environment provenance. Returns each sample's accession, BioSample id, latitude, longitude, geo-loc-name, collection-date, host-tax-id, species, and ENVO environment biome/feature/material - the sample-level metadata table that the study, analysis, genome, and biome tools never expose. Pass a single 'sample_accession' (e.g. 'SRS10016989') to fetch one sample, or omit it to page through samples optionally filtered by 'study_accession' or 'biome'. No API key required.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "sample_accession": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Fetch a single sample by its MGnify/ENA accession (e.g., 'SRS10016989'). If provided, study_accession/biome/page are ignored."
+        },
+        "study_accession": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter samples belonging to a study (e.g., 'MGYS00002008')."
+        },
+        "biome": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by biome name lineage (e.g., 'root:Host-associated:Human:Digestive system')."
+        },
+        "page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Page number (default 1)."
+        },
+        "page_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Samples per page (default 25, max 100)."
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint_type": "sample",
+      "query_mode": "list"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "page_size": 2
+      },
+      {
+        "sample_accession": "SRS10016989"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sample_accession": {
+                "type": "string"
+              },
+              "biosample": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "latitude": {
+                "type": [
+                  "number",
+                  "string",
+                  "null"
+                ]
+              },
+              "longitude": {
+                "type": [
+                  "number",
+                  "string",
+                  "null"
+                ]
+              },
+              "geo_loc_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "collection_date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "host_tax_id": {
+                "type": [
+                  "string",
+                  "integer",
+                  "null"
+                ]
+              },
+              "environment_biome": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "environment_feature": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "environment_material": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "MGnify",
+      "Microbiome",
+      "Samples",
+      "Metadata"
+    ],
+    "metadata": {
+      "tags": [
+        "samples",
+        "sample_metadata",
+        "geography",
+        "host",
+        "environment",
+        "microbiome",
+        "metagenomics"
+      ],
+      "estimated_execution_time": "< 5 seconds"
+    }
+  },
+  {
+    "name": "MGnify_list_analysis_downloads",
+    "description": "List the downloadable result files produced by a MGnify analysis. Returns each output file's id, label/description, file format, compression, group type, and a direct download URL - covering taxonomy and functional outputs such as predicted CDS (.faa), predicted ORF (.ffn), processed contigs (.fasta), combined eggNOG/InterPro/antiSMASH annotation GFF, eggNOG (emapper) TSV, and Diamond TSV. The parsed-annotation tools (taxonomy, GO, InterPro) summarize content but cannot enumerate or point to the actual files; this tool does. No API key required.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "analysis_id": {
+          "type": "string",
+          "description": "MGnify analysis accession (e.g., 'MGYA00585482'). Find IDs via MGnify_list_analyses."
+        },
+        "page_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of download entries to return (default 100, max 100)."
+        }
+      },
+      "required": [
+        "analysis_id"
+      ]
+    },
+    "fields": {
+      "endpoint_type": "analysis",
+      "query_mode": "downloads"
+    },
+    "type": "MGnifyExpandedTool",
+    "test_examples": [
+      {
+        "analysis_id": "MGYA00585482"
+      },
+      {
+        "analysis_id": "MGYA00585482",
+        "page_size": 10
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file_id": {
+                "type": "string"
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "file_format": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "compression": {
+                "type": [
+                  "boolean",
+                  "string",
+                  "null"
+                ]
+              },
+              "group_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "download_url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "MGnify",
+      "Microbiome",
+      "Downloads",
+      "Files"
+    ],
+    "metadata": {
+      "tags": [
+        "downloads",
+        "files",
+        "predicted_cds",
+        "eggnog",
+        "interpro",
+        "diamond",
+        "microbiome",
+        "metagenomics"
+      ],
+      "estimated_execution_time": "< 5 seconds"
+    }
+  }
+]

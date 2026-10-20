@@ -1,0 +1,404 @@
+[
+  {
+    "name": "ORCID_get_profile",
+    "type": "ORCIDTool",
+    "description": "Get a researcher's full ORCID profile by ORCID iD. Returns name, biography, email, keywords, researcher URLs, and summary counts of works and employments. ORCID iDs have format XXXX-XXXX-XXXX-XXXX (e.g., 0000-0002-1825-0097). Use for: identifying researchers, getting affiliation info, finding publication counts.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "get_profile"
+          ],
+          "description": "Operation type",
+          "default": "get_profile"
+        },
+        "orcid": {
+          "type": "string",
+          "description": "ORCID iD in format XXXX-XXXX-XXXX-XXXX (e.g., '0000-0002-1825-0097')"
+        }
+      },
+      "required": [
+        "orcid"
+      ]
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "orcid": {
+          "type": "string"
+        },
+        "name": {},
+        "biography": {},
+        "emails": {},
+        "keywords": {},
+        "urls": {},
+        "works_count": {
+          "type": "integer"
+        },
+        "employments_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "operation": "get_profile",
+        "orcid": "0000-0002-1825-0097"
+      }
+    ],
+    "fields": {
+      "operation": "get_profile"
+    }
+  },
+  {
+    "name": "ORCID_get_works",
+    "type": "ORCIDTool",
+    "description": "Get list of publications and works for an ORCID researcher. Returns titles, publication types, dates, journal names, and external identifiers (DOI, PubMed ID). Use for: finding researcher's publication history, getting DOIs, assessing research output.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "get_works"
+          ],
+          "description": "Operation type",
+          "default": "get_works"
+        },
+        "orcid": {
+          "type": "string",
+          "description": "ORCID iD in format XXXX-XXXX-XXXX-XXXX"
+        }
+      },
+      "required": [
+        "orcid"
+      ]
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "operation": "get_works",
+        "orcid": "0000-0002-1825-0097"
+      }
+    ],
+    "fields": {
+      "operation": "get_works"
+    }
+  },
+  {
+    "name": "ORCID_search_researchers",
+    "type": "ORCIDTool",
+    "description": "Search ORCID registry for researchers by keyword query. Returns each match's ORCID iD along with given/family/credit names, other names, and institution affiliations, so same-named candidates can be disambiguated without a separate profile lookup. Supports full-text search across names, affiliations, publications, and keywords. Use for: finding researchers working on specific topics, identifying collaborators, disambiguating authors.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "search_researchers"
+          ],
+          "description": "Operation type",
+          "default": "search_researchers"
+        },
+        "query": {
+          "type": "string",
+          "description": "Search query (e.g., 'BRCA1 cancer genetics', 'Harvard genomics')"
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Pagination offset (0-based)"
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 10,
+          "description": "Number of results to return"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "operation": "search_researchers",
+        "query": "BRCA1 cancer genetics",
+        "rows": 5
+      }
+    ],
+    "fields": {
+      "operation": "search_researchers"
+    }
+  },
+  {
+    "name": "ORCID_get_employments",
+    "type": "ORCIDTool",
+    "description": "Get employment and affiliation history for an ORCID researcher. Returns organization names, departments, roles, and employment date ranges. Use for: verifying academic affiliations, tracing career history, finding current institution.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "get_employments"
+          ],
+          "description": "Operation type",
+          "default": "get_employments"
+        },
+        "orcid": {
+          "type": "string",
+          "description": "ORCID iD in format XXXX-XXXX-XXXX-XXXX"
+        }
+      },
+      "required": [
+        "orcid"
+      ]
+    },
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "test_examples": [
+      {
+        "operation": "get_employments",
+        "orcid": "0000-0002-1825-0097"
+      }
+    ],
+    "fields": {
+      "operation": "get_employments"
+    }
+  },
+  {
+    "name": "ORCID_get_fundings",
+    "type": "ORCIDTool",
+    "description": "Get the funding/grant records attached to an ORCID researcher's profile. Returns each grant's title, funder organization (with country), award/funding type, start/end dates, external identifiers, and URL. Use for: profiling a researcher's grant history, identifying funders, linking grants to a person. ORCID iDs have format XXXX-XXXX-XXXX-XXXX (e.g., 0000-0001-5109-3700).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "get_fundings"
+          ],
+          "description": "Operation type",
+          "default": "get_fundings"
+        },
+        "orcid": {
+          "type": "string",
+          "description": "ORCID iD in format XXXX-XXXX-XXXX-XXXX (e.g., '0000-0001-5109-3700')"
+        }
+      },
+      "required": [
+        "orcid"
+      ]
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "put_code": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "organization": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "organization_country": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "start_date": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "end_date": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "external_ids": {
+                "type": "array"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "operation": "get_fundings",
+        "orcid": "0000-0001-5109-3700"
+      }
+    ],
+    "fields": {
+      "operation": "get_fundings"
+    }
+  },
+  {
+    "name": "ORCID_get_peer_reviews",
+    "type": "ORCIDTool",
+    "description": "Get the peer-review activity attached to an ORCID researcher's profile. Peer review is a recognized research-contribution type. Returns each review's reviewer role, review type, convening organization (the venue/journal/funder the review was done for, with country), review-group id, completion date, and URL. Use for: assessing reviewing/editorial service, profiling a researcher's contributions. ORCID iDs have format XXXX-XXXX-XXXX-XXXX (e.g., 0000-0001-5109-3700).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "get_peer_reviews"
+          ],
+          "description": "Operation type",
+          "default": "get_peer_reviews"
+        },
+        "orcid": {
+          "type": "string",
+          "description": "ORCID iD in format XXXX-XXXX-XXXX-XXXX (e.g., '0000-0001-5109-3700')"
+        }
+      },
+      "required": [
+        "orcid"
+      ]
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "put_code": {
+                "type": [
+                  "integer",
+                  "string",
+                  "null"
+                ]
+              },
+              "reviewer_role": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "review_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "review_group_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "convening_organization": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "convening_organization_country": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "completion_date": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "review_url": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "operation": "get_peer_reviews",
+        "orcid": "0000-0001-5109-3700"
+      }
+    ],
+    "fields": {
+      "operation": "get_peer_reviews"
+    }
+  }
+]

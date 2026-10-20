@@ -1,0 +1,379 @@
+[
+  {
+    "name": "MedlinePlus_search_topics_by_keyword",
+    "description": "Search MedlinePlus health topics by keyword via NLM's wsearch Web Service. IMPORTANT: although the db parameter accepts seven historical database names, the live service only returns results for healthTopics (English) and healthTopicsSpanish (Spanish); drugs, drugsSpanish, genetics, medicalTests and medicalEncyclopedia are accepted but always answer with zero results. Use MedlinePlus_get_genetics_gene_by_name / MedlinePlus_get_genetics_condition_by_name for genetics, and MedlinePlus_connect_lookup_by_code for drug/test codes.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "term": {
+          "type": "string",
+          "description": "Search keyword, e.g., \"diabetes\", needs to be URL encoded before passing."
+        },
+        "db": {
+          "type": "string",
+          "enum": [
+            "healthTopics",
+            "healthTopicsSpanish",
+            "drugs",
+            "drugsSpanish",
+            "genetics",
+            "medicalTests",
+            "medicalEncyclopedia"
+          ],
+          "description": "Database to search. Only two values are actually served by NLM's wsearch endpoint: healthTopics (English health topics) and healthTopicsSpanish (Spanish health topics). The remaining values (drugs, drugsSpanish, genetics, medicalTests, medicalEncyclopedia) are still accepted for backward compatibility but the service returns zero results for every query against them; the tool reports that explicitly instead of pretending the term had no match."
+        },
+        "rettype": {
+          "type": "string",
+          "enum": [
+            "brief",
+            "topic",
+            "all"
+          ],
+          "description": "Result return format (default: topic). topic returns the full structured health-topic record (title, meta description, aliases, full summary, topic groups). brief returns the condensed search-result fields (title, alternate title, full summary, group names and a match snippet, which is surfaced as meta_desc); it carries no language attribute, so the language is derived from db. all returns the brief fields plus the same structured record as topic, and is parsed identically to topic. All three produce the same output keys.",
+          "default": "topic"
+        }
+      },
+      "required": [
+        "term",
+        "db"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://wsearch.nlm.nih.gov/ws/query?db={db}&term={term}&rettype={rettype}",
+      "input_description": "Input parameters:\n- term: keyword to search (URL encoded);\n- db: database name; only healthTopics and healthTopicsSpanish return results (the other enum values are accepted but always yield zero results);\n- rettype: return format, options: topic (default), brief, all.",
+      "output_description": "Returns {\"topics\": [...]} where each entry has title, meta_desc, url, language, rank, also_called, summary and groups, parsed from the wsearch XML. The same keys are produced for all three rettype values. On zero results the tool returns an error naming the cause, including an explicit note when the requested db is one that MedlinePlus wsearch does not serve."
+    },
+    "type": "MedlinePlusRESTTool",
+    "test_examples": [
+      {
+        "term": "cancer",
+        "db": "healthTopics",
+        "rettype": "topic"
+      },
+      {
+        "term": "leishmaniasis",
+        "db": "healthTopics",
+        "rettype": "brief"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "meta_desc": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "rank": {
+                "type": "string"
+              },
+              "also_called": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "summary": {
+                "type": "string"
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": ["string", "object"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "MedlinePlus_connect_lookup_by_code",
+    "description": "Look up corresponding MedlinePlus page information through MedlinePlus Connect Web Service using clinical/drug/test codes (such as ICD-10 CM, RXCUI, LOINC, etc.), supports JSON or XML format return.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "cs": {
+          "type": "string",
+          "description": "Code system OID, e.g., ICD-10 CM=2.16.840.1.113883.6.90, RXCUI=2.16.840.1.113883.6.88, LOINC=2.16.840.1.113883.6.1, etc."
+        },
+        "c": {
+          "type": "string",
+          "description": "Specific code value to query, e.g., \"E11.9\" (ICD-10 CM) or \"637188\" (RXCUI)."
+        },
+        "dn": {
+          "type": "string",
+          "description": "Optional, descriptive name (English) corresponding to the code, for drugs can fill in \"Chantix 0.5 MG Oral Tablet\", can improve matching accuracy.",
+          "default": ""
+        },
+        "language": {
+          "type": "string",
+          "enum": [
+            "en",
+            "es"
+          ],
+          "description": "Return information language, \"en\" for English, \"es\" for Spanish, default \"en\".",
+          "default": "en"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "application/json",
+            "text/xml"
+          ],
+          "description": "Return format, options \"application/json\" or \"text/xml\", default \"application/json\".",
+          "default": "application/json"
+        }
+      },
+      "required": [
+        "cs",
+        "c"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://connect.medlineplus.gov/service?mainSearchCriteria.v.cs={cs}&mainSearchCriteria.v.c={c}&informationRecipient.languageCode.c={language}&knowledgeResponseType={format}&mainSearchCriteria.v.dn={dn}",
+      "input_description": "Input parameters:\n- cs: code system OID;\n- c: specific code value;\n- dn: optional code descriptive name;\n- language: return language (en or es);\n- format: return format (application/json or text/xml).",
+      "output_description": "Returns MedlinePlus Connect Web Service response, can include title, links, summary, etc. of MedlinePlus pages matching the code. Returns parsed dictionary with list of matched responses."
+    },
+    "type": "MedlinePlusRESTTool",
+    "test_examples": [
+      {
+        "cs": "2.16.840.1.113883.6.90",
+        "c": "E11.9",
+        "dn": "Type 2 diabetes mellitus without complications",
+        "language": "en",
+        "format": "application/json"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "responses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Title of the matched MedlinePlus page"
+              },
+              "summary": {
+                "type": "string",
+                "description": "Summary text of the matched page"
+              },
+              "url": {
+                "type": "string",
+                "description": "URL of the matched MedlinePlus page"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if no match found"
+        }
+      }
+    }
+  },
+  {
+    "name": "MedlinePlus_get_genetics_condition_by_name",
+    "description": "Get detailed information from MedlinePlus Genetics corresponding to genetic condition name. Returns condition description, related genes, inheritance pattern, synonyms, and other details.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Genetic condition: its name or one of its other names (e.g. 'Alport syndrome', 'Marfan syndrome') or the page slug (e.g. 'alport-syndrome'). A name with no MedlinePlus Genetics page returns an error listing the closest page names."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "xml"
+          ],
+          "description": "Format parameter for the endpoint (note: API always returns XML regardless of this parameter).",
+          "default": "json"
+        }
+      },
+      "required": [
+        "condition"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://medlineplus.gov/download/genetics/condition/{condition}.{format}",
+      "input_description": "Input parameters:\n- condition: genetic condition name (URL slug), e.g., \"alzheimer-disease\";\n- format: format parameter (API always returns XML).",
+      "output_description": "Returns XML data containing detailed information about the genetic condition, including consumer version description, symptoms, gene information, treatment options, etc. The XML is parsed into a Python dictionary for subsequent use."
+    },
+    "type": "MedlinePlusRESTTool",
+    "test_examples": [
+      {
+        "condition": "alzheimer-disease",
+        "format": "json"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the genetic condition"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the condition"
+        },
+        "genes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of related genes"
+        },
+        "inheritance": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Inheritance pattern(s) (e.g. 'Autosomal dominant')"
+        },
+        "synonyms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Alternative names for the condition"
+        },
+        "ghr_page": {
+          "type": "string",
+          "description": "URL to the detailed information page"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if condition not found"
+        }
+      }
+    }
+  },
+  {
+    "name": "MedlinePlus_get_genetics_gene_by_name",
+    "description": "Get detailed information from MedlinePlus Genetics corresponding to gene name. Returns XML data parsed into a dictionary with gene function, related health conditions, synonyms, and other details.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene": {
+          "type": "string",
+          "description": "Gene symbol (e.g. 'BRCA1'), full gene name (e.g. 'fibrillin 1') or page slug. A gene with no MedlinePlus Genetics page returns an error listing the closest page names."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "xml"
+          ],
+          "description": "Format parameter for the endpoint (note: API always returns XML regardless of this parameter).",
+          "default": "json"
+        }
+      },
+      "required": [
+        "gene"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://medlineplus.gov/download/genetics/gene/{gene}.{format}",
+      "input_description": "Input parameters:\n- gene: gene name (URL slug), e.g., \"BRCA1\";\n- format: format parameter (API always returns XML).",
+      "output_description": "Returns XML data containing detailed gene information, including consumer version description, gene function, related genetic conditions, gene structure, etc. The XML is parsed into a Python dictionary for subsequent use."
+    },
+    "type": "MedlinePlusRESTTool",
+    "test_examples": [
+      {
+        "gene": "BRCA1",
+        "format": "json"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Gene name"
+        },
+        "function": {
+          "type": "string",
+          "description": "Description of gene function"
+        },
+        "health_conditions": {
+          "type": "array",
+          "items": {
+            "type": ["string", "object"]
+          },
+          "description": "List of related health conditions"
+        },
+        "synonyms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Alternative names for the gene"
+        },
+        "ghr_page": {
+          "type": "string",
+          "description": "URL to the detailed information page"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if gene not found"
+        }
+      }
+    }
+  },
+  {
+    "name": "MedlinePlus_get_genetics_index",
+    "description": "Download index file (XML) of all genetics entries in MedlinePlus, get complete list in one call.",
+    "parameter": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://medlineplus.gov/download/TopicIndex.xml",
+      "input_description": "No input parameters needed, directly call to get complete genetics index.",
+      "output_description": "Returns XML index containing all genetics entries, data will be parsed into Python dictionary or OrderedDict, can be used for offline caching or batch processing."
+    },
+    "type": "MedlinePlusRESTTool",
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

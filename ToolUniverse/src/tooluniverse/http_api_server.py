@@ -1,0 +1,465 @@
+#!/usr/bin/env python3
+"""
+ToolUniverse HTTP API Server
+
+Auto-generating FastAPI server that exposes ALL ToolUniverse class methods via HTTP.
+Uses Python introspection to automatically discover methods - no manual updates needed!
+
+When you add/modify methods in ToolUniverse, they automatically work over HTTP.
+
+Usage:
+    # Loopback only (default, no authentication needed):
+    python -m tooluniverse.http_api_server
+
+    # Network exposure requires a Bearer token (see TOOLUNIVERSE_API_TOKEN);
+    # binding to a non-loopback host without it is refused:
+    TOOLUNIVERSE_API_TOKEN=secret TOOLUNIVERSE_HTTP_HOST=0.0.0.0 \
+        python -m tooluniverse.http_api_server
+
+    # Or use the CLI entry point for more options:
+    tooluniverse-http-api --host 0.0.0.0 --port 8080
+"""
+
+import asyncio
+import inspect
+import json
+import os
+import threading
+import traceback
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
+from typing import Any, Dict, List, Optional
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+from .execute_function import ToolUniverse
+from .logging_config import get_logger
+from .server_security import (
+    enforce_bind_security,
+    get_api_token,
+    is_loopback_authority,
+    is_loopback_host,
+    is_loopback_origin,
+    token_matches,
+)
+
+logger = get_logger("HTTPAPIServer")
+
+# Thread pool for running sync ToolUniverse methods asynchronously
+# Can be configured via TOOLUNIVERSE_THREAD_POOL_SIZE environment variable
+_thread_pool_size = int(os.getenv("TOOLUNIVERSE_THREAD_POOL_SIZE", "20"))
+_thread_pool = ThreadPoolExecutor(max_workers=_thread_pool_size)
+logger.info(
+    f"Initialized thread pool with {_thread_pool_size} workers for async execution"
+)
+
+
+class CallMethodRequest(BaseModel):
+    """Request model for calling any ToolUniverse method"""
+
+    method: str = Field(..., description="Name of the ToolUniverse method to call")
+    kwargs: Dict[str, Any] = Field(
+        default_factory=dict, description="Method arguments as key-value pairs"
+    )
+
+
+class CallMethodResponse(BaseModel):
+    """Response model for method calls"""
+
+    success: bool = Field(..., description="Whether the call succeeded")
+    result: Optional[Any] = Field(
+        None, description="Result from the method (if successful)"
+    )
+    error: Optional[str] = Field(None, description="Error message (if failed)")
+    error_type: Optional[str] = Field(None, description="Type of error that occurred")
+
+
+class MethodInfo(BaseModel):
+    """Information about a ToolUniverse method"""
+
+    name: str
+    parameters: List[Dict[str, Any]]
+    docstring: Optional[str]
+
+
+class MethodsListResponse(BaseModel):
+    """Response model for listing available methods"""
+
+    methods: List[MethodInfo]
+    total: int
+
+
+class ToolUniverseManager:
+    """
+    Singleton manager for ToolUniverse instance.
+
+    Ensures thread-safe access to a single ToolUniverse instance
+    that persists across requests.
+    """
+
+    def __init__(self):
+        self._instance: Optional[ToolUniverse] = None
+        self._lock = threading.Lock()
+        self._init_kwargs: Dict[str, Any] = {}
+
+    def get_instance(self) -> ToolUniverse:
+        """Get or create the ToolUniverse instance (thread-safe)"""
+        if self._instance is None:
+            with self._lock:
+                if self._instance is None:
+                    logger.info("Creating new ToolUniverse instance")
+                    self._instance = ToolUniverse(**self._init_kwargs)
+        return self._instance
+
+    def status_snapshot(self) -> tuple[bool, int]:
+        """Read initialization state without starting or waiting for the SDK.
+
+        Assignment to ``_instance`` occurs only after construction completes, so
+        this lock-free snapshot is safe for a liveness endpoint.  In particular,
+        it must not wait on the initialization lock held by a slow first request.
+        """
+        instance = self._instance
+        return (instance is not None, len(instance.all_tools) if instance else 0)
+
+    def reset(self, **kwargs):
+        """Reset the ToolUniverse instance with new configuration"""
+        with self._lock:
+            if self._instance is not None:
+                try:
+                    self._instance.close()
+                except Exception as e:
+                    logger.warning(f"Error closing ToolUniverse instance: {e}")
+            self._init_kwargs = kwargs
+            self._instance = None
+            logger.info("ToolUniverse instance reset")
+
+    def configure(self, **kwargs):
+        """Configure the ToolUniverse instance initialization parameters"""
+        with self._lock:
+            self._init_kwargs.update(kwargs)
+            logger.info(f"Updated ToolUniverse configuration: {kwargs}")
+
+
+# Global instance manager
+_tu_manager = ToolUniverseManager()
+
+
+def discover_public_methods(cls) -> Dict[str, Dict[str, Any]]:
+    """
+    Automatically discover all public methods from a class using introspection.
+
+    Args:
+        cls: The class to inspect
+
+    Returns:
+        Dictionary mapping method names to their metadata
+    """
+    methods = {}
+
+    _empty = inspect.Parameter.empty
+
+    for name, method in inspect.getmembers(cls, predicate=inspect.isfunction):
+        # Skip private/magic methods
+        if name.startswith("_"):
+            continue
+
+        try:
+            sig = inspect.signature(method)
+            params = [
+                {
+                    "name": param_name,
+                    "type": str(param.annotation)
+                    if param.annotation is not _empty
+                    else "Any",
+                    "required": param.default is _empty,
+                    "default": str(param.default)
+                    if param.default is not _empty
+                    else None,
+                }
+                for param_name, param in sig.parameters.items()
+                if param_name != "self"
+            ]
+
+            methods[name] = {
+                "signature": sig,
+                "parameters": params,
+                "docstring": inspect.getdoc(method),
+            }
+        except Exception as e:
+            logger.warning(f"Could not inspect method '{name}': {e}")
+            continue
+
+    return methods
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="ToolUniverse HTTP API",
+    description="Auto-generated API exposing all ToolUniverse methods via HTTP",
+    version="1.0.0",
+)
+
+# Paths reachable without authentication (liveness checks only).
+_PUBLIC_PATHS = {"/health"}
+
+
+@app.middleware("http")
+async def require_bearer_token(request, call_next):
+    """Require a Bearer token on every request when one is configured.
+
+    This endpoint can execute arbitrary ToolUniverse methods (including the
+    Python code executor), so it must never be reachable unauthenticated over
+    the network. When ``TOOLUNIVERSE_API_TOKEN`` is set, all routes except
+    ``/health`` require ``Authorization: Bearer <token>``. The bind guard in the
+    server entry points ensures a token is set before binding to a non-loopback
+    interface, so an unauthenticated server is only ever reachable from
+    localhost.
+    """
+    token = get_api_token()
+    if token is not None and request.url.path not in _PUBLIC_PATHS:
+        if not token_matches(request.headers.get("authorization", ""), token):
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "success": False,
+                    "error": "Unauthorized: a valid Bearer token is required",
+                    "error_type": "AuthenticationError",
+                },
+            )
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def guard_host_and_origin(request, call_next):
+    """Reject requests whose Host/Origin do not name loopback, on loopback binds.
+
+    A server bound to 127.0.0.1 is not automatically safe from remote callers:
+    DNS rebinding lets a malicious webpage resolve its own origin to the
+    loopback address and become an in-browser client of this server, with a
+    ``Host`` header naming the attacker's domain rather than "localhost" and
+    (when the request is a fetch/XHR) an ``Origin`` header to match. This closes
+    that gap independent of whether a Bearer token is configured.
+
+    Skipped once the server is actually bound to a non-loopback interface:
+    that's an explicit operator opt-in that ``enforce_bind_security`` already
+    gates on a Bearer token, and the Host/Origin a legitimate remote caller
+    sends there is not expected to be loopback.
+    """
+    server = request.scope.get("server")
+    if server and is_loopback_host(server[0]):
+        if not is_loopback_authority(request.headers.get("host", "")):
+            return JSONResponse(
+                status_code=421,
+                content={"success": False, "error": "Misdirected Request"},
+            )
+        origin = request.headers.get("origin")
+        if origin and not is_loopback_origin(origin):
+            return JSONResponse(
+                status_code=403,
+                content={"success": False, "error": "Forbidden Origin"},
+            )
+    return await call_next(request)
+
+
+@app.get("/", tags=["Health"])
+async def root():
+    """Root endpoint - API information"""
+    return {
+        "name": "ToolUniverse HTTP API",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "/api/call": "Call any ToolUniverse method",
+            "/api/methods": "List all available methods",
+            "/api/reset": "Reset ToolUniverse instance",
+            "/health": "Health check",
+        },
+    }
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Return liveness without triggering expensive ToolUniverse initialization."""
+    initialized, loaded_tools_count = _tu_manager.status_snapshot()
+    return {
+        "status": "healthy",
+        "tooluniverse_initialized": initialized,
+        "loaded_tools_count": loaded_tools_count,
+    }
+
+
+@app.get("/api/methods", response_model=MethodsListResponse, tags=["Discovery"])
+async def list_methods():
+    """
+    List all available ToolUniverse methods with their signatures.
+
+    Returns detailed information about each method including:
+    - Method name
+    - Parameters (name, type, required, default)
+    - Docstring documentation
+    """
+    try:
+        methods_dict = discover_public_methods(ToolUniverse)
+
+        methods_list = [
+            MethodInfo(
+                name=name, parameters=info["parameters"], docstring=info["docstring"]
+            )
+            for name, info in sorted(methods_dict.items())
+        ]
+
+        return MethodsListResponse(methods=methods_list, total=len(methods_list))
+    except Exception as e:
+        logger.error(f"Error listing methods: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/call", response_model=CallMethodResponse, tags=["Execution"])
+async def call_method(request: CallMethodRequest):
+    """
+    Generic endpoint to call any ToolUniverse method.
+
+    This is the main endpoint - it can call ANY public method on ToolUniverse.
+
+    Example request body:
+    ```json
+    {
+        "method": "load_tools",
+        "kwargs": {
+            "tool_type": ["uniprot", "ChEMBL"],
+            "exclude_tools": []
+        }
+    }
+    ```
+
+    Example request body:
+    ```json
+    {
+        "method": "run_one_function",
+        "kwargs": {
+            "function_call_json": {
+                "name": "UniProt_get_entry_by_accession",
+                "arguments": {"accession": "P05067"}
+            }
+        }
+    }
+    ```
+    """
+    try:
+        # Get ToolUniverse instance
+        tu = _tu_manager.get_instance()
+
+        # Validate method exists and is public
+        if not hasattr(tu, request.method):
+            return CallMethodResponse(
+                success=False,
+                error=f"Method '{request.method}' not found on ToolUniverse",
+                error_type="MethodNotFoundError",
+            )
+
+        if request.method.startswith("_"):
+            return CallMethodResponse(
+                success=False,
+                error=f"Cannot call private method '{request.method}'",
+                error_type="PrivateMethodError",
+            )
+
+        # Get the method
+        method = getattr(tu, request.method)
+
+        if not callable(method):
+            return CallMethodResponse(
+                success=False,
+                error=f"'{request.method}' is not a callable method",
+                error_type="NotCallableError",
+            )
+
+        # Call the method with provided kwargs
+        logger.info(
+            f"Calling method: {request.method} with kwargs: {list(request.kwargs.keys())}"
+        )
+
+        # Run the synchronous method in a thread pool to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            _thread_pool, partial(method, **request.kwargs)
+        )
+
+        # Serialize result (handle non-JSON-serializable objects)
+        try:
+            json.dumps(result)  # Test if serializable
+            serialized_result = result
+        except (TypeError, ValueError):
+            # Convert to string if not JSON-serializable
+            serialized_result = str(result)
+            logger.warning(
+                f"Result from {request.method} was not JSON-serializable, converted to string"
+            )
+
+        return CallMethodResponse(success=True, result=serialized_result)
+
+    except TypeError as e:
+        # Invalid arguments
+        error_msg = f"Invalid arguments for method '{request.method}': {str(e)}"
+        logger.error(error_msg)
+        logger.debug(traceback.format_exc())
+        return CallMethodResponse(
+            success=False, error=error_msg, error_type="InvalidArgumentsError"
+        )
+
+    except Exception as e:
+        # Any other error during execution
+        error_msg = f"Error executing method '{request.method}': {str(e)}"
+        logger.error(error_msg)
+        logger.debug(traceback.format_exc())
+        return CallMethodResponse(
+            success=False, error=error_msg, error_type=type(e).__name__
+        )
+
+
+@app.post("/api/reset", tags=["Management"])
+async def reset_instance(config: Optional[Dict[str, Any]] = None):
+    """
+    Reset the ToolUniverse instance.
+
+    Optionally provide configuration for the new instance:
+    ```json
+    {
+        "log_level": "DEBUG",
+        "hooks_enabled": true
+    }
+    ```
+    """
+    try:
+        if config:
+            _tu_manager.reset(**config)
+        else:
+            _tu_manager.reset()
+
+        return {"success": True, "message": "ToolUniverse instance reset successfully"}
+    except Exception as e:
+        logger.error(f"Error resetting instance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# CORS middleware (optional - uncomment if needed)
+# from fastapi.middleware.cors import CORSMiddleware
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    # Default to loopback. Remote exposure (e.g. 0.0.0.0) requires a token and
+    # is refused otherwise by enforce_bind_security().
+    host = os.getenv("TOOLUNIVERSE_HTTP_HOST", "127.0.0.1")
+    port = int(os.getenv("TOOLUNIVERSE_HTTP_PORT", "8080"))
+    enforce_bind_security(host)
+    uvicorn.run(app, host=host, port=port)

@@ -1,0 +1,69 @@
+"""
+FDA_search_drug_labels
+
+Search FDA-approved drug labels (prescribing information) by drug name or medical indication. Dru...
+"""
+
+from typing import Any, Optional, Callable
+from ._shared_client import get_shared_client
+
+
+def FDA_search_drug_labels(
+    drug_name: Optional[str] = None,
+    indication: Optional[str] = None,
+    limit: Optional[int] = 5,
+    max_section_chars: Optional[int] = 2000,
+    *,
+    stream_callback: Optional[Callable[[str], None]] = None,
+    use_cache: bool = False,
+    validate: bool = True,
+) -> Any:
+    """
+    Search FDA-approved drug labels (prescribing information) by drug name or medical indication. Dru...
+
+    Parameters
+    ----------
+    drug_name : str
+        Brand or generic drug name to search (e.g., 'metformin', 'atorvastatin', 'lis...
+    indication : str
+        Medical condition to search in indications sections (e.g., 'hypertension', 't...
+    limit : int
+        Maximum number of results to return (default: 5, max: 20)
+    max_section_chars : int
+        Maximum characters returned per clinical section (default: 2000, 0 = no limit...
+    stream_callback : Callable, optional
+        Callback for streaming output
+    use_cache : bool, default False
+        Enable caching
+    validate : bool, default True
+        Validate parameters
+
+    Returns
+    -------
+    Any
+    """
+    # Handle mutable defaults to avoid B006 linting error
+
+    # Strip None values so optional parameters don't trigger schema validation errors
+    _args = {
+        k: v
+        for k, v in {
+            "drug_name": drug_name,
+            "indication": indication,
+            "limit": limit,
+            "max_section_chars": max_section_chars,
+        }.items()
+        if v is not None
+    }
+    return get_shared_client().run_one_function(
+        {
+            "name": "FDA_search_drug_labels",
+            "arguments": _args,
+        },
+        stream_callback=stream_callback,
+        use_cache=use_cache,
+        validate=validate,
+    )
+
+
+__all__ = ["FDA_search_drug_labels"]

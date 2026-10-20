@@ -1,0 +1,325 @@
+# complex_portal_tool.py
+"""
+EBI Complex Portal API tool for ToolUniverse.
+
+The Complex Portal is a manually curated, encyclopaedic resource of
+macromolecular complexes from a number of key model organisms.
+It includes CORUM mammalian protein complex data.
+
+Data includes:
+- Curated protein complex compositions
+- Subunit stoichiometry
+- Complex function and disease relevance
+- Cross-references to PDB structures, Reactome pathways, GO annotations
+
+API Documentation: https://www.ebi.ac.uk/complexportal/documentation
+Base URL: https://www.ebi.ac.uk/complexportal/ws/
+No authentication required.
+"""
+
+import requests
+from typing import Dict, Any
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+# Base URL for Complex Portal API (IntAct complex-ws)
+COMPLEX_PORTAL_BASE = "https://www.ebi.ac.uk/intact/complex-ws"
+
+# Complex Portal's `species_f` search facet is indexed by full UniProt-style
+# organism name strings (confirmed via the API's own `facets` response), NOT
+# NCBI taxonomy IDs -- a raw "9606" never matches anything in the facet
+# index and silently no-ops the filter. This maps the common taxonomy IDs
+# and casual names callers are likely to pass to the exact facet strings.
+SPECIES_TAXID_TO_NAME = {
+    "9606": "Homo sapiens",
+    "10090": "Mus musculus",
+    "10116": "Rattus norvegicus",
+    "7227": "Drosophila melanogaster",
+    "6239": "Caenorhabditis elegans",
+    "7955": "Danio rerio",
+    "3702": "Arabidopsis thaliana",
+    "9031": "Gallus gallus",
+    "9913": "Bos taurus",
+    "4932": "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+    "559292": "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+    "83333": "Escherichia coli (strain K12)",
+    "511145": "Escherichia coli (strain K12)",
+    "284812": "Schizosaccharomyces pombe (strain 972 / ATCC 24843)",
+    "2697049": "Severe acute respiratory syndrome coronavirus 2",
+    "694009": "Severe acute respiratory syndrome coronavirus",
+}
+SPECIES_NAME_ALIASES = {
+    "human": "Homo sapiens",
+    "mouse": "Mus musculus",
+    "rat": "Rattus norvegicus",
+    "fly": "Drosophila melanogaster",
+    "fruit fly": "Drosophila melanogaster",
+    "worm": "Caenorhabditis elegans",
+    "zebrafish": "Danio rerio",
+    "yeast": "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+    "e. coli": "Escherichia coli (strain K12)",
+    "e.coli": "Escherichia coli (strain K12)",
+    "ecoli": "Escherichia coli (strain K12)",
+}
+
+
+def _resolve_species_facet_name(species: str) -> str:
+    """Translate a caller-supplied taxonomy ID or common name to the exact
+    organism name string Complex Portal's species_f facet is indexed by.
+    Falls back to the input as-is, so a caller who already knows and passes
+    the exact facet name (e.g. a less common organism) still works."""
+    key = species.strip()
+    return (
+        SPECIES_TAXID_TO_NAME.get(key) or SPECIES_NAME_ALIASES.get(key.lower()) or key
+    )
+
+
+@register_tool("ComplexPortalTool")
+class ComplexPortalTool(BaseTool):
+    """
+    Tool for querying the EBI Complex Portal for curated protein complexes.
+
+    Provides access to:
+    - Protein complex search by gene/protein name
+    - Detailed complex compositions and stoichiometry
+    - Complex function, disease associations, and cross-references
+    - Data from CORUM and other curated complex databases
+
+    No authentication required.
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        self.timeout = tool_config.get("timeout", 30)
+        self.operation = tool_config.get("fields", {}).get(
+            "operation", "search_complexes"
+        )
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the Complex Portal API call."""
+        operation = self.operation
+
+        if operation == "search_complexes":
+            return self._search_complexes(arguments)
+        elif operation == "get_complex":
+            return self._get_complex(arguments)
+        else:
+            return {"status": "error", "error": f"Unknown operation: {operation}"}
+
+    def _search_complexes(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Search for protein complexes containing a given gene/protein.
+
+        Queries the Complex Portal search endpoint.
+        """
+        query = arguments.get("query", "")
+        species = arguments.get("species", "9606")  # Default: human
+        first = arguments.get("first", 0)
+        number = arguments.get("number", 25)
+
+        if not query:
+            return {"status": "error", "error": "query parameter is required"}
+
+        try:
+            species_name = _resolve_species_facet_name(species) if species else None
+            url = f"{COMPLEX_PORTAL_BASE}/search/{query}"
+            params = {
+                "format": "json",
+                "facets": "species_f",
+                "filters": f'species_f:("{species_name}")' if species_name else None,
+                "first": first,
+                "number": min(number, 100),
+            }
+            # Remove None values
+            params = {k: v for k, v in params.items() if v is not None}
+
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+
+            complexes = []
+            elements = data.get("elements", [])
+            for elem in elements:
+                complex_info = {
+                    "complex_id": elem.get("complexAC"),
+                    "name": elem.get("complexName"),
+                    "species": elem.get("organismName"),
+                    "description": (
+                        elem.get("description", "")[:500]
+                        if elem.get("description")
+                        else None
+                    ),
+                    "predicted": elem.get("predictedComplex", False),
+                    "subunits": [],
+                }
+
+                # Parse interactors (subunits)
+                for interactor in elem.get("interactors", elem.get("participants", [])):
+                    subunit = {
+                        "identifier": interactor.get("identifier"),
+                        "name": interactor.get("name"),
+                        "description": interactor.get("description"),
+                        "stoichiometry": interactor.get("stochiometry"),
+                        "interactor_type": interactor.get("interactorType"),
+                    }
+                    complex_info["subunits"].append(subunit)
+
+                complexes.append(complex_info)
+
+            total_found = data.get(
+                "totalNumberOfResults", data.get("size", len(complexes))
+            )
+
+            return {
+                "status": "success",
+                "data": {
+                    "query": query,
+                    "species_filter": species_name,
+                    "complexes": complexes,
+                    "count": len(complexes),
+                    "total_found": total_found,
+                },
+                "source": "EBI Complex Portal (includes CORUM data)",
+            }
+
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "error": f"Complex Portal API timeout after {self.timeout}s",
+            }
+        except requests.exceptions.HTTPError as e:
+            status_code = (
+                e.response.status_code if e.response is not None else "unknown"
+            )
+            if status_code == 404:
+                return {
+                    "status": "success",
+                    "data": {
+                        "query": query,
+                        "complexes": [],
+                        "count": 0,
+                        "total_found": 0,
+                    },
+                    "message": f"No complexes found for '{query}'",
+                }
+            return {
+                "status": "error",
+                "error": f"Complex Portal API HTTP error: {status_code}",
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "error",
+                "error": f"Complex Portal API request failed: {str(e)}",
+            }
+        except Exception as e:
+            return {"status": "error", "error": f"Unexpected error: {str(e)}"}
+
+    def _get_complex(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Get detailed information for a specific protein complex by its Complex Portal ID.
+
+        Returns full complex data including subunit composition, function, and cross-references.
+        """
+        complex_id = arguments.get("complex_id", "")
+
+        if not complex_id:
+            return {"status": "error", "error": "complex_id parameter is required"}
+
+        try:
+            url = f"{COMPLEX_PORTAL_BASE}/complex/{complex_id}"
+            params = {"format": "json"}
+
+            response = requests.get(url, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+
+            # Parse complex details. The record now uses complexAc/name/species
+            # ("Mus musculus; 10090") and lists its description under `functions`;
+            # the older complexAC/complexName/organismName keys are kept as fallbacks.
+            # Reading only those made name, species and description come back null.
+            species_text = data.get("species") or data.get("organismName")
+            species_name, _, species_taxid = (species_text or "").partition(";")
+            functions = data.get("functions") or []
+            assemblies = data.get("complexAssemblies") or []
+            complex_data = {
+                "complex_id": data.get("complexAc")
+                or data.get("complexAC")
+                or data.get("ac"),
+                "name": data.get("name") or data.get("complexName"),
+                "systematic_name": data.get("systematicName"),
+                "synonyms": data.get("synonyms") or [],
+                "species": species_name.strip() or None,
+                "taxonomy_id": species_taxid.strip()
+                or data.get("organismTaxId")
+                or None,
+                "description": data.get("description")
+                or ("\n".join(functions) if functions else None),
+                "properties": data.get("properties"),
+                "complex_type": data.get("complexType")
+                or (", ".join(assemblies) if assemblies else None),
+                "predicted": data.get("predictedComplex"),
+                "evidence_type": data.get("evidenceType"),
+                "subunits": [],
+                "cross_references": [],
+                "diseases": [],
+                "go_annotations": [],
+            }
+
+            # Parse interactors (subunits)
+            for interactor in data.get("interactors", data.get("participants", [])):
+                subunit = {
+                    "identifier": interactor.get("identifier"),
+                    "name": interactor.get("name"),
+                    "description": interactor.get("description"),
+                    "stoichiometry": interactor.get("stochiometry"),
+                    "interactor_type": interactor.get("interactorType"),
+                }
+                complex_data["subunits"].append(subunit)
+
+            # Parse cross-references
+            for xref in data.get("crossReferences", []):
+                db = xref.get("database", "")
+                xref_entry = {
+                    "database": db,
+                    "identifier": xref.get("identifier"),
+                    "description": xref.get("description"),
+                }
+                if db.lower() in ("efo", "orphanet", "mondo"):
+                    complex_data["diseases"].append(xref_entry)
+                elif db.lower() in ("go", "gene ontology"):
+                    complex_data["go_annotations"].append(xref_entry)
+                else:
+                    complex_data["cross_references"].append(xref_entry)
+
+            return {
+                "status": "success",
+                "data": complex_data,
+                "source": "EBI Complex Portal",
+            }
+
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "error": f"Complex Portal API timeout after {self.timeout}s",
+            }
+        except requests.exceptions.HTTPError as e:
+            status_code = (
+                e.response.status_code if e.response is not None else "unknown"
+            )
+            if status_code == 404:
+                return {
+                    "status": "success",
+                    "data": None,
+                    "message": f"Complex not found: {complex_id}",
+                }
+            return {
+                "status": "error",
+                "error": f"Complex Portal API HTTP error: {status_code}",
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "status": "error",
+                "error": f"Complex Portal API request failed: {str(e)}",
+            }
+        except Exception as e:
+            return {"status": "error", "error": f"Unexpected error: {str(e)}"}

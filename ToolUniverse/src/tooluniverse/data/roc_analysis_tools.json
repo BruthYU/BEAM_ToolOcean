@@ -1,0 +1,208 @@
+[
+  {
+    "name": "ROC_analysis",
+    "type": "ROCAnalysisTool",
+    "description": "Deterministic ROC / AUC diagnostic-accuracy analysis for any binary classifier or continuous biomarker. Give scores + 0/1 labels (inline arrays) or a CSV with score/label columns; returns AUC with a bootstrap 95% CI, the Youden-optimal cutoff and its sensitivity/specificity, optional metrics at a fixed cutoff, and a downsampled ROC curve. Pure NumPy compute (no scikit-learn, runs on a default install); no API key.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "scores": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          },
+          "description": "Continuous prediction scores (inline). Pair with 'labels'."
+        },
+        "labels": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "description": "Binary class labels aligned to scores (1=positive/0=negative, or any two values + 'positive_label')."
+        },
+        "csv_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Alternative to inline arrays: path to a CSV with score and label columns"
+        },
+        "score_col": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Score column name in csv_path (default 'score')"
+        },
+        "label_col": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Label column name in csv_path (default 'label')"
+        },
+        "positive_label": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ],
+          "description": "Which label value is the positive class (default: 1, or the larger of two classes)"
+        },
+        "cutoff": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Optional fixed cutoff; also reports sensitivity/specificity at score >= cutoff"
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "description": "ROC/AUC diagnostic-accuracy analysis results.",
+      "properties": {
+        "auc": {
+          "type": "number",
+          "description": "Area under the ROC curve."
+        },
+        "auc_ci95": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Bootstrap 95% confidence interval for AUC as [low, high]."
+        },
+        "n": {
+          "type": "integer",
+          "description": "Total number of samples."
+        },
+        "n_positive": {
+          "type": "integer",
+          "description": "Number of positive-class samples."
+        },
+        "n_negative": {
+          "type": "integer",
+          "description": "Number of negative-class samples."
+        },
+        "youden_optimal": {
+          "type": "object",
+          "description": "Cutoff maximizing Youden's J statistic (sensitivity + specificity - 1).",
+          "properties": {
+            "cutoff": {
+              "type": "number"
+            },
+            "sensitivity": {
+              "type": "number"
+            },
+            "specificity": {
+              "type": "number"
+            }
+          }
+        },
+        "roc_curve": {
+          "type": "object",
+          "description": "Downsampled ROC curve points.",
+          "properties": {
+            "fpr": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "tpr": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "thresholds": {
+              "type": "array",
+              "items": {
+                "type": ["number", "null"]
+              }
+            }
+          }
+        },
+        "at_cutoff": {
+          "type": "object",
+          "description": "Sensitivity/specificity at the user-specified fixed cutoff (present only when 'cutoff' parameter is given).",
+          "properties": {
+            "cutoff": {
+              "type": "number"
+            },
+            "sensitivity": {
+              "type": "number"
+            },
+            "specificity": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "required": [
+        "auc",
+        "n",
+        "youden_optimal",
+        "roc_curve"
+      ]
+    },
+    "test_examples": [
+      {
+        "scores": [
+          0.1,
+          0.4,
+          0.35,
+          0.8,
+          0.2,
+          0.9,
+          0.6,
+          0.45
+        ],
+        "labels": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "scores": [
+          0.1,
+          0.4,
+          0.35,
+          0.8,
+          0.2,
+          0.9,
+          0.6,
+          0.45
+        ],
+        "labels": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          1,
+          1
+        ],
+        "cutoff": 0.5
+      }
+    ]
+  }
+]

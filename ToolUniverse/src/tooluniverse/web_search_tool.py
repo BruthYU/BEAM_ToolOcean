@@ -1,0 +1,969 @@
+"""Web search tools for ToolUniverse using DDGS plus opt-in hosted backends
+(Parallel Search MCP, SerpBase, Firecrawl Search)."""
+
+import importlib.util
+import json
+import re
+import subprocess
+import sys
+import time
+from html import unescape
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, urlparse
+
+import requests
+
+from .base_tool import BaseTool
+from .mcp_client_tool import BaseMCPClient
+from .extras import install_hint
+from .tool_registry import register_tool
+
+PARALLEL_SEARCH_MCP_URL = "https://search.parallel.ai/mcp"
+PARALLEL_PROVIDER_NOTICE = (
+    "Query sent to Parallel's hosted third-party Search MCP service at "
+    f"{PARALLEL_SEARCH_MCP_URL}. ToolUniverse region and safesearch controls "
+    "are not applied by this backend; do not submit sensitive or "
+    "patient-identifying information."
+)
+
+SERPBASE_SEARCH_URL = "https://api.serpbase.dev/google/search"
+SERPBASE_PROVIDER_NOTICE = (
+    "Query sent to SerpBase's hosted third-party Google-SERP API at "
+    f"{SERPBASE_SEARCH_URL} (billed per request). ToolUniverse safesearch "
+    "control is not applied by this backend; do not submit sensitive or "
+    "patient-identifying information."
+)
+
+FIRECRAWL_SEARCH_URL = "https://api.firecrawl.dev/v2/search"
+FIRECRAWL_PROVIDER_NOTICE = (
+    "Query sent to Firecrawl's hosted third-party Search API at "
+    f"{FIRECRAWL_SEARCH_URL}. ToolUniverse region is applied as a country "
+    "code only and safesearch as a two-state filter by this backend; do not "
+    "submit sensitive or patient-identifying information."
+)
+# Region prefixes in the web_search enum that are not ISO 3166-1 alpha-2
+# country codes ("uk-en" is the United Kingdom; "ja-jp" is Japan).
+_FIRECRAWL_COUNTRY_OVERRIDES = {"uk": "GB", "ja": "JP"}
+
+
+def _firecrawl_country_from_region(region: str) -> str:
+    """Map a DDGS-style region such as ``uk-en`` to Firecrawl's ``country``.
+
+    Firecrawl only takes an ISO 3166-1 alpha-2 country code; the language half
+    of the ToolUniverse region has no equivalent and is not sent.
+    """
+    country, _, _ = (region or "").partition("-")
+    country = country.strip().lower()
+    if not country:
+        return "US"
+    return _FIRECRAWL_COUNTRY_OVERRIDES.get(country, country.upper())
+
+
+@register_tool("WebSearchTool")
+class WebSearchTool(BaseTool):
+    """
+    Web search tool using DDGS library.
+
+    This tool performs web searches using the DDGS library which supports
+    multiple search engines including Google, Bing, Brave, Yahoo, DuckDuckGo, etc.
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        # DDGS instance will be created per request to avoid session issues
+
+    def _search_with_ddgs(
+        self,
+        query: str,
+        max_results: int = 10,
+        backend: str = "auto",
+        region: str = "us-en",
+        safesearch: str = "moderate",
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform a web search using DDGS library and return formatted results.
+
+        Args:
+            query: Search query string
+            max_results: Maximum number of results to return
+            backend: Search engine backend (auto, google, bing, brave, etc.)
+            region: Search region (e.g., 'us-en', 'cn-zh')
+            safesearch: Safe search level ('on', 'moderate', 'off')
+
+        Returns:
+            List of search results with title, url, and snippet
+        """
+        # Run DDGS in a subprocess so native-library panics cannot crash the
+        # current ToolUniverse process.
+        payload = {
+            "query": query,
+            "max_results": max_results,
+            "backend": backend,
+            "region": region,
+            "safesearch": safesearch,
+        }
+        ddgs_script = """
+import json
+import sys
+from ddgs import DDGS
+
+args = json.loads(sys.argv[1])
+results = list(
+    DDGS().text(
+        query=args["query"],
+        max_results=args["max_results"],
+        backend=args["backend"],
+        region=args["region"],
+        safesearch=args["safesearch"],
+    )
+)
+print(json.dumps(results))
+"""
+
+        # The script above imports ddgs, and it runs under this interpreter, so
+        # find_spec here predicts the child exactly. Checking first turns
+        # "DDGS subprocess failed with exit code 1: ModuleNotFoundError: No
+        # module named 'ddgs'" into something the caller can act on.
+        if importlib.util.find_spec("ddgs") is None:
+            raise RuntimeError(
+                f"ddgs is required for web search. {install_hint('websearch', 'ddgs')}"
+            )
+
+        completed = subprocess.run(
+            [sys.executable, "-c", ddgs_script, json.dumps(payload)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if completed.returncode != 0:
+            stderr_preview = (completed.stderr or "").strip()[:300]
+            stdout_preview = (completed.stdout or "").strip()[:300]
+            detail = stderr_preview or stdout_preview or "Unknown subprocess failure"
+            raise RuntimeError(
+                f"DDGS subprocess failed with exit code {completed.returncode}: {detail}"
+            )
+
+        try:
+            search_results = json.loads(completed.stdout or "[]")
+        except json.JSONDecodeError as error:
+            raise RuntimeError(
+                f"DDGS subprocess returned invalid JSON: {str(error)}"
+            ) from error
+
+        # Convert DDGS results to our expected format
+        results = []
+        for i, result in enumerate(search_results):
+            results.append(
+                {
+                    "title": result.get("title", ""),
+                    "url": result.get("href", ""),
+                    "snippet": result.get("body", ""),
+                    "rank": i + 1,
+                }
+            )
+
+        return results
+
+    def _search_with_parallel(
+        self, query: str, max_results: int
+    ) -> List[Dict[str, Any]]:
+        """Search with Parallel Search MCP and normalize its structured results."""
+        client = BaseMCPClient(PARALLEL_SEARCH_MCP_URL, transport="http", timeout=30)
+        response = client._run_with_cleanup(
+            lambda: client._make_mcp_request(
+                "tools/call",
+                {
+                    "name": "web_search",
+                    "arguments": {
+                        "objective": query,
+                        "search_queries": [query],
+                    },
+                },
+            )
+        )
+
+        if response.get("isError"):
+            raise RuntimeError("Parallel Search MCP returned an error")
+
+        structured_content = response.get("structuredContent") or response.get(
+            "structured_content"
+        )
+        if not isinstance(structured_content, dict):
+            raise RuntimeError(
+                "Parallel Search MCP response did not include structured content"
+            )
+
+        search_results = structured_content.get("results")
+        if not isinstance(search_results, list):
+            raise RuntimeError(
+                "Parallel Search MCP structured content did not include results"
+            )
+
+        results = []
+        for result in search_results:
+            if not isinstance(result, dict):
+                continue
+
+            url = result.get("url")
+            if not isinstance(url, str) or not url:
+                continue
+
+            title = result.get("title")
+            excerpts = result.get("excerpts")
+            if isinstance(excerpts, list):
+                snippet = "\n\n".join(
+                    excerpt for excerpt in excerpts if isinstance(excerpt, str)
+                )
+            else:
+                snippet = ""
+
+            results.append(
+                {
+                    "title": title if isinstance(title, str) else "",
+                    "url": url,
+                    "snippet": snippet,
+                    "rank": len(results) + 1,
+                }
+            )
+            if len(results) >= max_results:
+                break
+
+        return results
+
+    def _search_with_serpbase(
+        self, query: str, max_results: int, region: str = "us-en"
+    ) -> List[Dict[str, Any]]:
+        """Search with SerpBase's real Google-SERP API and normalize its results.
+
+        Requires SERPBASE_API_KEY. SerpBase returns HTTP 200 even for
+        authentication/quota errors, with the failure indicated in the JSON
+        body's ``error`` field rather than the status code, so that field is
+        checked explicitly rather than relying on ``raise_for_status()`` alone.
+        """
+        api_key = self.credential("SERPBASE_API_KEY") or ""
+        if not api_key:
+            raise RuntimeError(
+                "SERPBASE_API_KEY environment variable is not set. "
+                "Request a key at https://serpbase.dev."
+            )
+
+        country, _, language = region.partition("-")
+        payload = {"q": query, "gl": country or "us", "hl": language or "en"}
+
+        response = requests.post(
+            SERPBASE_SEARCH_URL,
+            json=payload,
+            headers={"X-API-Key": api_key},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("error"):
+            raise RuntimeError(f"SerpBase API error: {data['error']}")
+
+        organic = data.get("organic")
+        if not isinstance(organic, list):
+            raise RuntimeError("SerpBase response did not include organic results")
+
+        results = []
+        for item in organic:
+            if not isinstance(item, dict):
+                continue
+            link = item.get("link") or item.get("url")
+            if not isinstance(link, str) or not link:
+                continue
+            title = item.get("title")
+            snippet = item.get("snippet")
+            results.append(
+                {
+                    "title": title if isinstance(title, str) else "",
+                    "url": link,
+                    "snippet": snippet if isinstance(snippet, str) else "",
+                    "rank": item.get("rank", len(results) + 1),
+                }
+            )
+            if len(results) >= max_results:
+                break
+
+        return results
+
+    def _search_with_firecrawl(
+        self,
+        query: str,
+        max_results: int,
+        region: str = "us-en",
+        safesearch: str = "moderate",
+    ) -> List[Dict[str, Any]]:
+        """Search with Firecrawl's Search API and normalize its web results.
+
+        Works without a key: Firecrawl caps keyless requests per IP per day
+        (requests and credits) and answers HTTP 429 past the cap. When
+        FIRECRAWL_API_KEY resolves -- from the request's credential scope when
+        one is active, otherwise from the environment -- searches are billed
+        against that account's credits and get its higher rate limits.
+        Resolving per call rather than at construction is what lets one hosted
+        process serve several users' keys. Firecrawl reports
+        failures through the HTTP status code with ``{"success": false,
+        "error": ...}`` in the body, so the body is read first to keep that
+        message, then the status is enforced.
+        """
+        headers: Dict[str, str] = {}
+        api_key = (self.credential("FIRECRAWL_API_KEY") or "").strip()
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        payload: Dict[str, Any] = {
+            "query": query,
+            "limit": max_results,
+            "sources": ["web"],
+            "country": _firecrawl_country_from_region(region),
+            # Firecrawl defaults to query-relevant "highlights", which can be
+            # several KB of markdown per result. Ask for plain provider
+            # snippets so `snippet` stays comparable to the other backends.
+            "highlights": False,
+        }
+        # Firecrawl's filter is two-state: ``safe: true`` filters, omitting it
+        # does not. ToolUniverse's "on" and its default "moderate" both enable
+        # the filter (the conservative reading); only an explicit "off" leaves
+        # it unset.
+        if safesearch in ("on", "moderate"):
+            payload["safe"] = True
+
+        response = requests.post(
+            FIRECRAWL_SEARCH_URL,
+            json=payload,
+            headers=headers,
+            timeout=30,
+        )
+
+        try:
+            data = response.json()
+        except ValueError:
+            data = None
+        body_error = data.get("error") if isinstance(data, dict) else None
+
+        if response.status_code == 402:
+            detail = f" {body_error}" if body_error else ""
+            raise RuntimeError(
+                f"Firecrawl Search account is out of credits (HTTP 402).{detail}"
+            )
+        if response.status_code == 429:
+            if api_key:
+                hint = "The account's per-minute search rate limit was exceeded."
+            else:
+                hint = (
+                    "Keyless requests are capped per IP per day; set "
+                    "FIRECRAWL_API_KEY to use the account's limits instead."
+                )
+            detail = f" {body_error}." if body_error else ""
+            raise RuntimeError(
+                f"Firecrawl Search rate limit reached (HTTP 429).{detail} {hint}"
+            )
+        if response.status_code >= 400:
+            message = body_error or response.reason or "request failed"
+            details = data.get("details") if isinstance(data, dict) else None
+            if details:
+                message = f"{message} {details}"
+            raise RuntimeError(
+                f"Firecrawl Search API error (HTTP {response.status_code}): {message}"
+            )
+
+        if not isinstance(data, dict):
+            raise RuntimeError("Firecrawl Search response was not a JSON object")
+        if not data.get("success", False):
+            raise RuntimeError(
+                f"Firecrawl Search API error: {body_error or 'unknown error'}"
+            )
+
+        payload_data = data.get("data")
+        web_results = (
+            payload_data.get("web") if isinstance(payload_data, dict) else None
+        )
+        if not isinstance(web_results, list):
+            raise RuntimeError("Firecrawl Search response did not include web results")
+
+        results = []
+        for item in web_results:
+            if not isinstance(item, dict):
+                continue
+            url = item.get("url")
+            if not isinstance(url, str) or not url:
+                continue
+            title = item.get("title")
+            description = item.get("description")
+            results.append(
+                {
+                    "title": title if isinstance(title, str) else "",
+                    "url": url,
+                    "snippet": description if isinstance(description, str) else "",
+                    "rank": len(results) + 1,
+                }
+            )
+            if len(results) >= max_results:
+                break
+
+        return results
+
+    def _search_with_fallback(
+        self,
+        query: str,
+        max_results: int,
+        backend: str,
+        region: str,
+        safesearch: str,
+    ) -> Tuple[
+        List[Dict[str, Any]],
+        Optional[str],
+        List[str],
+        Optional[str],
+        Dict[str, str],
+    ]:
+        """
+        Search with backend fallback strategy.
+
+        Returns:
+            (results, backend_used, attempted_backends, warning, provider_errors)
+        """
+        attempted_backends = []
+        last_error = None
+        provider_errors: Dict[str, str] = {}
+        had_empty_success = False
+        backends_to_try = [backend]
+        stop_ddgs_backends = False
+
+        if backend == "parallel":
+            attempted_backends.append("parallel")
+            try:
+                results = self._search_with_parallel(
+                    query=query, max_results=max_results
+                )
+                if results:
+                    return (
+                        results,
+                        "parallel",
+                        attempted_backends,
+                        None,
+                        provider_errors,
+                    )
+                had_empty_success = True
+            except Exception as error:
+                last_error = str(error)
+                provider_errors["parallel"] = str(error)
+
+            # Explicit providers fall back to DDGS auto today. Preserve that
+            # contract without adding Parallel to the default provider chain.
+            backends_to_try = ["auto"]
+        elif backend == "serpbase":
+            attempted_backends.append("serpbase")
+            try:
+                results = self._search_with_serpbase(
+                    query=query, max_results=max_results, region=region
+                )
+                if results:
+                    return (
+                        results,
+                        "serpbase",
+                        attempted_backends,
+                        None,
+                        provider_errors,
+                    )
+                had_empty_success = True
+            except Exception as error:
+                last_error = str(error)
+                provider_errors["serpbase"] = str(error)
+
+            # Explicit providers fall back to DDGS auto today. Preserve that
+            # contract without adding SerpBase to the default provider chain.
+            backends_to_try = ["auto"]
+        elif backend == "firecrawl":
+            attempted_backends.append("firecrawl")
+            try:
+                results = self._search_with_firecrawl(
+                    query=query,
+                    max_results=max_results,
+                    region=region,
+                    safesearch=safesearch,
+                )
+                if results:
+                    return (
+                        results,
+                        "firecrawl",
+                        attempted_backends,
+                        None,
+                        provider_errors,
+                    )
+                had_empty_success = True
+            except Exception as error:
+                last_error = str(error)
+                provider_errors["firecrawl"] = str(error)
+
+            # Explicit providers fall back to DDGS auto today. Preserve that
+            # contract without adding Firecrawl to the default provider chain.
+            backends_to_try = ["auto"]
+        elif backend == "auto":
+            # Try the explicit DuckDuckGo backend first. It tends to fail with
+            # regular Python exceptions in restricted environments, while some
+            # other backends can trigger native panics.
+            backends_to_try = ["duckduckgo", "auto", "bing", "brave"]
+        else:
+            backends_to_try.append("auto")
+
+        seen = set()
+        unique_backends = []
+        for backend_name in backends_to_try:
+            if backend_name not in seen:
+                seen.add(backend_name)
+                unique_backends.append(backend_name)
+
+        for backend_name in unique_backends:
+            if stop_ddgs_backends:
+                break
+
+            attempted_backends.append(backend_name)
+            try:
+                results = self._search_with_ddgs(
+                    query=query,
+                    max_results=max_results,
+                    backend=backend_name,
+                    region=region,
+                    safesearch=safesearch,
+                )
+                if results:
+                    return (
+                        results,
+                        backend_name,
+                        attempted_backends,
+                        None,
+                        provider_errors,
+                    )
+                had_empty_success = True
+            except Exception as error:
+                error_str = str(error)
+                last_error = error_str
+                provider_errors[backend_name] = error_str
+                # If DNS resolution is unavailable, additional DDGS backends
+                # are unlikely to help and may trigger avoidable native panics.
+                if any(
+                    token in error_str
+                    for token in [
+                        "NameResolutionError",
+                        "nodename nor servname provided",
+                        "Temporary failure in name resolution",
+                    ]
+                ):
+                    stop_ddgs_backends = True
+                continue
+
+        # Fallback providers that do not depend on DDGS.
+        provider_chain = [
+            ("duckduckgo_html", self._search_with_duckduckgo_html),
+            ("wikipedia_api", self._search_with_wikipedia_api),
+        ]
+
+        for provider_name, provider_func in provider_chain:
+            attempted_backends.append(provider_name)
+            try:
+                results = provider_func(query=query, max_results=max_results)
+                if results:
+                    return (
+                        results,
+                        provider_name,
+                        attempted_backends,
+                        None,
+                        provider_errors,
+                    )
+                had_empty_success = True
+            except Exception as error:
+                last_error = str(error)
+                provider_errors[provider_name] = str(error)
+                continue
+
+        # Return clean empty set + last error context when every provider fails
+        # or no provider had results.
+        if had_empty_success:
+            return [], "empty", attempted_backends, None, provider_errors
+
+        warning = (
+            "All search providers failed"
+            if provider_errors
+            else (last_error or "No search providers returned results")
+        )
+        return [], "none", attempted_backends, warning, provider_errors
+
+    def _search_with_duckduckgo_html(
+        self, query: str, max_results: int
+    ) -> List[Dict[str, Any]]:
+        """Fallback provider: parse DuckDuckGo HTML results without DDGS."""
+        response = requests.get(
+            "https://duckduckgo.com/html/",
+            params={"q": query},
+            timeout=15,
+            headers={"User-Agent": "ToolUniverse/1.0"},
+        )
+        response.raise_for_status()
+        html_text = response.text
+
+        result_pattern = re.compile(
+            r'<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        snippet_pattern = re.compile(
+            r'<a[^>]*class="result__snippet"[^>]*>(.*?)</a>',
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        anchors = result_pattern.findall(html_text)
+        snippets = snippet_pattern.findall(html_text)
+        results = []
+
+        for index, (href, raw_title) in enumerate(anchors[:max_results], start=1):
+            parsed_href = href
+            if href.startswith("/l/?") or "uddg=" in href:
+                parsed = urlparse(href)
+                query_map = parse_qs(parsed.query)
+                uddg_values = query_map.get("uddg")
+                if uddg_values:
+                    # parse_qs already percent-decodes query values. Decoding a
+                    # second time corrupts destinations that intentionally
+                    # contain escaped reserved characters (for example %2B).
+                    parsed_href = uddg_values[0]
+
+            clean_title = unescape(re.sub(r"<[^>]+>", "", raw_title)).strip()
+            raw_snippet = snippets[index - 1] if index - 1 < len(snippets) else ""
+            clean_snippet = unescape(re.sub(r"<[^>]+>", "", raw_snippet)).strip()
+
+            if not parsed_href:
+                continue
+
+            results.append(
+                {
+                    "title": clean_title,
+                    "url": parsed_href,
+                    "snippet": clean_snippet,
+                    "rank": index,
+                }
+            )
+
+        return results
+
+    def _search_with_wikipedia_api(
+        self, query: str, max_results: int
+    ) -> List[Dict[str, Any]]:
+        """Fallback provider: Wikipedia OpenSearch API."""
+        response = requests.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={
+                "action": "opensearch",
+                "search": query,
+                "limit": max_results,
+                "namespace": 0,
+                "format": "json",
+            },
+            timeout=15,
+            headers={"User-Agent": "ToolUniverse/1.0"},
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if not isinstance(data, list) or len(data) < 4:
+            return []
+
+        titles = data[1] if isinstance(data[1], list) else []
+        descriptions = data[2] if isinstance(data[2], list) else []
+        urls = data[3] if isinstance(data[3], list) else []
+
+        results = []
+        for index, title in enumerate(titles[:max_results], start=1):
+            url = urls[index - 1] if index - 1 < len(urls) else ""
+            snippet = descriptions[index - 1] if index - 1 < len(descriptions) else ""
+            if not url:
+                continue
+            results.append(
+                {
+                    "title": str(title),
+                    "url": str(url),
+                    "snippet": str(snippet),
+                    "rank": index,
+                }
+            )
+        return results
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute web search using DDGS.
+
+        Args:
+            arguments: Dictionary containing:
+                - query: Search query string
+                - max_results: Maximum number of results (default: 10)
+                - search_type: Type of search (default: 'general')
+                - backend: Search engine backend (default: 'auto')
+                - region: Search region (default: 'us-en')
+                - safesearch: Safe search level (default: 'moderate')
+
+        Returns:
+            Dictionary containing search results
+        """
+        try:
+            query = arguments.get("query", "").strip()
+            max_results = int(arguments.get("max_results", 10))
+            search_type = arguments.get("search_type", "general")
+            backend = arguments.get("backend", "auto")
+            region = arguments.get("region", "us-en")
+            safesearch = arguments.get("safesearch", "moderate")
+
+            if not query:
+                error_msg = "Query parameter is required"
+                return {
+                    "status": "error",
+                    "error": error_msg,
+                    "data": {
+                        "status": "error",
+                        "error": error_msg,
+                        "query": "",
+                        "total_results": 0,
+                        "results": [],
+                    },
+                }
+
+            if backend == "parallel":
+                unsupported_controls = []
+                if region != "us-en":
+                    unsupported_controls.append("region")
+                if safesearch != "moderate":
+                    unsupported_controls.append("safesearch")
+                if unsupported_controls:
+                    controls = ", ".join(unsupported_controls)
+                    error_msg = (
+                        "The Parallel backend does not support non-default "
+                        f"ToolUniverse controls: {controls}. Omit these controls "
+                        "or use a DDGS backend."
+                    )
+                    return {
+                        "status": "error",
+                        "error": error_msg,
+                        "data": {
+                            "status": "error",
+                            "error": error_msg,
+                            "query": query,
+                            "total_results": 0,
+                            "results": [],
+                        },
+                    }
+
+            if backend == "serpbase" and safesearch != "moderate":
+                error_msg = (
+                    "The SerpBase backend does not support the safesearch "
+                    "control. Omit it or use a DDGS backend."
+                )
+                return {
+                    "status": "error",
+                    "error": error_msg,
+                    "data": {
+                        "status": "error",
+                        "error": error_msg,
+                        "query": query,
+                        "total_results": 0,
+                        "results": [],
+                    },
+                }
+
+            # Validate max_results
+            max_results = max(1, min(max_results, 50))  # Limit between 1-50
+
+            # Modify query based on search type
+            if search_type == "api_documentation":
+                query = f"{query} API documentation python library"
+            elif search_type == "python_packages":
+                query = f"{query} python package pypi"
+            elif search_type == "github":
+                query = f"{query} site:github.com"
+
+            # Perform search using fallback backends to improve reliability.
+            (
+                results,
+                backend_used,
+                attempted_backends,
+                search_warning,
+                provider_errors,
+            ) = self._search_with_fallback(
+                query=query,
+                max_results=max_results,
+                backend=backend,
+                region=region,
+                safesearch=safesearch,
+            )
+
+            if search_warning:
+                response = {
+                    "status": "success",
+                    "warning": search_warning,
+                    "data": {
+                        "status": "success",
+                        "query": query,
+                        "search_type": search_type,
+                        "total_results": 0,
+                        "results": [],
+                        "attempted_backends": attempted_backends,
+                        "backend_used": backend_used or "none",
+                        "all_providers_failed": backend_used == "none",
+                        "provider_errors": provider_errors,
+                        "warning": search_warning,
+                    },
+                }
+                if "parallel" in attempted_backends:
+                    response["data"]["provider_notice"] = PARALLEL_PROVIDER_NOTICE
+                if "serpbase" in attempted_backends:
+                    response["data"]["provider_notice"] = SERPBASE_PROVIDER_NOTICE
+                if "firecrawl" in attempted_backends:
+                    response["data"]["provider_notice"] = FIRECRAWL_PROVIDER_NOTICE
+                return response
+
+            # Add rate limiting to be respectful
+            time.sleep(0.5)
+
+            result_data = {
+                "status": "success",
+                "query": query,
+                "search_type": search_type,
+                "total_results": len(results),
+                "results": results,
+                "backend_used": backend_used or backend,
+                "attempted_backends": attempted_backends,
+            }
+            if provider_errors:
+                result_data["provider_errors"] = provider_errors
+            if "parallel" in attempted_backends:
+                result_data["provider_notice"] = PARALLEL_PROVIDER_NOTICE
+            if "serpbase" in attempted_backends:
+                result_data["provider_notice"] = SERPBASE_PROVIDER_NOTICE
+            if "firecrawl" in attempted_backends:
+                result_data["provider_notice"] = FIRECRAWL_PROVIDER_NOTICE
+
+            return {"status": "success", "data": result_data}
+
+        except Exception as e:
+            error_msg = str(e)
+            return {
+                "status": "error",
+                "error": error_msg,
+                "data": {
+                    "status": "error",
+                    "error": error_msg,
+                    "query": arguments.get("query", ""),
+                    "total_results": 0,
+                    "results": [],
+                },
+            }
+
+
+@register_tool("WebAPIDocumentationSearchTool")
+class WebAPIDocumentationSearchTool(WebSearchTool):
+    """
+    Specialized web search tool for API documentation and Python libraries.
+
+    This tool is optimized for finding API documentation, Python packages,
+    and technical resources using DDGS with multiple search engines.
+    """
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute API documentation focused search.
+
+        Args:
+            arguments: Dictionary containing:
+                - query: Search query string
+                - max_results: Maximum number of results (default: 10)
+                - focus: Focus area ('api_docs', 'python_packages', etc.)
+                - backend: Search engine backend (default: 'auto')
+
+        Returns:
+            Dictionary containing search results
+        """
+        try:
+            query = arguments.get("query", "").strip()
+            focus = arguments.get("focus", "api_docs")
+            backend = arguments.get("backend", "auto")
+
+            if not query:
+                error_msg = "Query parameter is required"
+                return {
+                    "status": "error",
+                    "error": error_msg,
+                    "data": {
+                        "status": "error",
+                        "error": error_msg,
+                        "query": "",
+                        "total_results": 0,
+                        "results": [],
+                    },
+                }
+
+            # Modify query based on focus
+            if focus == "api_docs":
+                enhanced_query = f'"{query}" API documentation official docs'
+            elif focus == "python_packages":
+                enhanced_query = f'"{query}" python package pypi install pip'
+            elif focus == "github_repos":
+                enhanced_query = f'"{query}" github repository source code'
+            else:
+                enhanced_query = f'"{query}" documentation API reference'
+
+            # The query is already focus-enhanced above. Pass it through the
+            # parent as a general search so it is not enhanced a second time,
+            # and do not mutate the caller's arguments dictionary.
+            parent_arguments = {
+                **arguments,
+                "query": enhanced_query,
+                "search_type": "general",
+                "backend": backend,
+            }
+
+            result = super().run(parent_arguments)
+
+            # Extract data from parent result and add focus-specific metadata
+            if result["status"] == "success" and "data" in result:
+                result_data = result["data"]
+                result_data["search_type"] = "api_documentation"
+                result_data["focus"] = focus
+                result_data["enhanced_query"] = enhanced_query
+
+                # Filter results for better relevance
+                if focus == "python_packages":
+                    result_data["results"] = [
+                        r
+                        for r in result_data["results"]
+                        if (
+                            "pypi.org" in r.get("url", "")
+                            or "python" in r.get("title", "").lower()
+                        )
+                    ]
+                elif focus == "github_repos":
+                    result_data["results"] = [
+                        r
+                        for r in result_data["results"]
+                        if "github.com" in r.get("url", "")
+                    ]
+
+                # Update total_results after filtering
+                result_data["total_results"] = len(result_data["results"])
+
+                return {"status": "success", "data": result_data}
+
+            return result
+
+        except Exception as e:
+            error_msg = str(e)
+            return {
+                "status": "error",
+                "error": error_msg,
+                "data": {
+                    "status": "error",
+                    "error": error_msg,
+                    "query": arguments.get("query", ""),
+                    "total_results": 0,
+                    "results": [],
+                },
+            }

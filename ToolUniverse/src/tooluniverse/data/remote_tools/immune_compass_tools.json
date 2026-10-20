@@ -1,0 +1,103 @@
+[
+  {
+    "type": "RemoteTool",
+    "name": "run_compass_prediction",
+    "description": "Predict immune-checkpoint-inhibitor response with the official COMPASS architecture and a digest-pinned provider artifact stored as safetensors plus data-only preprocessing arrays.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gene_expression_data_path": {
+          "type": "string",
+          "description": "One-sample CSV or TSV inside the provider data directory, with Index and cancer_code columns followed by all 15,672 model TPM genes."
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Probability threshold for responder classification (0.0-1.0). Values \u2265 threshold classify sample as likely responder. Default 0.5 provides balanced sensitivity/specificity. Consider lower thresholds (~0.3) for higher sensitivity.",
+          "default": 0.5,
+          "minimum": 0.0,
+          "maximum": 1.0
+        }
+      },
+      "required": [
+        "gene_expression_data_path"
+      ]
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "prediction": {
+          "type": "object",
+          "description": "Core prediction results",
+          "properties": {
+            "is_responder": {
+              "type": "boolean",
+              "description": "True if predicted responder (probability \u2265 threshold)"
+            },
+            "responder_probability": {
+              "type": "number",
+              "description": "COMPASS probability for the responder class."
+            },
+            "threshold": {
+              "type": "number",
+              "description": "Threshold applied to responder_probability."
+            },
+            "top_concepts": {
+              "type": "array",
+              "maxItems": 44,
+              "description": "Ranked immune cell concepts",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "concept": {
+                    "type": "string",
+                    "description": "Name of immune cell population/concept"
+                  },
+                  "score": {
+                    "type": "number",
+                    "description": "Importance score for this concept"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "model": {
+          "type": "object",
+          "description": "Safe model provenance and inference device.",
+          "properties": {
+            "artifact_format": {"type": "string"},
+            "source_sha256": {"type": "string"},
+            "upstream_revision": {"type": "string"},
+            "device": {"type": "string"}
+          }
+        },
+        "context_info": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Human-readable analysis summary and status messages"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error description if prediction failed"
+        }
+      }
+    },
+    "remote_info": {
+      "server_type": "SMCP",
+      "transport": "http",
+      "original_type": "CompassTool",
+      "url": "https://zitniklab.hms.harvard.edu/ToolUniverse/expand_tooluniverse/remote/immune_compass.html",
+      "code_url": "https://github.com/mims-harvard/bioagent/tree/main/ToolUniverse/src/tooluniverse/remote/immune_compass",
+      "mcp_tool_name": "run_compass_prediction"
+    },
+    "test_examples": [
+      {
+        "gene_expression_data_path": "example_tpm.tsv",
+        "threshold": 0.5
+      }
+    ]
+  }
+]

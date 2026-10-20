@@ -1,0 +1,599 @@
+import os
+import re
+import tempfile
+
+import requests
+from .base_tool import BaseTool
+from .http_utils import request_with_retry
+from .provider_rate_limit import enforce_provider_rate_limit
+from .extras import install_hint
+from .tool_registry import register_tool
+
+try:
+    from markitdown import MarkItDown
+
+    MARKITDOWN_AVAILABLE = True
+except ImportError:
+    MARKITDOWN_AVAILABLE = False
+
+
+def _coerce_total(value):
+    """Normalize the upstream ``total`` field to a non-negative int or None.
+
+    Fix-R30: Semantic Scholar's OpenAPI spec declares ``total`` on
+    ``PaperRelevanceSearchBatch``/``PaperBulkSearchBatch`` as a *string*
+    ("Approximate number of matching search results.") while the live API
+    returns a JSON integer, so accept both. Anything else -- including a
+    missing key -- yields None, which callers must render as "unknown"
+    rather than substituting the page size.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isdigit():
+            return int(text)
+    return None
+
+
+@register_tool("SemanticScholarTool")
+class SemanticScholarTool(BaseTool):
+    """
+    Tool to search for papers on Semantic Scholar including abstracts.
+
+    API key is resolved from the active request credential context, with
+    SEMANTIC_SCHOLAR_API_KEY as the local environment fallback.
+    Request an API key at: https://www.semanticscholar.org/product/api
+
+    Semantic Scholar currently gives new API keys an introductory quota of 1 request/second.
+    Anonymous requests use a shared upstream pool and may be throttled dynamically.
+    """
+
+    def __init__(
+        self,
+        tool_config,
+        base_url="https://api.semanticscholar.org/graph/v1/paper/search",
+    ):
+        super().__init__(tool_config)
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.headers.update({"Accept": "application/json"})
+
+    def run(self, arguments):
+        query = arguments.get("query")
+        limit = arguments.get("limit", 5)
+        year = arguments.get("year")
+        sort = arguments.get("sort")
+        include_abstract = bool(arguments.get("include_abstract", False))
+        if not query:
+            return {"status": "error", "error": "`query` parameter is required."}
+        if limit <= 0:
+            # No upstream request is issued when the caller asks for zero rows,
+            # so there is no corpus total to report. `total` is 0 here purely
+            # because nothing was requested -- `total_source` says so explicitly
+            # so this is never mistaken for "the corpus has no matches".
+            return {
+                "status": "success",
+                "data": [],
+                "metadata": {
+                    "query": query,
+                    "returned": 0,
+                    "total": 0,
+                    "total_source": "not_queried",
+                },
+                "truncated": False,
+            }
+        upstream_meta = {}
+        papers = self._search(
+            query,
+            limit,
+            year=year,
+            sort=sort,
+            include_abstract=include_abstract,
+            upstream_meta=upstream_meta,
+        )
+        # Check if _search returned an error list
+        if papers and isinstance(papers[0], dict) and "error" in papers[0]:
+            err = papers[0]
+            return {
+                "status": "error",
+                "error": err.get("error", "Unknown error"),
+                "retryable": err.get("retryable", False),
+            }
+        # Fix-R30: `total` used to be len(papers), i.e. the size of the single
+        # page just fetched, so it always equalled `limit` (limit=10/5/3 ->
+        # total=10/5/3 for the same query) and a caller could not tell a
+        # 3-paper literature base from a 3000-paper one. Report the corpus
+        # match count the API actually sends back, keep the page size in its
+        # own field, and flag truncation at the top level.
+        returned = len(papers)
+        total = upstream_meta.get("total")
+        metadata = {
+            "query": query,
+            "returned": returned,
+            "total": total,
+            "total_source": (
+                "semantic_scholar" if total is not None else "unavailable"
+            ),
+        }
+        response = {"status": "success", "data": papers, "metadata": metadata}
+        if total is not None and total > returned:
+            response["truncated"] = True
+            response["truncation_note"] = (
+                f"Returning {returned} of approximately {total} Semantic Scholar "
+                f"papers matching this query. Raise `limit` (max 100 per request) "
+                f"or narrow the query with `year`/more specific keywords to see more. "
+                f"`total` is the API's approximate match count, not an exact figure."
+            )
+        else:
+            response["truncated"] = False
+        return response
+
+    def _enforce_rate_limit(self, api_key: str) -> None:
+        # New authenticated keys start at 1 RPS across Semantic Scholar endpoints. Anonymous
+        # traffic belongs to a shared, adaptive upstream pool, so Retry-After/backoff is more
+        # accurate than imposing the old, incorrect process-wide 1 RPS assumption locally.
+        enforce_provider_rate_limit(
+            "semantic_scholar",
+            api_key,
+            1.0 if api_key else None,
+        )
+
+    def _fetch_missing_abstract(self, paper_id: str) -> dict | None:
+        paper_id = (paper_id or "").strip()
+        if not paper_id:
+            return None
+
+        url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}"
+        params = {"fields": "abstract,externalIds,openAccessPdf"}
+        api_key = self.credential("SEMANTIC_SCHOLAR_API_KEY") or ""
+        headers = {"x-api-key": api_key} if api_key else {}
+        self._enforce_rate_limit(api_key)
+        resp = request_with_retry(
+            self.session,
+            "GET",
+            url,
+            params=params,
+            headers=headers,
+            timeout=20,
+            max_attempts=3,
+        )
+        if resp.status_code != 200:
+            return None
+        try:
+            payload = resp.json()
+        except ValueError:
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _search(
+        self,
+        query,
+        limit,
+        *,
+        year=None,
+        sort=None,
+        include_abstract: bool = False,
+        upstream_meta: dict | None = None,
+    ):
+        """Return the page of papers as a list.
+
+        `upstream_meta`, when a dict is passed in, is populated in place with
+        response-level (non-row) facts from the upstream payload -- currently
+        just `total`, the API's approximate corpus match count. It is an
+        out-parameter rather than a second return value so that the existing
+        callers/tests that treat `_search` as "list of papers or a
+        single-element error list" keep working unchanged.
+        """
+        # Include identifiers and lightweight impact signals for better downstream utility.
+        fields = [
+            "paperId",
+            "externalIds",
+            "title",
+            "abstract",
+            "tldr",
+            "year",
+            "venue",
+            "url",
+            "authors",
+            "citationCount",
+            "referenceCount",
+            "isOpenAccess",
+            "openAccessPdf",
+            "fieldsOfStudy",
+        ]
+        # Fix-R12A-1: /paper/search/bulk (used below whenever sort is set)
+        # rejects the "tldr" field with a 400 ("Unrecognized or unsupported
+        # fields: [tldr]") -- confirmed live via raw curl -- even though the
+        # regular /paper/search endpoint supports it fine. Drop it only for
+        # the bulk path rather than losing TLDR summaries on every search.
+        if sort:
+            fields = [f for f in fields if f != "tldr"]
+        params = {
+            "query": query,
+            "limit": limit,
+            "fields": ",".join(fields),
+        }
+        if year:
+            params["year"] = str(year)
+        if sort:
+            params["sort"] = sort
+        api_key = self.credential("SEMANTIC_SCHOLAR_API_KEY") or ""
+        headers = {"x-api-key": api_key} if api_key else {}
+        self._enforce_rate_limit(api_key)
+        # Use /paper/search/bulk when sorting, as /paper/search silently
+        # ignores the sort parameter and always returns relevance-ranked results.
+        url = self.base_url
+        if sort:
+            url = url.replace("/paper/search", "/paper/search/bulk")
+        response = request_with_retry(
+            self.session,
+            "GET",
+            url,
+            params=params,
+            headers=headers,
+            timeout=20,
+            max_attempts=3,
+        )
+        if response.status_code != 200:
+            retryable = response.status_code in (408, 429, 500, 502, 503, 504)
+            return [
+                {
+                    "title": "Error",
+                    "error": f"Semantic Scholar API error {response.status_code}",
+                    "reason": response.reason,
+                    "retryable": retryable,
+                    "suggestion": "Try again later or set SEMANTIC_SCHOLAR_API_KEY for higher limits. Alternatives: ArXiv_search_papers, EuropePMC_search_articles, openalex_literature_search, PubMed_search_articles.",
+                }
+            ]
+        try:
+            payload = response.json()
+        except ValueError:
+            return [
+                {
+                    "title": "Error",
+                    "error": "Semantic Scholar returned invalid JSON",
+                    "retryable": True,
+                }
+            ]
+
+        results = payload.get("data", []) if isinstance(payload, dict) else []
+        # Fix-R30: capture the corpus-level match count that sits alongside
+        # `data`. Both /paper/search (PaperRelevanceSearchBatch) and
+        # /paper/search/bulk (PaperBulkSearchBatch) document a `total` field:
+        # "Approximate number of matching search results." Absent/garbage stays
+        # None -- never backfilled from len(results).
+        if isinstance(upstream_meta, dict):
+            upstream_meta["total"] = (
+                _coerce_total(payload.get("total"))
+                if isinstance(payload, dict)
+                else None
+            )
+        if sort:
+            # /paper/search/bulk has no `limit` concept of its own (only
+            # token-based pagination over its full result set), so the
+            # `limit` param above is silently ignored server-side -- slice
+            # here instead of returning however many the page happened to
+            # contain (and instead of unnecessarily paying the N+1
+            # missing-abstract lookup cost below for rows beyond `limit`).
+            results = results[:limit]
+        papers = []
+        for p in results:
+            # Extract basic information
+            external_ids = (
+                p.get("externalIds") if isinstance(p.get("externalIds"), dict) else {}
+            )
+            doi = (
+                external_ids.get("DOI")
+                if isinstance(external_ids.get("DOI"), str)
+                else None
+            )
+            doi_url = f"https://doi.org/{doi}" if doi else None
+            title = p.get("title")
+            abstract = p.get("abstract") or None
+            journal = p.get("venue") or None
+            year = p.get("year")
+            url = p.get("url")
+            paper_id = p.get("paperId") if isinstance(p.get("paperId"), str) else None
+
+            # Extract TLDR summary
+            raw_tldr = p.get("tldr")
+            tldr = None
+            if isinstance(raw_tldr, dict) and isinstance(raw_tldr.get("text"), str):
+                tldr = raw_tldr["text"]
+
+            # Extract fields of study
+            raw_fields = p.get("fieldsOfStudy")
+            fields_of_study = raw_fields if isinstance(raw_fields, list) else None
+
+            authors = []
+            raw_authors = p.get("authors", [])
+            if isinstance(raw_authors, list):
+                for a in raw_authors:
+                    if (
+                        isinstance(a, dict)
+                        and isinstance(a.get("name"), str)
+                        and a["name"].strip()
+                    ):
+                        authors.append(a["name"].strip())
+
+            citation_count = p.get("citationCount")
+            reference_count = p.get("referenceCount")
+            is_open_access = p.get("isOpenAccess")
+            open_access_pdf = (
+                p.get("openAccessPdf")
+                if isinstance(p.get("openAccessPdf"), dict)
+                else None
+            )
+            open_access_pdf_url = (
+                open_access_pdf.get("url")
+                if open_access_pdf
+                and isinstance(open_access_pdf.get("url"), str)
+                and open_access_pdf.get("url", "").strip()
+                else None
+            )
+
+            if include_abstract and not abstract and paper_id:
+                details = self._fetch_missing_abstract(paper_id)
+                if details:
+                    details_external = (
+                        details.get("externalIds")
+                        if isinstance(details.get("externalIds"), dict)
+                        else {}
+                    )
+                    details_doi = (
+                        details_external.get("DOI")
+                        if isinstance(details_external.get("DOI"), str)
+                        else None
+                    )
+                    if not doi and details_doi:
+                        doi = details_doi
+                        doi_url = f"https://doi.org/{doi}"
+
+                    details_abstract = details.get("abstract")
+                    if isinstance(details_abstract, str) and details_abstract.strip():
+                        abstract = details_abstract.strip()
+
+                    details_open_access_pdf = (
+                        details.get("openAccessPdf")
+                        if isinstance(details.get("openAccessPdf"), dict)
+                        else None
+                    )
+                    if (
+                        not open_access_pdf_url
+                        and details_open_access_pdf
+                        and isinstance(details_open_access_pdf.get("url"), str)
+                    ):
+                        open_access_pdf_url = details_open_access_pdf.get("url")
+
+            papers.append(
+                {
+                    "title": title or "Title not available",
+                    "abstract": abstract,
+                    "tldr": tldr,
+                    "journal": journal,
+                    "year": year,
+                    "url": url,
+                    "paper_id": paper_id,
+                    "doi": doi,
+                    "doi_url": doi_url,
+                    "authors": authors,
+                    "fields_of_study": fields_of_study,
+                    "citation_count": citation_count,
+                    "reference_count": reference_count,
+                    "open_access": is_open_access
+                    if isinstance(is_open_access, bool)
+                    else None,
+                    "open_access_pdf_url": open_access_pdf_url,
+                    "data_quality": {
+                        "has_abstract": bool(abstract),
+                        "has_tldr": bool(tldr),
+                        "has_journal": bool(journal),
+                        "has_year": bool(year),
+                        "has_url": bool(url),
+                        "has_doi": bool(doi),
+                        "has_authors": bool(authors),
+                    },
+                }
+            )
+        return papers
+
+
+@register_tool("SemanticScholarPDFSnippetsTool")
+class SemanticScholarPDFSnippetsTool(BaseTool):
+    """
+    Fetch a paper's PDF from Semantic Scholar and return bounded text snippets
+    around user-provided terms. Uses markitdown to convert PDF to markdown text.
+    """
+
+    def __init__(self, tool_config):
+        super().__init__(tool_config)
+        self.session = requests.Session()
+        self.session.headers.update({"Accept": "application/pdf, */*;q=0.8"})
+        if MARKITDOWN_AVAILABLE:
+            self.md_converter = MarkItDown()
+        else:
+            self.md_converter = None
+
+    def run(self, arguments):
+        paper_id = arguments.get("paper_id")
+        open_access_pdf_url = arguments.get("open_access_pdf_url")
+        terms = arguments.get("terms")
+
+        # Validate terms
+        if not isinstance(terms, list) or not [
+            t for t in terms if isinstance(t, str) and t.strip()
+        ]:
+            return {
+                "status": "error",
+                "error": "`terms` must be a non-empty list of strings.",
+                "retryable": False,
+            }
+
+        # Get PDF URL
+        pdf_url = None
+        lookup_error = None
+        if isinstance(open_access_pdf_url, str) and open_access_pdf_url.strip():
+            pdf_url = open_access_pdf_url.strip()
+        elif isinstance(paper_id, str) and paper_id.strip():
+            # Fetch paper details to get PDF URL
+            paper_id = paper_id.strip()
+            api_url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}"
+            params = {"fields": "openAccessPdf"}
+            api_key = self.credential("SEMANTIC_SCHOLAR_API_KEY") or ""
+            headers = {"x-api-key": api_key} if api_key else {}
+            try:
+                enforce_provider_rate_limit(
+                    "semantic_scholar",
+                    api_key,
+                    1.0 if api_key else None,
+                )
+                resp = request_with_retry(
+                    self.session,
+                    "GET",
+                    api_url,
+                    params=params,
+                    headers=headers,
+                    timeout=20,
+                    max_attempts=2,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if isinstance(data, dict) and isinstance(
+                        data.get("openAccessPdf"), dict
+                    ):
+                        pdf_url = data["openAccessPdf"].get("url")
+            except Exception as e:
+                lookup_error = str(e)
+
+        if not pdf_url:
+            msg = "Could not determine PDF URL. Provide `open_access_pdf_url` or a valid `paper_id` with available open access PDF."
+            if lookup_error:
+                msg += f" (API lookup failed: {lookup_error})"
+            return {
+                "status": "error",
+                "error": msg,
+                "retryable": "429" in (lookup_error or "")
+                or "timeout" in (lookup_error or "").lower(),
+            }
+
+        # Check if markitdown is available
+        if not MARKITDOWN_AVAILABLE:
+            return {
+                "status": "error",
+                "error": (
+                    f"markitdown is required to extract text from this PDF. "
+                    f"{install_hint('documents')}"
+                ),
+                "retryable": False,
+            }
+
+        # Parse optional parameters
+        try:
+            window_chars = int(arguments.get("window_chars", 220))
+        except (TypeError, ValueError):
+            window_chars = 220
+        window_chars = max(20, min(window_chars, 2000))
+
+        try:
+            max_snippets_per_term = int(arguments.get("max_snippets_per_term", 3))
+        except (TypeError, ValueError):
+            max_snippets_per_term = 3
+        max_snippets_per_term = max(1, min(max_snippets_per_term, 10))
+
+        try:
+            max_total_chars = int(arguments.get("max_total_chars", 8000))
+        except (TypeError, ValueError):
+            max_total_chars = 8000
+        max_total_chars = max(1000, min(max_total_chars, 50000))
+
+        # Download PDF to temp file
+        try:
+            resp = request_with_retry(
+                self.session, "GET", pdf_url, timeout=60, max_attempts=2
+            )
+            if resp.status_code != 200:
+                return {
+                    "status": "error",
+                    "error": f"PDF download failed (HTTP {resp.status_code})",
+                    "url": pdf_url,
+                    "status_code": resp.status_code,
+                    "retryable": resp.status_code in (408, 429, 500, 502, 503, 504),
+                }
+
+            # Save to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(resp.content)
+                tmp_path = tmp.name
+
+            # Convert PDF to markdown using markitdown
+            try:
+                result = self.md_converter.convert(tmp_path)
+                text = (
+                    result.text_content
+                    if hasattr(result, "text_content")
+                    else str(result)
+                )
+            except Exception as e:
+                # Clean up temp file
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+                return {
+                    "status": "error",
+                    "error": f"PDF to markdown conversion failed: {str(e)}",
+                    "url": pdf_url,
+                    "retryable": False,
+                }
+
+            # Clean up temp file
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"PDF download/processing failed: {str(e)}",
+                "url": pdf_url,
+                "retryable": True,
+            }
+
+        # Extract snippets around terms
+        snippets = []
+        total_chars = 0
+        low = text.lower()
+
+        for raw_term in terms:
+            if not isinstance(raw_term, str):
+                continue
+            term = raw_term.strip()
+            if not term:
+                continue
+
+            needle = term.lower()
+            found = 0
+            for m in re.finditer(re.escape(needle), low):
+                if found >= max_snippets_per_term:
+                    break
+                start = max(0, m.start() - window_chars)
+                end = min(len(text), m.end() + window_chars)
+                snippet = text[start:end].strip()
+                # Bound total output size
+                if total_chars + len(snippet) > max_total_chars:
+                    break
+                snippets.append({"term": term, "snippet": snippet})
+                total_chars += len(snippet)
+                found += 1
+
+        payload = {
+            "pdf_url": pdf_url,
+            "snippets": snippets,
+            "snippets_count": len(snippets),
+            "truncated": total_chars >= max_total_chars,
+        }
+        return {"status": "success", **payload, "data": payload}

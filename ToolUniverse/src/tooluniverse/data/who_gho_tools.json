@@ -1,0 +1,366 @@
+[
+  {
+    "name": "WHOGHO_search_indicators",
+    "description": "Search WHO Global Health Observatory (GHO) health indicators by name using the ODATA API. Returns indicator codes and names covering mortality, disease, nutrition, maternal health, mental health, and more. No authentication required. Use indicator codes with WHOGHO_get_indicator_data to retrieve actual data values. Examples: 'life expectancy' (WHOSIS_000001), 'malaria' (MALARIA002), 'obesity' (NCD_BMI_30C).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "OData filter string for indicator names. Examples: \"contains(IndicatorName,'malaria')\", \"contains(IndicatorName,'HIV')\", \"contains(IndicatorName,'mortality')\", \"contains(IndicatorName,'obesity')\""
+        },
+        "top": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of results to return. Default: 10, max: 100"
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://ghoapi.azureedge.net/api/Indicator",
+      "params": {
+        "$top": 10
+      },
+      "param_mapping": {
+        "filter": "$filter",
+        "top": "$top"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "filter": "contains(IndicatorName,'malaria')",
+        "top": 5
+      },
+      {
+        "filter": "contains(IndicatorName,'HIV')",
+        "top": 5
+      },
+      {
+        "filter": "contains(IndicatorName,'life expectancy')",
+        "top": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "WHO GHO indicator search results",
+          "properties": {
+            "value": {
+              "type": "array",
+              "description": "List of matching indicators",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "IndicatorCode": {
+                    "type": "string",
+                    "description": "Unique indicator code (use in WHOGHO_get_indicator_data)"
+                  },
+                  "IndicatorName": {
+                    "type": "string",
+                    "description": "Full indicator name/description"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WHOGHO_get_indicator_data",
+    "description": "Get actual health data values for a specific WHO Global Health Observatory indicator by its code. Returns country-level data with values, confidence intervals, year, and sex/age breakdowns. No authentication required. Common indicator codes: WHOSIS_000001 (life expectancy at birth), MALARIA002 (malaria cases), MDG_0000000026 (HIV prevalence), NCD_BMI_30C (obesity prevalence), SDGPM25 (PM2.5 air pollution), WHS4_100 (hospital beds per 10000). Rows are ordered by country then year and capped at `top`: the response reports 'count' (rows returned), 'total_available' (rows matching upstream) and a 'truncated' flag, and when truncated a 'truncation_note' explaining how to retrieve the rest.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "indicator_code": {
+          "type": "string",
+          "description": "WHO GHO indicator code. Examples: 'WHOSIS_000001' (life expectancy), 'MALARIA002' (malaria cases), 'MDG_0000000026' (HIV prevalence), 'NCD_BMI_30C' (obesity), 'SDGPM25' (air pollution PM2.5), 'WHS4_100' (hospital beds)"
+        },
+        "filter": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "OData filter for data rows. Examples: \"SpatialDim eq 'USA'\", \"TimeDim eq 2022\", \"Dim1 eq 'SEX_FMLE' and TimeDim ge 2015\""
+        },
+        "top": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of data rows to return (default 100). One row is one country-year-dimension observation, so a full time series for one country needs top >= the number of years (and x3 if the indicator is broken down by sex). Raise this when the response reports truncated=true."
+        },
+        "orderby": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "OData $orderby clause controlling row order, which also determines which rows survive the `top` cut-off. Default: \"SpatialDim asc,TimeDim asc\" (grouped by country, then chronological), so a truncated result is a contiguous prefix rather than an arbitrary sample. Use \"TimeDim asc\" for a purely chronological cross-section, or \"TimeDim desc\" for the most recent years first."
+        }
+      },
+      "required": [
+        "indicator_code"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://ghoapi.azureedge.net/api/{indicator_code}",
+      "params": {
+        "$top": 100,
+        "$orderby": "SpatialDim asc,TimeDim asc",
+        "$count": "true"
+      },
+      "param_mapping": {
+        "filter": "$filter",
+        "top": "$top",
+        "orderby": "$orderby"
+      },
+      "echo_request_url": true,
+      "pagination_disclosure": {
+        "total_path": [
+          "@odata.count"
+        ],
+        "rows_path": [
+          "value"
+        ],
+        "more_hint": "The GHO OData API applied the `top` row cap server-side. Re-run with a larger `top` to retrieve the full series, or narrow `filter` (e.g. \"SpatialDim eq 'BGD'\", \"TimeDim ge 2015\") so the whole result fits. Rows are returned in `orderby` order, so a truncated result is a contiguous prefix of that ordering."
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "indicator_code": "WHOSIS_000001",
+        "filter": "TimeDim eq 2020",
+        "top": 10
+      },
+      {
+        "indicator_code": "MALARIA002",
+        "top": 10
+      },
+      {
+        "indicator_code": "NCD_BMI_30C",
+        "filter": "SpatialDim eq 'USA'",
+        "top": 10
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "WHO GHO indicator data values",
+          "properties": {
+            "@odata.count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Total rows matching the query upstream, before the `top` cap. Compare with the length of 'value' (also echoed as the envelope's 'count'/'total_available'/'truncated' fields) to detect truncation."
+            },
+            "value": {
+              "type": "array",
+              "description": "Data records",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "IndicatorCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "SpatialDim": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Country/region ISO code"
+                  },
+                  "TimeDim": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "Year"
+                  },
+                  "Dim1": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Dimension 1 (e.g., SEX_BTSX, SEX_MLE, SEX_FMLE)"
+                  },
+                  "NumericValue": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "Numeric data value"
+                  },
+                  "Value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Formatted value with confidence intervals"
+                  },
+                  "Low": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "Lower confidence interval"
+                  },
+                  "High": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "Upper confidence interval"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WHOGHO_list_dimension_values",
+    "description": "Decode WHO GHO dimension codes into human-readable labels and the country->region hierarchy. WHOGHO_get_indicator_data returns cryptic codes (SpatialDim='ABW', Dim1='SEX_FMLE'/'AGEGROUP_AGE0-4', region 'AFR'); this tool resolves every code in a dimension to a Title and gives the country->region rollup via ParentCode (e.g. ABW -> Aruba -> AMR/Americas). Use it to interpret results, build correct $filter clauses for WHOGHO_get_indicator_data, and aggregate countries into WHO regions. Common dimension_code values: 'COUNTRY' (234 ISO-3 country codes + region rollup), 'REGION' (6 WHO regions: AFR/AMR/EMR/EUR/SEAR/WPR), 'SEX' (SEX_BTSX/SEX_MLE/SEX_FMLE), 'AGEGROUP' (e.g. AGEGROUP_AGE0-4), 'GHO' (indicator codes), 'YEAR'. Pass 'Dimension' (capital D, no DimensionValues) to enumerate all 195 dimensions. No authentication required.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dimension_code": {
+          "type": "string",
+          "description": "WHO GHO dimension code whose values to list. Examples: 'COUNTRY' (countries + region parent), 'REGION' (WHO regions), 'SEX', 'AGEGROUP', 'GHO', 'YEAR', 'WORLDBANKINCOMEGROUP'. Special value 'Dimension' (case-sensitive) lists all 195 available dimension codes instead of the values of one dimension."
+        }
+      },
+      "required": [
+        "dimension_code"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://ghoapi.azureedge.net/api/DIMENSION/{dimension_code}/DimensionValues",
+      "return_format": "JSON"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "dimension_code": "COUNTRY"
+      },
+      {
+        "dimension_code": "SEX"
+      },
+      {
+        "dimension_code": "REGION"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "OData envelope. The 'value' array holds the dimension values (code -> label, with parent rollup).",
+          "properties": {
+            "value": {
+              "type": "array",
+              "description": "List of dimension values",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "Code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Dimension value code as returned by WHOGHO_get_indicator_data (e.g. 'ABW', 'SEX_FMLE', 'AGEGROUP_AGE0-4', 'AMR')"
+                  },
+                  "Title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Human-readable label (e.g. 'Aruba', 'Female', '0-4 years of age', 'Americas')"
+                  },
+                  "Dimension": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The dimension this value belongs to (e.g. 'COUNTRY')"
+                  },
+                  "ParentDimension": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Parent dimension for hierarchical rollup (e.g. 'REGION' for COUNTRY)"
+                  },
+                  "ParentCode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Parent code for rollup (e.g. 'AMR' for country 'ABW')"
+                  },
+                  "ParentTitle": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Parent label (e.g. 'Americas' for country 'ABW')"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Error payload",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

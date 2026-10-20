@@ -1,0 +1,525 @@
+[
+  {
+    "type": "SearchSPLTool",
+    "name": "DailyMed_search_spls",
+    "description": "Search SPL list using multiple filter conditions (drug_name/ndc/rxcui/setid) and return metadata + data array.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "drug_name": {
+          "type": "string",
+          "description": "Generic or brand name of the drug, e.g., 'TAMSULOSIN HYDROCHLORIDE'."
+        },
+        "ndc": {
+          "type": "string",
+          "description": "National Drug Code (NDC)."
+        },
+        "rxcui": {
+          "type": "string",
+          "description": "RxNorm Code (RXCUI)."
+        },
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Set ID corresponding to the SPL."
+        },
+        "published_date_gte": {
+          "type": "string",
+          "description": "Published date >= specified date, format 'YYYY-MM-DD'."
+        },
+        "published_date_eq": {
+          "type": "string",
+          "description": "Published date == specified date, format 'YYYY-MM-DD'."
+        },
+        "pagesize": {
+          "type": "integer",
+          "description": "Number of items per page, maximum 100, default 100.",
+          "default": 100
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Alias for pagesize."
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number, starts from 1, default 1.",
+          "default": 1
+        }
+      },
+      "required": [
+        "drug_name"
+      ]
+    },
+    "test_examples": [
+      {
+        "drug_name": "Aspirin",
+        "pagesize": 2,
+        "page": 1
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "description": "List of matching Structured Product Labeling (SPL) documents.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "spl_version": {
+            "type": "integer"
+          },
+          "published_date": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "setid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": "GetSPLBySetIDTool",
+    "name": "DailyMed_get_spl_by_setid",
+    "description": "Get complete label corresponding to SPL Set ID, returns content in XML or JSON format.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "SPL Set ID to query."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "xml"
+          ],
+          "default": "xml",
+          "description": "Return format, only supports 'xml'."
+        }
+      },
+      "required": [
+        "setid"
+      ]
+    },
+    "test_examples": [
+      {
+        "setid": "030d9bca-a934-6ef9-e063-6394a90a8277",
+        "format": "xml"
+      }
+    ],
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "xml": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "error_details": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "type": "DailyMedSPLParserTool",
+    "name": "DailyMed_parse_adverse_reactions",
+    "description": "Parse adverse reactions section from SPL XML into structured table format. Returns AE frequencies, severity, and descriptions. Example: setid='030d9bca-a934-6ef9-e063-6394a90a8277' extracts headache 10%, GI upset 5%.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "operation": {
+          "const": "parse_adverse_reactions",
+          "description": "Operation type (fixed)"
+        },
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "SPL Set ID to parse"
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Drug name for automatic Set ID lookup (alternative to setid)"
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "adverse_reactions": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "setid": "030d9bca-a934-6ef9-e063-6394a90a8277"
+      }
+    ],
+    "fields": {
+      "operation": "parse_adverse_reactions"
+    }
+  },
+  {
+    "type": "DailyMedSPLParserTool",
+    "name": "DailyMed_parse_dosing",
+    "description": "Parse dosage and administration section from SPL XML. Returns structured dosing instructions, dose modifications, and administration guidelines. Example: standard dose, dose adjustments for renal/hepatic impairment.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "operation": {
+          "const": "parse_dosing",
+          "description": "Operation type (fixed)"
+        },
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "SPL Set ID to parse"
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Drug name for automatic Set ID lookup (alternative to setid)"
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "dosing_info": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "setid": "030d9bca-a934-6ef9-e063-6394a90a8277"
+      }
+    ],
+    "fields": {
+      "operation": "parse_dosing"
+    }
+  },
+  {
+    "type": "DailyMedSPLParserTool",
+    "name": "DailyMed_parse_contraindications",
+    "description": "Parse contraindications section from SPL XML into structured list. Returns conditions, populations, or situations where drug should not be used. Example: pregnancy, hypersensitivity, severe renal impairment.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "operation": {
+          "const": "parse_contraindications",
+          "description": "Operation type (fixed)"
+        },
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "SPL Set ID to parse"
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Drug name for automatic Set ID lookup (alternative to setid)"
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "contraindications": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "setid": "030d9bca-a934-6ef9-e063-6394a90a8277"
+      }
+    ],
+    "fields": {
+      "operation": "parse_contraindications"
+    }
+  },
+  {
+    "type": "DailyMedSPLParserTool",
+    "name": "DailyMed_parse_drug_interactions",
+    "description": "Parse drug interactions section from SPL XML into structured format. Returns CYP substrates/inhibitors/inducers, P-gp interactions, and specific drug-drug interactions. Example: avoid with strong CYP3A4 inhibitors.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "operation": {
+          "const": "parse_drug_interactions",
+          "description": "Operation type (fixed)"
+        },
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "SPL Set ID to parse"
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Drug name for automatic Set ID lookup (alternative to setid)"
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "interactions": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "setid": "030d9bca-a934-6ef9-e063-6394a90a8277"
+      }
+    ],
+    "fields": {
+      "operation": "parse_drug_interactions"
+    }
+  },
+  {
+    "type": "DailyMedSPLParserTool",
+    "name": "DailyMed_parse_clinical_pharmacology",
+    "description": "Parse clinical pharmacology section from SPL XML. Returns PK parameters (Cmax, Tmax, t1/2, AUC), PD effects, metabolism pathways, and elimination. Example: absorption, distribution, metabolism tables.",
+    "parameter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "operation": {
+          "const": "parse_clinical_pharmacology",
+          "description": "Operation type (fixed)"
+        },
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "SPL Set ID to parse"
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Drug name for automatic Set ID lookup (alternative to setid)"
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "pharmacology": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "test_examples": [
+      {
+        "setid": "030d9bca-a934-6ef9-e063-6394a90a8277"
+      }
+    ],
+    "fields": {
+      "operation": "parse_clinical_pharmacology"
+    }
+  },
+  {
+    "type": "GetSPLBySetIDTool",
+    "name": "DailyMed_get_spl_media",
+    "description": "Get the structured list of drug-label images (pill photos, packaging/carton images, figures) for a DailyMed SPL Set ID. Returns each media item's MIME type, file name, and a direct image URL. Useful for pill identification and label review. No API key required. Example: setid '43c94480-78d1-4a23-91d4-1d49fea72cb7' (Ibuprofen Capsule, Aurohealth) returns media including 'ibuprofen-fig1.jpg' (image/jpeg) with its image.cfm URL.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "DailyMed SPL Set ID UUID. Example: '43c94480-78d1-4a23-91d4-1d49fea72cb7'."
+        }
+      },
+      "required": [
+        "setid"
+      ]
+    },
+    "fields": {
+      "resource": "media"
+    },
+    "test_examples": [
+      {
+        "setid": "43c94480-78d1-4a23-91d4-1d49fea72cb7"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "setid": {
+              "type": "string"
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "spl_version": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "media": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "mime_type": {
+                    "type": "string",
+                    "description": "Image MIME type, e.g., image/jpeg"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Media file name"
+                  },
+                  "url": {
+                    "type": "string",
+                    "description": "Direct image URL"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "setid",
+            "media"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "type": "GetSPLBySetIDTool",
+    "name": "DailyMed_get_spl_history",
+    "description": "Get the full version history of a DailyMed SPL Set ID: every published SPL version with its version number and publication date. Useful for tracking label revisions over time. No API key required. Example: setid '43c94480-78d1-4a23-91d4-1d49fea72cb7' returns history including spl_version 2 (published 'Jun 09, 2026') and spl_version 1 (published 'Jul 22, 2022').",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "setid": {
+          "type": "string",
+          "format": "uuid",
+          "description": "DailyMed SPL Set ID UUID. Example: '43c94480-78d1-4a23-91d4-1d49fea72cb7'."
+        }
+      },
+      "required": [
+        "setid"
+      ]
+    },
+    "fields": {
+      "resource": "history"
+    },
+    "test_examples": [
+      {
+        "setid": "43c94480-78d1-4a23-91d4-1d49fea72cb7"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "setid": {
+              "type": "string"
+            },
+            "title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "history": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "spl_version": {
+                    "type": "integer",
+                    "description": "SPL version number"
+                  },
+                  "published_date": {
+                    "type": "string",
+                    "description": "Publication date, e.g., 'Jul 22, 2022'"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "setid",
+            "history"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

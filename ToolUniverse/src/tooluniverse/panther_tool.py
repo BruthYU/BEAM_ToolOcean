@@ -1,0 +1,361 @@
+# panther_tool.py
+"""
+PANTHER REST API tool for ToolUniverse.
+
+PANTHER (Protein ANalysis THrough Evolutionary Relationships) classifies
+proteins and their genes by function using a library of phylogenetic trees.
+It provides gene functional classification, pathway analysis, and
+overrepresentation (enrichment) analysis for gene lists.
+
+API: https://pantherdb.org/services/oai/pantherdb/
+No authentication required. Free for all use.
+Supports 144 organisms.
+"""
+
+import requests
+from typing import Dict, Any
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+PANTHER_BASE_URL = "https://pantherdb.org/services/oai/pantherdb"
+
+
+@register_tool("PANTHERTool")
+class PANTHERTool(BaseTool):
+    """
+    Tool for querying PANTHER gene classification and enrichment analysis.
+
+    Provides gene functional annotation, overrepresentation analysis
+    with GO/pathway enrichment, and ortholog mapping across 144 organisms.
+
+    No authentication required.
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        self.timeout = tool_config.get("timeout", 60)
+        self.endpoint_type = tool_config.get("fields", {}).get(
+            "endpoint_type", "gene_info"
+        )
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the PANTHER API call."""
+        try:
+            return self._dispatch(arguments)
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "error": f"PANTHER API request timed out after {self.timeout} seconds",
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "error",
+                "error": "Failed to connect to PANTHER API. Check network connectivity.",
+            }
+        except requests.exceptions.HTTPError as e:
+            return {
+                "status": "error",
+                "error": f"PANTHER API HTTP error: {e.response.status_code}",
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Unexpected error querying PANTHER: {str(e)}",
+            }
+
+    def _dispatch(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Route to appropriate endpoint based on config."""
+        if self.endpoint_type == "gene_info":
+            return self._gene_info(arguments)
+        elif self.endpoint_type == "enrichment":
+            return self._enrichment(arguments)
+        elif self.endpoint_type == "ortholog":
+            return self._ortholog(arguments)
+        else:
+            return {
+                "status": "error",
+                "error": f"Unknown endpoint_type: {self.endpoint_type}",
+            }
+
+    def _gene_info(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get gene classification and functional annotation from PANTHER."""
+        gene_id = arguments.get("gene_id", "")
+        organism = arguments.get("organism", 9606)
+        if not gene_id:
+            return {
+                "status": "error",
+                "error": "gene_id parameter is required (e.g., 'P04637' for TP53)",
+            }
+        if organism is None:
+            organism = 9606
+
+        url = f"{PANTHER_BASE_URL}/geneinfo"
+        params = {
+            "geneInputList": gene_id,
+            "organism": organism,
+            "type": "ortholog",
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        raw = response.json()
+
+        search = raw.get("search", {})
+        mapped = search.get("mapped_genes", {})
+        gene_data = mapped.get("gene", {})
+
+        # `geneInputList` accepts several identifiers, and PANTHER answers with
+        # a bare object for one match and a list for several. Keeping only
+        # `gene_data[0]` published one gene's family and annotations under
+        # whatever was asked for -- confirmed live that gene_id "TP53,BRCA1"
+        # echoed both names while returning BRCA1's PTHR13763 alone, with
+        # nothing to show a gene had been dropped. Same collapse as `_ortholog`
+        # further down this file.
+        genes = [
+            self._parse_gene_entry(entry)
+            for entry in (gene_data if isinstance(gene_data, list) else [gene_data])
+            if entry
+        ]
+
+        first = genes[0] if genes else {}
+        result = {
+            "gene_id": gene_id,
+            "organism": organism,
+            # These three predate `genes` and stay as the first match so
+            # existing callers keep working; they are not the whole answer.
+            "family_id": first.get("family_id"),
+            "subfamily_id": first.get("subfamily_id"),
+            "annotations": first.get("annotations", []),
+            "genes": genes,
+            "total_genes": len(genes),
+        }
+
+        return {
+            "status": "success",
+            "data": result,
+            "metadata": {
+                "source": "PANTHER",
+                "query": gene_id,
+                "endpoint": "geneinfo",
+            },
+        }
+
+    @staticmethod
+    def _parse_gene_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+        """Pull one mapped gene's family and GO-slim annotations out of PANTHER."""
+        ann_type_list = entry.get("annotation_type_list", {}).get(
+            "annotation_data_type", []
+        )
+        if isinstance(ann_type_list, dict):
+            ann_type_list = [ann_type_list]
+
+        annotations = []
+        for ann_type in ann_type_list:
+            ann_list = ann_type.get("annotation_list", {}).get("annotation", [])
+            if isinstance(ann_list, dict):
+                ann_list = [ann_list]
+
+            terms = [
+                {"id": ann.get("id", ""), "name": ann.get("name", "")}
+                for ann in ann_list
+            ]
+            if terms:
+                annotations.append(
+                    {"category": ann_type.get("content", ""), "terms": terms}
+                )
+
+        # `geneinfo` entries carry no `gene_symbol` -- their keys are
+        # accession, mapped_id_list, family_id/family_name, sf_id/sf_name and
+        # annotation_type_list. `mapped_id_list` holds the identifier the
+        # caller actually typed ("BRCA1"), which is the only field that says
+        # which input a row answers for; PANTHER does not preserve input order,
+        # so without it a multi-gene query is rows the caller cannot attribute
+        # without decoding "HUMAN|HGNC=1100|UniProtKB=P38398".
+        mapped_id = entry.get("mapped_id_list")
+        if isinstance(mapped_id, dict):
+            mapped_id = mapped_id.get("mapped_id")
+        if isinstance(mapped_id, list):
+            mapped_id = mapped_id[0] if mapped_id else None
+
+        return {
+            "input_id": mapped_id,
+            "accession": entry.get("accession"),
+            "family_id": entry.get("family_id"),
+            "family_name": entry.get("family_name"),
+            "subfamily_id": entry.get("sf_id"),
+            "subfamily_name": entry.get("sf_name"),
+            "annotations": annotations,
+        }
+
+    def _enrichment(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform gene set enrichment (overrepresentation) analysis."""
+        gene_list = arguments.get("gene_list", "")
+        organism = arguments.get("organism", 9606)
+        annotation_dataset = arguments.get("annotation_dataset", "GO:0008150")
+
+        if not gene_list:
+            return {
+                "status": "error",
+                "error": "gene_list parameter is required (e.g., 'TP53,BRCA1,EGFR,KRAS')",
+            }
+        if organism is None:
+            organism = 9606
+        if annotation_dataset is None:
+            annotation_dataset = "GO:0008150"
+
+        url = f"{PANTHER_BASE_URL}/enrich/overrep"
+        params = {
+            "geneInputList": gene_list,
+            "organism": organism,
+            "annotDataSet": annotation_dataset,
+            "enrichmentTestType": "FISHER",
+            "correction": "FDR",
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        raw = response.json()
+
+        results = raw.get("results", {}).get("result", [])
+        if isinstance(results, dict):
+            results = [results]
+
+        # Filter to significant results (FDR < 0.05) and sort by fold enrichment
+        enriched = []
+        for r in results:
+            fdr = r.get("fdr", 1.0)
+            if fdr is None or not isinstance(fdr, (int, float)):
+                continue
+            fold = r.get("fold_enrichment", 0)
+            if fold is None or not isinstance(fold, (int, float)):
+                continue
+
+            term = r.get("term", {})
+            enriched.append(
+                {
+                    "term_id": term.get("id", ""),
+                    "term_label": term.get("label", ""),
+                    "number_in_list": r.get("number_in_list", 0),
+                    "number_in_reference": r.get("number_in_reference", 0),
+                    "expected": r.get("expected", 0.0),
+                    "fold_enrichment": fold,
+                    "pvalue": r.get("pValue", 1.0),
+                    "fdr": fdr,
+                    "direction": r.get("plus_minus", ""),
+                }
+            )
+
+        # Sort by FDR then fold enrichment
+        enriched.sort(key=lambda x: (x["fdr"], -x["fold_enrichment"]))
+
+        # Return top 50 most significant
+        enriched_top = enriched[:50]
+
+        result = {
+            "gene_list": gene_list,
+            "organism": organism,
+            "annotation_dataset": annotation_dataset,
+            "result_count": len(enriched_top),
+            "enriched_terms": enriched_top,
+        }
+
+        return {
+            "status": "success",
+            "data": result,
+            "metadata": {
+                "source": "PANTHER",
+                "query": gene_list,
+                "endpoint": "enrich/overrep",
+            },
+        }
+
+    def _ortholog(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Find orthologs of a gene across species."""
+        gene_id = arguments.get("gene_id", "")
+        organism = arguments.get("organism", 9606)
+        target_organism = arguments.get("target_organism", 10090)
+        ortholog_type = arguments.get("ortholog_type", "LDO")
+
+        if not gene_id:
+            return {
+                "status": "error",
+                "error": "gene_id parameter is required (e.g., 'P04637' for TP53)",
+            }
+        if organism is None:
+            organism = 9606
+        if target_organism is None:
+            target_organism = 10090
+        if ortholog_type is None:
+            ortholog_type = "LDO"
+
+        url = f"{PANTHER_BASE_URL}/ortholog/matchortho"
+        params = {
+            "geneInputList": gene_id,
+            "organism": organism,
+            "targetOrganism": target_organism,
+            "orthologType": ortholog_type,
+        }
+
+        response = requests.get(
+            url,
+            params=params,
+            headers={"Accept": "application/json"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        raw = response.json()
+
+        search = raw.get("search", {})
+        mapping_data = search.get("mapping", {})
+        mapped = mapping_data.get("mapped", {})
+
+        # PANTHER returns a bare object when one ortholog matches and a list
+        # when several do. Keeping only `mapped[0]` silently discarded every
+        # ortholog past the first, including under `ortholog_type='O'`, whose
+        # own parameter description promises "all orthologs" -- confirmed live
+        # that human ABCB1 -> mouse returns two rows (Abcb1b as O, Abcb1a as
+        # LDO) and the tool published only Abcb1b. Publish all of them.
+        mappings = [
+            {
+                "source_gene": item.get("gene", ""),
+                "target_gene": item.get("target_gene", ""),
+                "target_gene_symbol": item.get("target_gene_symbol", None),
+                "ortholog_type": item.get("ortholog", ""),
+                "persistent_id": item.get("persistent_id", None),
+                "target_persistent_id": item.get("target_persistent_id", None),
+            }
+            for item in (mapped if isinstance(mapped, list) else [mapped])
+            if item
+        ]
+
+        result = {
+            "gene_id": gene_id,
+            "source_organism": organism,
+            "target_organism": target_organism,
+            "ortholog_type": ortholog_type,
+            # `mapping` predates `mappings` and stays as the first match so
+            # existing callers keep working; it is not the whole answer.
+            "mapping": mappings[0] if mappings else None,
+            "mappings": mappings,
+            "total_mappings": len(mappings),
+        }
+
+        return {
+            "status": "success",
+            "data": result,
+            "metadata": {
+                "source": "PANTHER",
+                "query": gene_id,
+                "endpoint": "ortholog/matchortho",
+            },
+        }

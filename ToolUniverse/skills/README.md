@@ -1,0 +1,141 @@
+# ToolUniverse Skills
+
+69 pre-built research skills for AI agents. Skills are automatically available — just ask naturally.
+
+```
+"Find the E. coli K-12 genome"           → tooluniverse-sequence-retrieval
+"What do we know about Alzheimer's?"      → tooluniverse-disease-research
+"Assess EGFR as a drug target"            → tooluniverse-target-research
+"Run differential expression on my data"  → tooluniverse-rnaseq-deseq2
+```
+
+## Install
+
+```bash
+npx skills add mims-harvard/ToolUniverse
+```
+
+## All Skills
+
+### Research Skills
+
+| Skill | Description |
+|-------|-------------|
+| `tooluniverse` | Router — dispatches to the right specialized skill automatically |
+| `tooluniverse-adverse-event-detection` | Adverse drug event signal detection using FDA FAERS data |
+| `tooluniverse-antibody-engineering` | Antibody humanization, affinity maturation, and optimization |
+| `tooluniverse-binder-discovery` | Small molecule binder discovery (structure-based and ligand-based) |
+| `tooluniverse-cancer-variant-interpretation` | Clinical interpretation of somatic cancer mutations |
+| `tooluniverse-chemical-compound-retrieval` | Chemical compound info from PubChem and ChEMBL |
+| `tooluniverse-chemical-safety` | Chemical safety and toxicology assessment (ADMET-AI, CTD, FDA) |
+| `tooluniverse-clinical-guidelines` | Clinical practice guidelines from 12+ sources (NICE, WHO, ADA, etc.) |
+| `tooluniverse-clinical-trial-design` | Clinical trial design feasibility assessment |
+| `tooluniverse-clinical-trial-matching` | Patient-to-trial matching for precision medicine |
+| `tooluniverse-clinical-terminology-lookup` | Fast terminology autocomplete/normalization (RxTerms, ICD-style conditions, HCPCS, star alleles, NPI) |
+| `tooluniverse-clinical-trial-protocol` | Generate FDA-style clinical trial protocol documents with sample-size calculation |
+| `tooluniverse-crispr-screen-analysis` | CRISPR knockout/activation screen analysis |
+| `tooluniverse-custom-tool` | Create and register custom tools |
+| `tooluniverse-disease-research` | Comprehensive disease reports using 100+ tools |
+| `tooluniverse-drug-drug-interaction` | Drug-drug interaction prediction and risk assessment |
+| `tooluniverse-drug-repurposing` | Drug repurposing via target-, compound-, and disease-driven strategies |
+| `tooluniverse-drug-research` | Comprehensive drug reports with evidence grading |
+| `tooluniverse-drug-target-validation` | Computational drug target validation (10 dimensions) |
+| `tooluniverse-epigenomics` | Epigenomics and gene regulation (ENCODE, JASPAR, methylation) |
+| `tooluniverse-expression-data-retrieval` | Gene expression datasets from ArrayExpress and BioStudies |
+| `tooluniverse-gene-enrichment` | Gene enrichment and pathway analysis (gseapy, PANTHER, STRING, etc.) |
+| `tooluniverse-gene-liability` | Human safety liability scoring for gene inhibition or loss of function |
+| `tooluniverse-glycobiology` | Glycan structure and protein-glycosylation research (GlyGen) |
+| `tooluniverse-gwas-drug-discovery` | GWAS signals to drug targets and repurposing opportunities |
+| `tooluniverse-gwas-finemapping` | Causal variant prioritization via statistical fine-mapping |
+| `tooluniverse-gwas-snp-interpretation` | Genetic variant interpretation from GWAS studies |
+| `tooluniverse-gwas-study-explorer` | GWAS study comparison and meta-analysis |
+| `tooluniverse-gwas-trait-to-gene` | Gene-trait associations from GWAS Catalog and Open Targets |
+| `tooluniverse-image-analysis` | Microscopy image analysis and quantitative imaging |
+| `tooluniverse-immune-repertoire-analysis` | TCR/BCR immune repertoire analysis |
+| `tooluniverse-immunotherapy-response-prediction` | Predict response to immune checkpoint inhibitors |
+| `tooluniverse-infectious-disease` | Pathogen characterization and drug repurposing for outbreaks |
+| `tooluniverse-install-skills` | Auto-detect and install missing skills |
+| `tooluniverse-lab-data-standardization` | Convert lab instrument output (plate reader, NanoDrop, qPCR, etc.) to a standardized ASM-style JSON/CSV |
+| `tooluniverse-literature-deep-research` | Literature research with evidence grading and theme extraction |
+| `tooluniverse-medical-imaging-radiology` | Radiology/DICOM cancer-imaging cohort and series discovery (TCIA) |
+| `tooluniverse-metabolomics` | Metabolomics research (metabolite ID, study analysis) |
+| `tooluniverse-metabolomics-analysis` | Metabolomics data analysis (quantification, pathway, flux) |
+| `tooluniverse-ml-inference-utility` | Generic ML/NLP/vision inference (classification, embeddings, NER, summarization) |
+| `tooluniverse-multi-omics-integration` | Multi-omics dataset integration |
+| `tooluniverse-multiomic-disease-characterization` | Multi-omics disease characterization |
+| `tooluniverse-network-pharmacology` | Compound-target-disease network analysis |
+| `tooluniverse-nfcore-pipelines` | Run real nf-core pipelines (rnaseq, sarek, atacseq) end-to-end via Nextflow |
+| `tooluniverse-pharmacovigilance` | Drug safety signal analysis from FDA reports |
+| `tooluniverse-phylogenetics` | Phylogenetics and sequence analysis |
+| `tooluniverse-polygenic-risk-score` | Polygenic risk score construction and interpretation |
+| `tooluniverse-precision-medicine-stratification` | Patient stratification for precision medicine |
+| `tooluniverse-precision-oncology` | Actionable cancer treatment recommendations from molecular profiles |
+| `tooluniverse-protein-interactions` | Protein-protein interaction networks (STRING, BioGRID) |
+| `tooluniverse-protein-structure-retrieval` | Protein structures from PDB, PDBe, and AlphaFold |
+| `tooluniverse-protein-therapeutic-design` | AI-guided protein therapeutic design (RFdiffusion, etc.) |
+| `tooluniverse-proteomics-analysis` | Mass spectrometry proteomics analysis |
+| `tooluniverse-rare-disease-diagnosis` | Rare disease differential diagnosis from phenotype and genetics |
+| `tooluniverse-rnaseq-deseq2` | RNA-seq differential expression with PyDESeq2 |
+| `tooluniverse-scientific-problem-selection` | Research strategy: idea pitching, risk assessment, stuck-project troubleshooting |
+| `tooluniverse-scvi-tools` | Deep-learning single-cell integration (scVI, scANVI, totalVI, PeakVI, MultiVI, DestVI, veloVI) |
+| `tooluniverse-sdk` | Build AI scientist systems using the Python SDK |
+| `tooluniverse-sequence-retrieval` | DNA, RNA, and protein sequences from NCBI and ENA |
+| `tooluniverse-single-cell` | Single-cell RNA-seq analysis (scanpy, anndata) |
+| `tooluniverse-spatial-omics-analysis` | Spatial multi-omics data integration |
+| `tooluniverse-spatial-transcriptomics` | Spatial transcriptomics (10x Visium, MERFISH, seqFISH) |
+| `tooluniverse-statistical-modeling` | Statistical modeling and regression for biomedical data |
+| `tooluniverse-structural-variant-analysis` | Structural variant analysis for clinical genomics |
+| `tooluniverse-synthetic-biology-parts` | Genetic parts/BioBrick lookup from SynBioHub and the iGEM Registry |
+| `tooluniverse-systems-biology` | Pathway analysis (Reactome, KEGG, WikiPathways) |
+| `tooluniverse-target-research` | Comprehensive drug target profiling (9 research paths) |
+| `tooluniverse-variant-analysis` | VCF processing, variant annotation, and SV/CNV interpretation |
+| `tooluniverse-variant-interpretation` | Clinical variant interpretation with ACMG classification |
+
+### Developer Skills
+
+| Skill | Description |
+|-------|-------------|
+| `setup-tooluniverse` | Install and configure ToolUniverse (MCP, CLI, or SDK) |
+| `tooluniverse-cs-setup` | Install/update ToolUniverse in **Claude Science** (conda env + pip package + native skill; not MCP) |
+| `create-tooluniverse-skill` | Create new skills with test-driven methodology |
+| `devtu-benchmark-harness` | Run benchmarks, diagnose failures, route fixes |
+| `devtu-remote-provider` | Add a GPU model provider on the resident remote-tool standard |
+
+The other nine `devtu-*` skills now live in the **tu-harness** plugin
+([tooluniverse/tooluniverse-harness](https://github.com/tooluniverse/tooluniverse-harness),
+`plugin/skills/`), which is where the maintainer-facing tooling belongs: they
+operate on this repository rather than being something a user of it calls, and
+keeping a second copy here meant the two drifted. They had, in every case but
+one. Install them with `claude plugin install tu-harness@tooluniverse-harness`.
+
+`devtu-auto-discover-apis` and `devtu-self-evolve` are not there under those
+names: the harness retired both (`plugin/scripts/validate_plugin.py` lists them
+in `DELETED_SKILLS` -- the first was renamed `devtu-discovery-harness`, the
+second had its content distributed across the three harnesses).
+
+The two above are still here because each is still wired into this repository:
+`benchmarks/bixbench/` runs `devtu-benchmark-harness/scripts/run_eval.py` from
+four places including a test that asserts the path exists, and the harness
+deleted that script in favour of its own `scripts/run_benchmark.py`; and the
+harness copy of `devtu-remote-provider` -- which is far ahead of this one, 61
+numbered mistakes against 25 -- is not pushed anywhere yet.
+
+## Skill Structure
+
+```
+skill-name/
+├── SKILL.md          # Main instructions (<500 lines)
+├── QUICK_START.md    # Quick reference (optional)
+├── EXAMPLES.md       # Usage examples (optional)
+└── references/       # Detailed reference material (optional)
+```
+
+## Contributing
+
+1. Create `skill-name/SKILL.md` with proper frontmatter
+2. Keep SKILL.md concise (<500 lines)
+3. Add examples for common use cases
+4. Keep canonical skills host-agnostic. Do not add client-specific metadata such
+   as `agents/openai.yaml`; generate host-specific files in the corresponding
+   plugin packaging layer instead.
+5. See `create-tooluniverse-skill` for the full workflow

@@ -1,0 +1,351 @@
+[
+  {
+    "name": "WorldBank_get_indicator",
+    "description": "Get World Bank development indicator data for one or more countries over time. Returns economic, health, education, and social development metrics from the World Development Indicators (WDI) database. Covers 200+ countries with annual data going back to 1960s. Example indicators: NY.GDP.MKTP.CD (GDP current USD), SP.POP.TOTL (total population), SH.DYN.MORT (child mortality), SE.ADT.LITR.ZS (adult literacy rate), SP.DYN.LE00.IN (life expectancy), SH.MED.PHYS.ZS (physicians per 1000), EN.ATM.CO2E.PC (CO2 per capita), SL.UEM.TOTL.ZS (unemployment rate). Results are paginated server-side: the response reports 'count' (rows returned), 'total_available' (rows matching upstream) and a 'truncated' flag, and when truncated a 'truncation_note' explaining how to retrieve the rest via 'per_page'/'page'.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-3 country code (e.g., 'USA', 'GBR', 'DEU', 'CHN', 'IND', 'BRA') or 'all' for all countries, or semicolon-separated codes (e.g., 'USA;GBR;DEU')"
+        },
+        "indicator": {
+          "type": "string",
+          "description": "World Bank indicator code (e.g., 'NY.GDP.MKTP.CD' for GDP, 'SP.POP.TOTL' for population, 'SH.DYN.MORT' for child mortality, 'SE.ADT.LITR.ZS' for literacy)"
+        },
+        "mrv": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Most recent values - number of most recent years to return (e.g., 5 for last 5 years). Default returns all available years."
+        },
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Year or year range to filter data (e.g., '2020', '2015:2023' for a range)"
+        },
+        "per_page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Rows returned per request (default 1000, maximum 32500). One row is one country-year observation, so a panel of N countries over Y years needs per_page >= N*Y. Raise this when the response reports truncated=true."
+        },
+        "page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "1-based page number of the result set (default 1). Only needed when a result exceeds per_page: the response reports total_available and pages so you can fetch the remaining pages."
+        }
+      },
+      "required": [
+        "country",
+        "indicator"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.worldbank.org/v2/country/{country}/indicator/{indicator}",
+      "params": {
+        "format": "json",
+        "per_page": "1000"
+      },
+      "echo_request_url": true,
+      "pagination_disclosure": {
+        "total_path": [
+          0,
+          "total"
+        ],
+        "rows_path": [
+          1
+        ],
+        "page_path": [
+          0,
+          "page"
+        ],
+        "pages_path": [
+          0,
+          "pages"
+        ],
+        "more_hint": "The World Bank API paginates server-side. Re-run with a larger `per_page` (maximum 32500) to get every row in one call, or step through the remaining pages with `page`. Narrowing `date` or `mrv` also reduces the result set."
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "country": "USA",
+        "indicator": "NY.GDP.MKTP.CD",
+        "mrv": 5
+      },
+      {
+        "country": "USA;GBR;DEU",
+        "indicator": "SP.POP.TOTL",
+        "mrv": 3
+      },
+      {
+        "country": "CHN",
+        "indicator": "SH.DYN.MORT",
+        "date": "2015:2023"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Two-element list: [0] pagination metadata (page, pages, per_page, total), [1] array of data points with country, year, indicator, and value",
+          "items": {
+            "type": ["object", "array"],
+            "properties": {
+              "indicator": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Indicator name"
+                  }
+                }
+              },
+              "country": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "countryiso3code": {
+                "type": "string",
+                "description": "ISO 3166-1 alpha-3 country code"
+              },
+              "date": {
+                "type": "string",
+                "description": "Year of the observation"
+              },
+              "value": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "Indicator value"
+              },
+              "decimal": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WorldBank_get_country",
+    "description": "Get metadata about a country from the World Bank database. Returns country name, ISO codes, world region, income level, lending type, capital city, and geographic coordinates. Essential for looking up country codes before querying World Bank indicators.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "ISO 3166-1 alpha-2 or alpha-3 country code (e.g., 'US' or 'USA' for United States, 'GB' or 'GBR' for UK, 'DE' or 'DEU' for Germany)"
+        }
+      },
+      "required": [
+        "country"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.worldbank.org/v2/country/{country}",
+      "params": {
+        "format": "json"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "country": "USA"
+      },
+      {
+        "country": "GBR"
+      },
+      {
+        "country": "CHN"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Two-element list: [0] pagination metadata, [1] array of country metadata objects",
+          "items": {
+            "type": ["object", "array"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "ISO 3166-1 alpha-3 code"
+              },
+              "iso2Code": {
+                "type": "string",
+                "description": "ISO 3166-1 alpha-2 code"
+              },
+              "name": {
+                "type": "string",
+                "description": "Country name"
+              },
+              "region": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "incomeLevel": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "capitalCity": {
+                "type": "string"
+              },
+              "longitude": {
+                "type": "string"
+              },
+              "latitude": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "WorldBank_search_indicators",
+    "description": "Search the World Development Indicators (WDI, ~1,500 indicators covering health, education, economy, environment, infrastructure, poverty and more) by keyword. Every word of the query must appear in the indicator's name, code or description; name matches rank first. Returns indicator codes, names, descriptions, units and the source database, as [metadata, indicators] with metadata.total = number of matches. Use it to discover indicator codes for WorldBank_get_indicator. Only the WDI database is searched, not the other ~29,000 indicators in World Bank's other databases.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search words; all must occur in the indicator name, code or description (e.g., 'GDP', 'mortality', 'literacy', 'CO2', 'life expectancy')."
+        },
+        "per_page": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of results to return (default 10, max 1000)"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.worldbank.org/v2/indicator",
+      "params": {
+        "format": "json"
+      }
+    },
+    "type": "WorldBankIndicatorSearchTool",
+    "test_examples": [
+      {
+        "query": "mortality"
+      },
+      {
+        "query": "GDP",
+        "per_page": 5
+      },
+      {
+        "query": "vaccination"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Two-element list: [0] pagination metadata, [1] array of matching indicators",
+          "items": {
+            "type": ["object", "array"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Indicator code (use in WorldBank_get_indicator)"
+              },
+              "name": {
+                "type": "string",
+                "description": "Indicator name"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Unit of measurement"
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "sourceNote": {
+                "type": "string",
+                "description": "Detailed description"
+              },
+              "topics": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

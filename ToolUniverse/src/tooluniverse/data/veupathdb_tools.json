@@ -1,0 +1,463 @@
+[
+  {
+    "name": "VEuPathDB_list_record_types",
+    "type": "BaseRESTTool",
+    "description": "List all available record types in VEuPathDB (Eukaryotic Pathogen, Vector and Host Informatics Resources). VEuPathDB is a unified bioinformatics resource for eukaryotic pathogen and host genomics covering Plasmodium (malaria), Toxoplasma, Cryptosporidium, Trypanosoma, Leishmania, fungi, and vector organisms. Returns the available record types (gene, transcript, organism, genomic-sequence, etc.) that can be queried through VEuPathDB's search API. Encompasses sub-databases: PlasmoDB, ToxoDB, CryptoDB, TriTrypDB, FungiDB, AmoebaDB, MicrosporidiaDB, PiroplasmaDB, GiardiaDB, TrichDB, HostDB, VectorBase, and SchistoDB.",
+    "parameter": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://veupathdb.org/veupathdb/service/record-types",
+      "return_format": "JSON"
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "List of available record types in VEuPathDB",
+          "items": {
+            "type": "string",
+            "description": "Record type name (e.g., 'gene', 'transcript', 'organism', 'genomic-sequence', 'dataset')"
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {}
+    ]
+  },
+  {
+    "name": "VEuPathDB_list_gene_searches",
+    "type": "BaseRESTTool",
+    "description": "List all available gene search strategies in VEuPathDB. Returns the search types that can be used to query genes across pathogen, vector, and host genomes. Each search has a URL segment, display name, description, and the parameters it accepts. Common searches include: GenesByTaxonGene (by organism), GenesFromTranscripts (transform transcript results to genes), and single gene lookups. Use this to discover what types of gene queries are available before constructing searches.",
+    "parameter": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://veupathdb.org/veupathdb/service/record-types/gene/searches",
+      "return_format": "JSON",
+      "auth_header": {
+        "env_var": "VEUPATHDB_API_KEY",
+        "header": "Authorization",
+        "required": true,
+        "register_url": "https://w1.veupathdb.org/veupathdb/app/user/profile#serviceAccess"
+      }
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Available gene search strategies",
+          "items": {
+            "type": "object",
+            "properties": {
+              "urlSegment": {
+                "type": "string",
+                "description": "URL path segment for this search"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Human-readable name"
+              },
+              "shortDisplayName": {
+                "type": "string",
+                "description": "Short display name"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Search description"
+              },
+              "fullName": {
+                "type": "string",
+                "description": "Fully qualified search name"
+              },
+              "paramNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Required parameter names"
+              },
+              "outputRecordClassName": {
+                "type": "string",
+                "description": "Output record class"
+              },
+              "isAnalyzable": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {}
+    ],
+    "required_api_keys": [
+      "VEUPATHDB_API_KEY"
+    ],
+    "api_key_info": {
+      "VEUPATHDB_API_KEY": {
+        "domain": "Pathogens & Microbiology",
+        "type": "secret",
+        "register_url": "https://w1.veupathdb.org/veupathdb/app/user/profile#serviceAccess",
+        "purpose": "Query the VEuPathDB WDK service for pathogen gene searches and records.",
+        "without": "VEuPathDB returns 401 'Valid API Key required for this endpoint.' Only the record-type listing stays open."
+      }
+    }
+  },
+  {
+    "name": "VEuPathDB_list_organism_searches",
+    "type": "BaseRESTTool",
+    "description": "List all available organism search strategies in VEuPathDB. Returns the search types that can be used to query organisms in the VEuPathDB database, covering 785+ pathogen, vector, and host organism genomes. Useful for discovering what organism queries are available. Common searches include: AllOrganisms (list all), GenomeDataTypes (genome statistics), GeneMetrics (gene counts), and OrganismsByText (text search).",
+    "parameter": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://veupathdb.org/veupathdb/service/record-types/organism/searches",
+      "return_format": "JSON",
+      "auth_header": {
+        "env_var": "VEUPATHDB_API_KEY",
+        "header": "Authorization",
+        "required": true,
+        "register_url": "https://w1.veupathdb.org/veupathdb/app/user/profile#serviceAccess"
+      }
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Available organism search strategies",
+          "items": {
+            "type": "object",
+            "properties": {
+              "urlSegment": {
+                "type": "string",
+                "description": "URL path segment for this search"
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Human-readable name"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Search description"
+              },
+              "paramNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Required parameter names"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {}
+    ],
+    "required_api_keys": [
+      "VEUPATHDB_API_KEY"
+    ]
+  },
+  {
+    "name": "VEuPathDB_search_genes_by_organism",
+    "description": "Search a VEuPathDB pathogen-genome database for all genes belonging to a given organism/strain, using the EuPathDB WDK GenesByTaxonGene search (POST query). VEuPathDB is a family of sites that share one API: PlasmoDB (malaria, Plasmodium), ToxoDB (Toxoplasma), FungiDB (fungi), VectorBase (disease vectors), CryptoDB, GiardiaDB, MicrosporidiaDB, PiroplasmaDB, TrichDB, TriTrypDB and AmoebaDB. Choose the site with the 'project' parameter and give the full organism name (genus + species + strain). Returns one row per gene with primary key (gene ID), protein product, organism, gene type and genomic location. Example: organism='Plasmodium falciparum 3D7', project='plasmodb' returns the ~5,720 P. falciparum 3D7 genes.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "organism": {
+          "type": "string",
+          "description": "Full organism/strain name as used by VEuPathDB. Examples: 'Plasmodium falciparum 3D7', 'Toxoplasma gondii ME49', 'Aspergillus fumigatus Af293'. Must match the site's organism vocabulary (genus + species + strain)."
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "VEuPathDB member site to query. One of: plasmodb (default), toxodb, fungidb, vectorbase, cryptodb, giardiadb, microsporidiadb, piroplasmadb, trichdb, tritrypdb, amoebadb."
+        },
+        "attributes": {
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of gene attribute columns to return. Defaults to primary_key, product, organism, gene_type, location_text, source_id. Other valid columns include chromosome, transcript_count, is_pseudo."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of genes to return (1-500, default 25)."
+        }
+      },
+      "required": [
+        "organism"
+      ]
+    },
+    "fields": {
+      "operation": "search_genes_by_organism"
+    },
+    "type": "VEuPathDBTool",
+    "test_examples": [
+      {
+        "organism": "Plasmodium falciparum 3D7",
+        "project": "plasmodb",
+        "limit": 5
+      },
+      {
+        "organism": "Toxoplasma gondii ME49",
+        "project": "toxodb",
+        "limit": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "primary_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "product": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "organism": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gene_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "location_text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "required_api_keys": [
+      "VEUPATHDB_API_KEY"
+    ]
+  },
+  {
+    "name": "VEuPathDB_get_gene_record",
+    "description": "Retrieve the record for a single gene from a VEuPathDB pathogen-genome database by its gene identifier (primary key), via the EuPathDB WDK gene records endpoint (POST query). Pick the member site with the 'project' parameter (plasmodb, toxodb, fungidb, vectorbase, cryptodb, giardiadb, microsporidiadb, piroplasmadb, trichdb, tritrypdb, amoebadb). Returns gene attributes: protein product, organism, gene type, genomic location, chromosome and transcript count. Example: gene_id='PF3D7_0417200', project='plasmodb' returns the bifunctional dihydrofolate reductase-thymidylate synthase (DHFR-TS) gene of Plasmodium falciparum 3D7.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene_id": {
+          "type": "string",
+          "description": "Gene identifier / primary key (source_id) as used by VEuPathDB. Examples: 'PF3D7_0417200' (PlasmoDB), 'TGME49_200010' (ToxoDB)."
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "VEuPathDB member site that owns the gene. One of: plasmodb (default), toxodb, fungidb, vectorbase, cryptodb, giardiadb, microsporidiadb, piroplasmadb, trichdb, tritrypdb, amoebadb."
+        },
+        "attributes": {
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional list of gene attribute columns to return. Defaults to primary_key, product, organism, gene_type, location_text, source_id. Other valid columns include chromosome, transcript_count, is_pseudo."
+        }
+      },
+      "required": [
+        "gene_id"
+      ]
+    },
+    "fields": {
+      "operation": "get_gene_record"
+    },
+    "type": "VEuPathDBTool",
+    "test_examples": [
+      {
+        "gene_id": "PF3D7_0417200",
+        "project": "plasmodb",
+        "attributes": [
+          "primary_key",
+          "product",
+          "organism",
+          "gene_type",
+          "location_text",
+          "chromosome",
+          "transcript_count"
+        ]
+      },
+      {
+        "gene_id": "TGME49_200010",
+        "project": "toxodb"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "primary_key": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "product": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "organism": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gene_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "location_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "chromosome": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "transcript_count": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "required_api_keys": [
+      "VEUPATHDB_API_KEY"
+    ]
+  }
+]

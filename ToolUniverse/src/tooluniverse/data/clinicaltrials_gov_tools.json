@@ -1,0 +1,2010 @@
+[
+  {
+    "name": "search_clinical_trials",
+    "description": "Search ClinicalTrials.gov for clinical trials by disease/condition, drug/intervention, or keywords. This is the PRIMARY tool for finding clinical trials \u2014 use it when you need to discover trials for a drug (e.g., 'olaparib', 'pembrolizumab'), a disease (e.g., 'lung cancer', 'diabetes'), or any study criteria. Accepts condition names, intervention/treatment names, and free-text queries. Returns NCT IDs and brief descriptions with pagination. Use the returned NCT IDs with 'get_clinical_trial_*' tools for detailed protocol info, or 'extract_clinical_trial_*' tools for efficacy/safety results. Limited to trials beyond phase 1. Query rewriting: multi-word `intervention` values are matched as an EXACT PHRASE against each study's registered intervention names/synonyms, so a phrase no registrant recorded verbatim can match 0 studies even when many trials mention it. The query actually executed is returned in `executed_query` (detail in `query_rewrites`), and a zero-hit rewritten query reports in `relaxed_match_check` how many studies your original wording would have matched. Wrap a value in parentheses (e.g. '(cell therapy)') to send it verbatim.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Query for condition or disease using Essie expression syntax (e.g., 'lung cancer', '(head OR neck) AND pain AND NOT \"back pain\"'). Sent to ClinicalTrials.gov verbatim (this tool does not rewrite condition values); see `executed_query` in the response for what actually ran."
+        },
+        "intervention": {
+          "type": "string",
+          "description": "Query for intervention/treatment using Essie expression syntax (e.g., 'chemotherapy', 'immunotherapy', 'olaparib', 'combination therapy'). Matched against each study's registered intervention names and synonyms (InterventionName/InterventionOtherName), not free text in study summaries, so prefer the generic/INN name: a brand name that no registrant recorded in either field can return zero results. Values that already contain Essie syntax (AREA[...]/AND/OR/NOT/quotes) are passed through unchanged. Matched against each study's registered intervention names and synonyms (InterventionName/InterventionOtherName), not free text in study summaries, and multi-word values are matched as an EXACT PHRASE -- so 'donor derived cell therapy' matches 0 studies even though 251 trials match the same words loosely. For looser matching, wrap the value in parentheses (e.g. '(donor derived cell therapy)') to send it verbatim, or use ClinicalTrials_search_studies with `query_term` for free text across all study fields. Prefer the generic/INN name over a brand name. See `executed_query` and `relaxed_match_check` in the response."
+        },
+        "query_term": {
+          "type": "string",
+          "description": "Query for 'other terms' with Essie expression syntax (e.g., 'combination', 'AREA[LastUpdatePostDate]RANGE[2023-01-15,MAX]', 'Phase II'). Can be used to search for all other protocol fields, including but not limited to title, outcome measures, status, phase, location, etc."
+        },
+        "pageSize": {
+          "type": "integer",
+          "description": "Maximum number of studies to return per page (default 10, max 1000)."
+        },
+        "pageToken": {
+          "type": "string",
+          "description": "Token to retrieve the next page of results, obtained from the 'nextPageToken' field of the previous response. Do not specify it for first page. When you make an initial request to the API which supports pagination, the response will include a nextPageToken. This token can then be used as a parameter in the subsequent API request to retrieve the next set of data."
+        },
+        "overall_status": {
+          "type": "array",
+          "description": "Filter by overall study status (e.g., ['RECRUITING'], ['COMPLETED'], ['RECRUITING', 'NOT_YET_RECRUITING']). Valid values: RECRUITING, NOT_YET_RECRUITING, ACTIVE_NOT_RECRUITING, COMPLETED, ENROLLING_BY_INVITATION, SUSPENDED, TERMINATED, WITHDRAWN.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Maximum number of studies to return (alias for pageSize, default 10, max 1000)."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Alias for max_results: maximum number of studies to return (default 10, max 1000).",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "status": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "Alias for overall_status. Filter by trial status, e.g. \"RECRUITING\", \"COMPLETED\"."
+        },
+        "keyword": {
+          "type": "string",
+          "description": "Alias for query_term. Free-text keyword search across all trial fields (e.g., drug name, condition, investigator)."
+        }
+      },
+      "required": []
+    },
+    "query_schema": {
+      "pageSize": 10
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Intervention",
+      "Adverse Effect",
+      "Efficacy",
+      "Search"
+    ],
+    "type": "ClinicalTrialsSearchTool",
+    "tool_url": "/studies",
+    "test_examples": [
+      {
+        "condition": "diabetes mellitus",
+        "intervention": "metformin",
+        "pageSize": 1
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Message when no studies are found"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "studies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "NCT ID": {
+                    "type": "string"
+                  },
+                  "brief_title": {
+                    "type": "string"
+                  },
+                  "brief_summary": {
+                    "type": "string"
+                  },
+                  "overall_status": {
+                    "type": "string"
+                  },
+                  "condition": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "phase": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "nextPageToken": {
+              "type": "string"
+            },
+            "total_count": {
+              "type": "integer"
+            },
+            "executed_query": {
+              "type": "object",
+              "description": "The query parameters actually sent to ClinicalTrials.gov, after phrase-quoting and AREA[] field restriction. Compare against what you passed: they differ whenever `query_rewrites` is non-empty."
+            },
+            "query_rewrites": {
+              "type": "array",
+              "description": "One entry per parameter whose value was rewritten before being sent. Empty when the query ran exactly as supplied.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {
+                    "type": "string",
+                    "description": "The parameter name you passed."
+                  },
+                  "api_field": {
+                    "type": "string",
+                    "description": "The ClinicalTrials.gov query field it was sent as."
+                  },
+                  "submitted": {
+                    "type": "string",
+                    "description": "The value you supplied."
+                  },
+                  "executed": {
+                    "type": "string",
+                    "description": "The rewritten value that was actually sent."
+                  },
+                  "restricted_to_fields": {
+                    "type": "array",
+                    "description": "Registry fields the value was restricted to, if any.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "relaxed_match_check": {
+              "type": "object",
+              "description": "Present ONLY when a rewritten query returned zero studies. Reports whether your original wording would have matched, so an empty `studies` list can be told apart from a genuine absence of trials. The relaxed results are never substituted for the ones you asked for -- follow `note` to retrieve them.",
+              "properties": {
+                "relaxed_query": {
+                  "type": "object",
+                  "description": "The un-rewritten query used for the check."
+                },
+                "relaxed_total_count": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Studies matching your original wording; null if the check request failed."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Plain-language reading of the check, naming the escape hatch when the zero is an artifact of the rewrite."
+                }
+              }
+            }
+          },
+          "required": [
+            "studies"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "get_clinical_trial_descriptions",
+    "description": "Retrieves detailed identification information for trials, including titles, phases, and descriptions, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description_type": {
+          "type": "string",
+          "description": "Type of information to retrieve. Options are 'brief' for brief descriptions or 'full' for full descriptions.",
+          "enum": [
+            "brief",
+            "full"
+          ]
+        }
+      },
+      "required": [
+        "nct_ids",
+        "description_type"
+      ]
+    },
+    "query_schema": {
+      "description_type": "brief"
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Description"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT01158625"
+        ],
+        "description_type": "brief"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "NCT ID": {
+            "type": "string"
+          },
+          "brief_title": {
+            "type": "string"
+          },
+          "brief_summary": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "get_clinical_trial_status_and_dates",
+    "description": "Retrieves trial status and start and completion dates, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status_and_date": {
+          "type": "string",
+          "description": "Unused filter parameter, kept for backward compatibility. Can be omitted or set to any string."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {},
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Status",
+      "Dates"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT01158625"
+        ],
+        "status_and_date": "recruiting"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "NCT ID": {
+            "type": "string"
+          },
+          "overall_status": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "primary_completion_date": {
+            "type": "string"
+          },
+          "completion_date": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "get_clinical_trial_conditions_and_interventions",
+    "description": "Retrieves the list of conditions or diseases and the interventions and arm groups that the clinical trials are focused on, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "condition_and_intervention": {
+          "type": "string",
+          "description": "Unused filter parameter, kept for backward compatibility. Can be omitted or set to any string."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {},
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Condition",
+      "Intervention",
+      "Arm Group"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT01158625"
+        ],
+        "condition_and_intervention": "diabetes-mellitus"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "NCT ID": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arm_groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "interventions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "get_clinical_trial_eligibility_criteria",
+    "description": "Retrieves the eligibility criteria for the clinical trials, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eligibility_criteria": {
+          "type": "string",
+          "description": "Unused filter parameter, kept for backward compatibility. Can be omitted or set to any string."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {},
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Eligibility Criteria"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT01158625"
+        ],
+        "eligibility_criteria": "E11.9"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "NCT ID": {
+            "type": "string"
+          },
+          "eligibility_criteria": {
+            "type": "string"
+          },
+          "healthy_volunteers": {
+            "type": "boolean"
+          },
+          "sex": {
+            "type": "string"
+          },
+          "minimum_age": {
+            "type": "string"
+          },
+          "maximum_age": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "get_clinical_trial_locations",
+    "description": "Retrieves the locations where the clinical trials are being conducted, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "location": {
+          "type": "string",
+          "description": "Unused filter parameter, kept for backward compatibility. Can be omitted or set to any string."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {},
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Location"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT01158625"
+        ],
+        "location": "E11.9"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "NCT ID": {
+            "type": "string"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "facility": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "get_clinical_trial_outcome_measures",
+    "description": "Retrieves the outcome measures for the clinical trials, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcome_measures": {
+          "type": "string",
+          "description": "Decides whether to retrieve primary, secondary, or all outcome measures. Options are 'primary', 'secondary', or 'all'. Default is 'primary'.",
+          "enum": [
+            "primary",
+            "secondary",
+            "all"
+          ]
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {
+      "outcome_measures": "primary"
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Outcome Measures"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT01158625"
+        ],
+        "outcome_measures": "primary"
+      }
+    ],
+    "return_schema": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "NCT ID": {
+            "type": "string"
+          },
+          "primary_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "measure": {
+                  "type": "string"
+                },
+                "timeFrame": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "get_clinical_trial_references",
+    "description": "Retrieves the references (if any) for the clinical trials, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "references": {
+          "type": "string",
+          "description": "Unused filter parameter, kept for backward compatibility. Can be omitted or set to any string."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {},
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "References"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT04368728"
+        ],
+        "references": "Study"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "NCT ID": {
+                "type": "string"
+              },
+              "references": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pmid": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "type": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "citation": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "see_also_links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "extract_clinical_trial_outcomes",
+    "description": "Extracts detailed trial outcome results (e.g., overall survival months, p-values, etc.) from clinicaltrials.gov, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcome_measure": {
+          "type": "string",
+          "description": "Outcome measure to extract. Example values include 'primary' (primary outcomes only), 'secondary' (secondary outcomes only), 'all' (all outcomes), or specific measure names such as 'survival', 'overall survival'. For specific measure names, outcome measures will be matched as long as the input partially matches their titles or descriptions (case agnostic). Querying for specific measure names is recommended after getting an overview of outcome measures ('primary'). If querying for specific measure names does not return any results, this parameter should be set to 'primary' for sanity check. By default, the value is set to 'primary', i.e. the tool will extract all primary outcome results."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {
+      "outcome_measure": "primary"
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Outcome",
+      "Efficacy",
+      "Primary Outcome",
+      "Secondary Outcome"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT04368728"
+        ],
+        "outcome_measure": "primary"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "NCT ID": {
+                    "type": "string"
+                  },
+                  "outcomes": {
+                    "type": "array"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "extract_clinical_trial_adverse_events",
+    "description": "Extracts detailed adverse event results from clinicaltrials.gov, using their NCT IDs.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_ids": {
+          "type": "array",
+          "description": "List of NCT IDs of the clinical trials (e.g., ['NCT04852770', 'NCT01728545']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "organ_systems": {
+          "type": "array",
+          "description": "List of organs or organ systems to filter adverse events (see enum for exact text). Adverse events will be matched only if the input exactly matches their terms (case agnostic). If not specified, all adverse events will be returned. By default, all adverse events will be returned.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Blood and Lymphatic System Disorders",
+              "Cardiac Disorders",
+              "Congenital, Familial and Genetic Disorders",
+              "Ear and Labyrinth Disorders",
+              "Endocrine Disorders",
+              "Eye Disorders",
+              "Gastrointestinal Disorders",
+              "General Disorders",
+              "Hepatobiliary Disorders",
+              "Immune System Disorders",
+              "Infections and Infestations",
+              "Injury, Poisoning and Procedural Complications",
+              "Investigations",
+              "Metabolism and Nutrition Disorders",
+              "Musculoskeletal and Connective Tissue Disorders",
+              "Neoplasms Benign, Malignant and Unspecified (Including Cysts and Polyps)",
+              "Nervous System Disorders",
+              "Pregnancy, Puerperium and Perinatal Conditions",
+              "Product Issues",
+              "Psychiatric Disorders",
+              "Renal and Urinary Disorders",
+              "Reproductive System and Breast Disorders",
+              "Respiratory, Thoracic and Mediastinal Disorders",
+              "Skin and Subcutaneous Tissue Disorders",
+              "Social Circumstances",
+              "Surgical and Medical Procedures",
+              "Vascular Disorders"
+            ]
+          }
+        },
+        "adverse_event_type": {
+          "type": "string",
+          "description": "Type of adverse events to extract. Options are 'serious' (serious adverse events only), 'other' (non-serious adverse events only), 'all' (all adverse events), or specific event names such as 'nausea', 'neutropenia', 'epilepsy' (from MedDRA). For specific event names, adverse events will be matched as long as the input partially matches their terms (case agnostic). Querying for specific adverse event names is recommended as there are typically many adverse events logged. If querying for specific event names does not return any results, this parameter should be set to 'serious' for sanity check. By default, the value is set to 'serious', i.e. the tool will extract all serious adverse events."
+        }
+      },
+      "required": [
+        "nct_ids"
+      ]
+    },
+    "query_schema": {
+      "adverse_event_type": "serious"
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study",
+      "Adverse Event",
+      "Safety"
+    ],
+    "type": "ClinicalTrialsDetailsTool",
+    "tool_url": "/studies/{nctId}",
+    "test_examples": [
+      {
+        "nct_ids": [
+          "NCT04368728"
+        ],
+        "organ_systems": [
+          "Cardiac Disorders",
+          "Nervous System Disorders"
+        ],
+        "adverse_event_type": "serious"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "NCT ID": {
+                "type": "string"
+              },
+              "freq_threshold": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "groups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "description": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              "serious_adverse_events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "term": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "organSystem": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "ClinicalTrials_search_studies",
+    "description": "Search ClinicalTrials.gov for clinical trial studies by condition, intervention, sponsor, or other criteria. Returns NCT IDs, titles, status, phase, enrollment, and key trial metadata. Example: search for 'breast cancer' trials with 'pembrolizumab' that are RECRUITING in Phase 3. Query rewriting: multi-word intervention/condition/sponsor values are sent to ClinicalTrials.gov as an EXACT PHRASE, and intervention/sponsor values are further restricted to specific registry fields, so a phrase no registrant recorded verbatim can match 0 studies even when many trials mention it. The query actually executed is always returned in `executed_query` (with per-parameter detail in `query_rewrites`); when a rewritten query matches nothing, `relaxed_match_check` reports how many studies your original wording would have matched and how to retrieve them. To opt out of the rewrite, wrap a value in parentheses (e.g. '(donor derived cell therapy)') and it is sent verbatim as a loose keyword match.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "search"
+          ],
+          "description": "Operation (optional; defaults to 'search' for this tool).",
+          "default": "search"
+        },
+        "query_cond": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Disease or condition to search for (e.g., 'breast cancer', 'type 2 diabetes', 'COVID-19'). Supports Boolean operators (AND, OR, NOT). Multi-word values are matched as an exact phrase (e.g. 'kidney transplantation' is sent as \"kidney transplantation\"), which is narrower than a loose keyword match. For looser matching, wrap the value in parentheses (e.g. '(kidney transplantation)') to send it verbatim. Values already containing Essie syntax (AND/OR/NOT/AREA[]/quotes) are passed through unchanged. See `executed_query` in the response for what actually ran."
+        },
+        "query_intr": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Intervention or drug to search for (e.g., 'pembrolizumab', 'metformin', 'chemotherapy'). Matched against each study's registered intervention names and synonyms (InterventionName/InterventionOtherName), not free text in study summaries, and multi-word values are matched as an EXACT PHRASE -- so 'donor derived cell therapy' matches 0 studies even though 251 trials match the same words loosely. For looser matching, wrap the value in parentheses (e.g. '(donor derived cell therapy)') to send it verbatim, or use ClinicalTrials_search_studies with `query_term` for free text across all study fields. Prefer the generic/INN name over a brand name. See `executed_query` and `relaxed_match_check` in the response."
+        },
+        "query_term": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Free-text search across all study fields. Use for general keyword search."
+        },
+        "filter_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by recruitment status. Options: 'RECRUITING', 'NOT_YET_RECRUITING', 'ACTIVE_NOT_RECRUITING', 'COMPLETED', 'WITHDRAWN', 'SUSPENDED', 'TERMINATED', 'ENROLLING_BY_INVITATION'. Comma-separate multiple values."
+        },
+        "filter_phase": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by trial phase. Options: 'EARLY_PHASE1', 'PHASE1', 'PHASE2', 'PHASE3', 'PHASE4', 'NA'. Comma-separate multiple (e.g., 'PHASE2,PHASE3')."
+        },
+        "filter_study_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by study type: 'INTERVENTIONAL', 'OBSERVATIONAL', 'EXPANDED_ACCESS'."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Number of results per page (default 10, max 1000).",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "next_page_token": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Token for retrieving the next page of results (obtained from previous response)."
+        },
+        "query": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "General keyword search across all fields. Alias for query_term. E.g., \"FLT3 AML\", \"KRAS NSCLC\"."
+        },
+        "condition": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Disease or condition to search for. Alias for query_cond. E.g., \"acute myeloid leukemia\". Multi-word values are matched as an exact phrase (e.g. 'kidney transplantation' is sent as \"kidney transplantation\"), which is narrower than a loose keyword match. For looser matching, wrap the value in parentheses (e.g. '(kidney transplantation)') to send it verbatim. Values already containing Essie syntax (AND/OR/NOT/AREA[]/quotes) are passed through unchanged. See `executed_query` in the response for what actually ran."
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Recruitment status filter. Alias for filter_status. E.g., \"RECRUITING\", \"COMPLETED\"."
+        },
+        "max_results": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of results to return. Alias for page_size."
+        },
+        "intervention": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Intervention or drug to search for. Alias for query_intr. E.g., \"pembrolizumab\", \"metformin\". Matched against each study's registered intervention names and synonyms (InterventionName/InterventionOtherName), not free text in study summaries, and multi-word values are matched as an EXACT PHRASE -- so 'donor derived cell therapy' matches 0 studies even though 251 trials match the same words loosely. For looser matching, wrap the value in parentheses (e.g. '(donor derived cell therapy)') to send it verbatim, or use ClinicalTrials_search_studies with `query_term` for free text across all study fields. Prefer the generic/INN name over a brand name. See `executed_query` and `relaxed_match_check` in the response."
+        },
+        "sponsor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Lead sponsor or collaborator name to search for. E.g., \"National Cancer Institute\". Matched against each study's registered lead-sponsor name (AREA[LeadSponsorName]) only, and multi-word values are matched as an EXACT PHRASE. For looser matching, wrap the value in parentheses (e.g. '(National Cancer Institute)') to send it verbatim. See `executed_query` and `relaxed_match_check` in the response."
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "operation": "search"
+    },
+    "query_schema": {},
+    "type": "ClinicalTrialsTool",
+    "test_examples": [
+      {
+        "query_cond": "breast cancer",
+        "query_intr": "pembrolizumab",
+        "filter_status": "RECRUITING",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "studies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "nct_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "brief_title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "study_type": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "phases": {
+                    "type": "array"
+                  },
+                  "enrollment": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "conditions": {
+                    "type": "array"
+                  },
+                  "interventions": {
+                    "type": "array"
+                  },
+                  "sponsor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "start_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "completion_date": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            },
+            "total_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Studies matching the query, independent of page_size. NULL on any page fetched with next_page_token: ClinicalTrials.gov reports this figure only on a first page, and a page's row count is not a substitute for it. Read the total from the first page of the same query. When null, total_count_note says so."
+            },
+            "total_count_note": {
+              "type": "string",
+              "description": "Present only when total_count is null, explaining that the registry does not report a matching-study count on a paged response and where to read the real total."
+            },
+            "next_page_token": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "executed_query": {
+              "type": "object",
+              "description": "The query parameters actually sent to ClinicalTrials.gov, after phrase-quoting and AREA[] field restriction. Compare against what you passed: they differ whenever `query_rewrites` is non-empty."
+            },
+            "query_rewrites": {
+              "type": "array",
+              "description": "One entry per parameter whose value was rewritten before being sent. Empty when the query ran exactly as supplied.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {
+                    "type": "string",
+                    "description": "The parameter name you passed."
+                  },
+                  "api_field": {
+                    "type": "string",
+                    "description": "The ClinicalTrials.gov query field it was sent as."
+                  },
+                  "submitted": {
+                    "type": "string",
+                    "description": "The value you supplied."
+                  },
+                  "executed": {
+                    "type": "string",
+                    "description": "The rewritten value that was actually sent."
+                  },
+                  "restricted_to_fields": {
+                    "type": "array",
+                    "description": "Registry fields the value was restricted to, if any.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "relaxed_match_check": {
+              "type": "object",
+              "description": "Present ONLY when a rewritten query returned zero studies. Reports whether your original wording would have matched, so an empty `studies` list can be told apart from a genuine absence of trials. The relaxed results are never substituted for the ones you asked for -- follow `note` to retrieve them.",
+              "properties": {
+                "relaxed_query": {
+                  "type": "object",
+                  "description": "The un-rewritten query used for the check."
+                },
+                "relaxed_total_count": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Studies matching your original wording; null if the check request failed."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Plain-language reading of the check, naming the escape hatch when the zero is an artifact of the rewrite."
+                }
+              }
+            }
+          },
+          "required": [
+            "studies"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Intervention",
+      "Search"
+    ]
+  },
+  {
+    "name": "ClinicalTrials_get_study",
+    "description": "Get full details for a specific clinical trial by NCT ID from ClinicalTrials.gov. Returns comprehensive protocol including title, objectives, eligibility criteria, interventions, outcome measures, contacts, and results summary. Example: NCT04280705 returns the ACTT remdesivir COVID-19 trial with all details.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "nct_id": {
+          "type": "string",
+          "description": "NCT (National Clinical Trial) identifier (e.g., 'NCT04280705', 'NCT02142712'). Obtain from ClinicalTrials_search_studies."
+        }
+      },
+      "required": [
+        "nct_id"
+      ]
+    },
+    "fields": {
+      "operation": "get_study"
+    },
+    "query_schema": {},
+    "type": "ClinicalTrialsTool",
+    "test_examples": [
+      {
+        "nct_id": "NCT04280705"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "nct_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "brief_title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "official_title": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "study_type": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "phases": {
+              "type": "array"
+            },
+            "enrollment": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "brief_summary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "conditions": {
+              "type": "array"
+            },
+            "interventions": {
+              "type": "array"
+            },
+            "primary_outcomes": {
+              "type": "array"
+            },
+            "eligibility_criteria": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sponsor": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "locations": {
+              "type": "array"
+            },
+            "references": {
+              "type": "array"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Study"
+    ]
+  },
+  {
+    "name": "ClinicalTrials_search_by_intervention",
+    "description": "Search ClinicalTrials.gov for all clinical trials testing a specific drug, biologic, device, or other intervention. Returns trial IDs, titles, phases, status, and conditions being studied. Ideal for finding all trials for a given drug (e.g., 'nivolumab') across all disease indications. Query rewriting: multi-word intervention/condition/sponsor values are sent to ClinicalTrials.gov as an EXACT PHRASE, and intervention/sponsor values are further restricted to specific registry fields, so a phrase no registrant recorded verbatim can match 0 studies even when many trials mention it. The query actually executed is always returned in `executed_query` (with per-parameter detail in `query_rewrites`); when a rewritten query matches nothing, `relaxed_match_check` reports how many studies your original wording would have matched and how to retrieve them. To opt out of the rewrite, wrap a value in parentheses (e.g. '(donor derived cell therapy)') and it is sent verbatim as a loose keyword match.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "intervention": {
+          "type": "string",
+          "description": "Drug, biologic, device, or intervention name (e.g., 'nivolumab', 'CRISPR', 'CAR-T cells', 'metformin', 'osimertinib'). Matched against each study's registered intervention names and synonyms (InterventionName/InterventionOtherName), not free text in study summaries, and multi-word values are matched as an EXACT PHRASE -- so 'donor derived cell therapy' matches 0 studies even though 251 trials match the same words loosely. For looser matching, wrap the value in parentheses (e.g. '(donor derived cell therapy)') to send it verbatim, or use ClinicalTrials_search_studies with `query_term` for free text across all study fields. Prefer the generic/INN name over a brand name. See `executed_query` and `relaxed_match_check` in the response."
+        },
+        "condition": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Disease or condition to filter trials (e.g., 'HER2 breast cancer', 'NSCLC KRAS G12C'). Alias for query_cond. Multi-word values are matched as an exact phrase (e.g. 'kidney transplantation' is sent as \"kidney transplantation\"), which is narrower than a loose keyword match. For looser matching, wrap the value in parentheses (e.g. '(kidney transplantation)') to send it verbatim. Values already containing Essie syntax (AND/OR/NOT/AREA[]/quotes) are passed through unchanged. See `executed_query` in the response for what actually ran."
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Recruitment status filter: 'RECRUITING', 'COMPLETED', 'ACTIVE_NOT_RECRUITING', 'TERMINATED'. Alias for filter_status."
+        },
+        "filter_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by recruitment status: 'RECRUITING', 'COMPLETED', 'ACTIVE_NOT_RECRUITING', 'TERMINATED'. Comma-separate multiple."
+        },
+        "filter_phase": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by trial phase: 'PHASE1', 'PHASE2', 'PHASE3', 'PHASE4'. Comma-separate multiple."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Number of results per page (default 10, max 1000).",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "intervention"
+      ]
+    },
+    "fields": {
+      "operation": "search"
+    },
+    "query_schema": {},
+    "type": "ClinicalTrialsTool",
+    "test_examples": [
+      {
+        "intervention": "nivolumab",
+        "filter_phase": "PHASE3",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "studies": {
+              "type": "array"
+            },
+            "total_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Studies matching the query, independent of page_size. NULL on any page fetched with next_page_token: ClinicalTrials.gov reports this figure only on a first page, and a page's row count is not a substitute for it. Read the total from the first page of the same query. When null, total_count_note says so."
+            },
+            "total_count_note": {
+              "type": "string",
+              "description": "Present only when total_count is null, explaining that the registry does not report a matching-study count on a paged response and where to read the real total."
+            },
+            "next_page_token": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "executed_query": {
+              "type": "object",
+              "description": "The query parameters actually sent to ClinicalTrials.gov, after phrase-quoting and AREA[] field restriction. Compare against what you passed: they differ whenever `query_rewrites` is non-empty."
+            },
+            "query_rewrites": {
+              "type": "array",
+              "description": "One entry per parameter whose value was rewritten before being sent. Empty when the query ran exactly as supplied.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {
+                    "type": "string",
+                    "description": "The parameter name you passed."
+                  },
+                  "api_field": {
+                    "type": "string",
+                    "description": "The ClinicalTrials.gov query field it was sent as."
+                  },
+                  "submitted": {
+                    "type": "string",
+                    "description": "The value you supplied."
+                  },
+                  "executed": {
+                    "type": "string",
+                    "description": "The rewritten value that was actually sent."
+                  },
+                  "restricted_to_fields": {
+                    "type": "array",
+                    "description": "Registry fields the value was restricted to, if any.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "relaxed_match_check": {
+              "type": "object",
+              "description": "Present ONLY when a rewritten query returned zero studies. Reports whether your original wording would have matched, so an empty `studies` list can be told apart from a genuine absence of trials. The relaxed results are never substituted for the ones you asked for -- follow `note` to retrieve them.",
+              "properties": {
+                "relaxed_query": {
+                  "type": "object",
+                  "description": "The un-rewritten query used for the check."
+                },
+                "relaxed_total_count": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Studies matching your original wording; null if the check request failed."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Plain-language reading of the check, naming the escape hatch when the zero is an artifact of the rewrite."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Intervention",
+      "Drug Development"
+    ]
+  },
+  {
+    "name": "ClinicalTrials_search_by_sponsor",
+    "description": "Search ClinicalTrials.gov for clinical trials by sponsor or lead organization. Returns trials funded by pharmaceutical companies, academic institutions, or government agencies. Example: find all Phase 3 trials sponsored by 'National Cancer Institute' for cancer conditions. Query rewriting: multi-word intervention/condition/sponsor values are sent to ClinicalTrials.gov as an EXACT PHRASE, and intervention/sponsor values are further restricted to specific registry fields, so a phrase no registrant recorded verbatim can match 0 studies even when many trials mention it. The query actually executed is always returned in `executed_query` (with per-parameter detail in `query_rewrites`); when a rewritten query matches nothing, `relaxed_match_check` reports how many studies your original wording would have matched and how to retrieve them. To opt out of the rewrite, wrap a value in parentheses (e.g. '(donor derived cell therapy)') and it is sent verbatim as a loose keyword match.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "sponsor": {
+          "type": "string",
+          "description": "Sponsor or lead organization name (e.g., 'Pfizer', 'National Cancer Institute', 'Novartis', 'Johns Hopkins University', 'Merck'). Matched against each study's registered lead-sponsor name (AREA[LeadSponsorName]) only, and multi-word values are matched as an EXACT PHRASE. For looser matching, wrap the value in parentheses (e.g. '(National Cancer Institute)') to send it verbatim. See `executed_query` and `relaxed_match_check` in the response."
+        },
+        "query_cond": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional disease/condition filter (e.g., 'cancer', 'cardiovascular disease', 'alzheimer'). Multi-word values are matched as an exact phrase (e.g. 'kidney transplantation' is sent as \"kidney transplantation\"), which is narrower than a loose keyword match. For looser matching, wrap the value in parentheses (e.g. '(kidney transplantation)') to send it verbatim. Values already containing Essie syntax (AND/OR/NOT/AREA[]/quotes) are passed through unchanged. See `executed_query` in the response for what actually ran."
+        },
+        "filter_status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by status: 'RECRUITING', 'COMPLETED', 'ACTIVE_NOT_RECRUITING'. Comma-separate multiple."
+        },
+        "filter_phase": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by phase: 'PHASE1', 'PHASE2', 'PHASE3', 'PHASE4'. Comma-separate multiple."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Number of results per page (default 10, max 1000).",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "sponsor"
+      ]
+    },
+    "fields": {
+      "operation": "search"
+    },
+    "query_schema": {},
+    "type": "ClinicalTrialsTool",
+    "test_examples": [
+      {
+        "sponsor": "National Cancer Institute",
+        "filter_phase": "PHASE3",
+        "page_size": 5
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "studies": {
+              "type": "array"
+            },
+            "total_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Studies matching the query, independent of page_size. NULL on any page fetched with next_page_token: ClinicalTrials.gov reports this figure only on a first page, and a page's row count is not a substitute for it. Read the total from the first page of the same query. When null, total_count_note says so."
+            },
+            "total_count_note": {
+              "type": "string",
+              "description": "Present only when total_count is null, explaining that the registry does not report a matching-study count on a paged response and where to read the real total."
+            },
+            "next_page_token": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "executed_query": {
+              "type": "object",
+              "description": "The query parameters actually sent to ClinicalTrials.gov, after phrase-quoting and AREA[] field restriction. Compare against what you passed: they differ whenever `query_rewrites` is non-empty."
+            },
+            "query_rewrites": {
+              "type": "array",
+              "description": "One entry per parameter whose value was rewritten before being sent. Empty when the query ran exactly as supplied.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "parameter": {
+                    "type": "string",
+                    "description": "The parameter name you passed."
+                  },
+                  "api_field": {
+                    "type": "string",
+                    "description": "The ClinicalTrials.gov query field it was sent as."
+                  },
+                  "submitted": {
+                    "type": "string",
+                    "description": "The value you supplied."
+                  },
+                  "executed": {
+                    "type": "string",
+                    "description": "The rewritten value that was actually sent."
+                  },
+                  "restricted_to_fields": {
+                    "type": "array",
+                    "description": "Registry fields the value was restricted to, if any.",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "relaxed_match_check": {
+              "type": "object",
+              "description": "Present ONLY when a rewritten query returned zero studies. Reports whether your original wording would have matched, so an empty `studies` list can be told apart from a genuine absence of trials. The relaxed results are never substituted for the ones you asked for -- follow `note` to retrieve them.",
+              "properties": {
+                "relaxed_query": {
+                  "type": "object",
+                  "description": "The un-rewritten query used for the check."
+                },
+                "relaxed_total_count": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "description": "Studies matching your original wording; null if the check request failed."
+                },
+                "note": {
+                  "type": "string",
+                  "description": "Plain-language reading of the check, naming the escape hatch when the zero is an artifact of the rewrite."
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Sponsor",
+      "Drug Development"
+    ]
+  },
+  {
+    "name": "ClinicalTrials_get_database_stats",
+    "description": "Get aggregate statistics about the ClinicalTrials.gov database, including total number of registered studies and size distribution. Returns database-wide counts and file size metrics.",
+    "parameter": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "fields": {
+      "operation": "stats_size"
+    },
+    "query_schema": {},
+    "type": "ClinicalTrialsTool",
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "total_studies": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Total number of studies registered on ClinicalTrials.gov (upstream 'totalStudies')"
+            },
+            "average_byte_size": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "description": "Mean size in bytes of a study record (upstream 'averageSizeBytes')"
+            },
+            "byte_size_percentiles": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Study record size in bytes at each percentile, keyed '5%' through '99%'"
+            },
+            "size_ranges": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Histogram of study record sizes as {sizeRange, studiesCount} buckets"
+            },
+            "largest_studies": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "description": "Largest study records as {id, sizeBytes}"
+            }
+          },
+          "required": [
+            "largest_studies"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Statistics"
+    ]
+  },
+  {
+    "name": "ClinicalTrials_get_field_values",
+    "description": "Get the registry-wide value distribution for one ClinicalTrials.gov field: each distinct value with the number of studies recording it. Use to see what status, phase, or study type options exist. Example: 'Phase' returns counts for PHASE1, PHASE2, PHASE3, etc. IMPORTANT for any share or percentage: the rows are NOT a partition of the registry. Studies that record no value for the field are excluded from the rows entirely (for 'Phase', 141,728 of 597,913), and where the field is multi-valued a study recording several values is counted in several rows (for 'Phase', 24,529 studies), so the rows sum to neither the registry total nor a subset of it. Never use the sum of the rows as a denominator; use 'total_studies_in_registry' for a share of all studies or 'studies_with_value' for a share of those recording the field, and read 'coverage_note' before quoting any percentage. Only ENUM, STRING and BOOLEAN fields have a value distribution: for INTEGER and DATE fields (e.g. 'EnrollmentCount', 'StartDate') ClinicalTrials.gov publishes a min/max range instead of a ranking, so 'values' is empty and 'value_summary' carries the range.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Field name to get value counts for. Common fields: 'OverallStatus' (trial status), 'Phase' (trial phase), 'StudyType' (Interventional/Observational), 'LeadSponsorClass' (industry/NIH/other), 'InterventionType' (drug/device/biological)."
+        },
+        "query_cond": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "NOT SUPPORTED - passing this returns an error. ClinicalTrials.gov's field-value statistics endpoint counts values across the whole registry and accepts no condition, status or phase filter (it rejects any such parameter with HTTP 400). For counts restricted to a condition, use ClinicalTrials_search_studies with query_cond and tally the per-study 'status', 'phases', 'study_type' or 'sponsor' fields it returns."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Maximum number of value rows to return, highest study count first (default 50, minimum 1). Truncation is reported: when this cuts the list, 'truncated' is true and 'unique_values_count' still gives the true number of distinct values. The counts in 'missing_studies_count', 'studies_with_value' and 'coverage_note' always describe the whole facet, never just the returned rows.",
+          "default": 50
+        }
+      },
+      "required": [
+        "field"
+      ]
+    },
+    "fields": {
+      "operation": "field_values"
+    },
+    "query_schema": {},
+    "type": "ClinicalTrialsTool",
+    "test_examples": [
+      {
+        "field": "Phase",
+        "page_size": 20
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "field_path": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Dotted path of the field in the ClinicalTrials.gov study record."
+            },
+            "field_type": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Upstream field type: ENUM, STRING, BOOLEAN, INTEGER or DATE. Only ENUM, STRING and BOOLEAN have a per-value distribution; INTEGER and DATE return value_summary instead and an empty 'values'."
+            },
+            "values": {
+              "type": "array",
+              "description": "Distinct values with study counts, highest first. Empty for INTEGER and DATE fields, which ClinicalTrials.gov does not rank per value - read value_summary and coverage_note, and do not read the empty list as 'no study records this field'.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "studies_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "Studies recording this value. Rows overlap when is_multi_valued is true, so they do not sum to a study count."
+                  }
+                }
+              }
+            },
+            "value_summary": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "Range summary ClinicalTrials.gov returns in place of a value ranking for INTEGER and DATE fields: 'minimum', 'maximum', and 'average' (INTEGER) or 'date_formats' (DATE). Null whenever 'values' carries the distribution instead.",
+              "properties": {
+                "minimum": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                },
+                "maximum": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                },
+                "average": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "date_formats": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "unique_values_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "True number of distinct values for this field across the registry, independent of page_size. Null when ClinicalTrials.gov does not publish it (INTEGER and DATE fields) - null means unknown, never zero. Replaces the former 'total_count', which named the row count here but the matching-study count in ClinicalTrials_search_studies."
+            },
+            "values_returned": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Number of value rows in this response."
+            },
+            "truncated": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "True when the returned rows are fewer than the field's distinct values, because page_size cut them or ClinicalTrials.gov itself capped or withheld the ranking. Null when the facet size is unpublished and truncation cannot be determined - null is not false."
+            },
+            "missing_studies_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Studies recording no value for this field. These are excluded from the rows entirely, not bucketed as unknown."
+            },
+            "total_studies_in_registry": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "All studies in ClinicalTrials.gov. Use as the denominator for a share of all registered studies. Null if the lookup failed."
+            },
+            "studies_with_value": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Studies recording at least one value for this field (total_studies_in_registry minus missing_studies_count). Use as the denominator for a share of studies that record the field."
+            },
+            "is_multi_valued": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "True when one study can appear in several rows because the field, or a list containing it, holds several values per study. Null if it could not be determined."
+            },
+            "duplicate_studies_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Studies counted in more than one row. Null when the returned ranking is capped upstream and the figure cannot be derived."
+            },
+            "coverage_note": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Prose stating how many studies are excluded from the facet, whether rows double-count studies, and which figure may be used as a denominator. Read before quoting any percentage."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "label": [
+      "ClinicalTrials.gov",
+      "Clinical Trial",
+      "Statistics"
+    ]
+  }
+]

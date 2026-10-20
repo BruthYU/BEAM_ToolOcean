@@ -1,0 +1,211 @@
+[
+  {
+    "name": "WikiPathways_search",
+    "type": "WikiPathwaysSearchTool",
+    "description": "Text search across community-curated pathways (disease, metabolic, signaling). Use to discover relevant pathways for a topic/gene set and obtain WPIDs for retrieval/visualization.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Free-text query (keywords, gene symbols, processes), e.g., 'p53', 'glycolysis'."
+        },
+        "organism": {
+          "type": "string",
+          "description": "Organism filter (scientific name), e.g., 'Homo sapiens'."
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://webservice.wikipathways.org/findPathwaysByText",
+      "format": "json"
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "wpid": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "organism": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "query": "p53"
+      },
+      {
+        "query": "metabolism",
+        "organism": "Homo sapiens"
+      }
+    ],
+    "label": [
+      "WikiPathways",
+      "Pathway",
+      "Search"
+    ],
+    "metadata": {
+      "tags": [
+        "pathway",
+        "enrichment",
+        "visualization"
+      ],
+      "estimated_execution_time": "< 2 seconds"
+    },
+    "aliases": [
+      "WikiPathways_search_pathways"
+    ]
+  },
+  {
+    "name": "WikiPathways_get_pathway",
+    "type": "WikiPathwaysGetTool",
+    "description": "Fetch pathway content by WPID. format='json' (default) returns structured metadata (uri, title, organism) plus the gene list (id, label, datasource) via WikiPathways' SPARQL endpoint, for enrichment reporting or network visualization. format='gpml' returns the pathway's raw GPML XML (nodes, edges, coordinates, exact upstream layout) instead -- use this when you need the full pathway diagram/model, not just its gene list. Errors clearly if the WPID has no GPML file or isn't in the SPARQL endpoint.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "wpid": {
+          "type": "string",
+          "description": "WikiPathways identifier (e.g., 'WP254')."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "gpml"
+          ],
+          "default": "json",
+          "description": "Response format: 'json' for structured, 'gpml' for GPML XML."
+        }
+      },
+      "required": [
+        "wpid"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://webservice.wikipathways.org/getPathway",
+      "format": "json"
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "format='json' response",
+          "properties": {
+            "wpid": {
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "organism": {
+              "type": "string"
+            },
+            "genes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "datasource": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "gene_count": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "wpid",
+            "title",
+            "genes"
+          ]
+        },
+        {
+          "type": "object",
+          "description": "format='gpml' response",
+          "properties": {
+            "wpid": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "gpml"
+              ]
+            },
+            "gpml": {
+              "type": "string",
+              "description": "Raw GPML XML"
+            }
+          },
+          "required": [
+            "wpid",
+            "format",
+            "gpml"
+          ]
+        }
+      ]
+    },
+    "test_examples": [
+      {
+        "wpid": "WP254",
+        "format": "json"
+      },
+      {
+        "wpid": "WP254",
+        "format": "gpml"
+      }
+    ],
+    "label": [
+      "WikiPathways",
+      "Pathway",
+      "Content"
+    ],
+    "metadata": {
+      "tags": [
+        "pathway",
+        "content",
+        "gpml"
+      ],
+      "estimated_execution_time": "< 2 seconds"
+    }
+  }
+]

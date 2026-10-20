@@ -1,0 +1,1368 @@
+[
+  {
+    "name": "EBIProteins_get_mutagenesis",
+    "description": "Get mutagenesis experiment data for a protein from the EBI Proteins API. Returns experimentally characterized mutations with their functional effects, including gain/loss of function, binding changes, and structural impacts. Data is curated from UniProtKB with literature evidence. Essential for understanding structure-function relationships. Example: P04637 (TP53) returns 651 mutagenesis annotations showing effects of each mutation on p53 function.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53/p53), 'P38398' (BRCA1), 'P00533' (EGFR), 'P01308' (Insulin)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "mutagenesis"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      },
+      {
+        "accession": "P00533"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "gene_name": {
+              "type": "null"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "original_sequence": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "evidences": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "source_name": {
+                          "type": "string"
+                        },
+                        "source_id": {
+                          "type": "string"
+                        },
+                        "source_url": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_features": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_proteomics_ptm",
+    "description": "Get post-translational modification (PTM) evidence from mass spectrometry proteomics for a protein from the EBI Proteins API. Returns experimentally detected PTMs (phosphorylation, acetylation, ubiquitination, etc.) with evidence from PeptideAtlas, ProteomicsDB, MaxQB, and EPD proteomics repositories. Shows modification positions, types, and detection confidence. Example: P04637 (TP53) returns 101 PTM features including phosphorylation sites critical for p53 regulation.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53/p53), 'P38398' (BRCA1), 'P00533' (EGFR), 'P31749' (AKT1)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "proteomics_ptm"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      },
+      {
+        "accession": "P31749"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "null"
+                  },
+                  "evidences": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "properties": {
+                          "type": "object",
+                          "properties": {
+                            "PEP": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_features": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_variation",
+    "description": "Get all known protein sequence variants for a UniProt protein from the EBI Proteins API. Returns variants from multiple sources including COSMIC (somatic mutations in cancer), ClinVar (clinical significance), gnomAD/ExAC (population frequencies), and UniProt (curated). Includes disease associations, clinical significance classifications, and cross-references. Essential for variant impact analysis and clinical interpretation. Example: P04637 (TP53) returns 3469 variants with cancer associations and clinical classifications.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53), 'P00533' (EGFR), 'P38398' (BRCA1)."
+        },
+        "source_type": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter by variant source. Options: 'large_scale_study' (COSMIC, gnomAD), 'mixed' (multiple sources), 'uniprot' (curated). Null returns all."
+        },
+        "disease_only": {
+          "type": "boolean",
+          "description": "If true, return only variants with disease associations. Default: false."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "variation"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      },
+      {
+        "accession": "P00533",
+        "disease_only": true
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "variants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "wild_type": {
+                    "type": "string"
+                  },
+                  "alternative": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "source_type": {
+                    "type": "string"
+                  },
+                  "clinical_significances": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "associations": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "is_disease": {
+                          "type": "boolean"
+                        }
+                      }
+                    }
+                  },
+                  "xrefs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "database": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_variants": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "total_all_sources": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "source_counts": {
+              "type": "object",
+              "properties": {
+                "large_scale_study": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "mixed": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                },
+                "uniprot": {
+                  "type": [
+                    "integer",
+                    "number"
+                  ]
+                }
+              }
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_features",
+    "description": "Get protein features filtered by category from the EBI Proteins API. Categories include DOMAINS_AND_SITES (domains, binding sites, active sites, motifs), MOLECULE_PROCESSING (signal peptides, transit peptides, chains), PTM (glycosylation, phosphorylation, disulfide bonds), STRUCTURAL (helices, strands, turns), TOPOLOGY (transmembrane, extracellular, cytoplasmic), and VARIANTS. Provides a consolidated view of all UniProt-annotated features. Example: P04637 (TP53) with DOMAINS_AND_SITES returns 31 features including DNA-binding domain, transactivation regions.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53), 'P00533' (EGFR), 'P01308' (Insulin)."
+        },
+        "category": {
+          "type": "string",
+          "description": "Feature category. Options: 'DOMAINS_AND_SITES', 'MOLECULE_PROCESSING', 'PTM', 'STRUCTURAL', 'TOPOLOGY', 'VARIANTS', 'MUTAGENESIS'. Default: 'DOMAINS_AND_SITES'."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "features"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637",
+        "category": "DOMAINS_AND_SITES"
+      },
+      {
+        "accession": "P00533",
+        "category": "STRUCTURAL"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "sequence_length": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "category_queried": {
+              "type": "string"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "evidences": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "source_name": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "source_id": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_features": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_antigen",
+    "description": "Get predicted antigenic regions for a protein from the EBI Proteins API. Returns regions of the protein sequence predicted to be immunogenic and suitable for antibody generation. Includes match scores indicating prediction confidence. Critical for antibody design, vaccine development, and immunology research. Example: P04637 (TP53) returns 2 antigenic regions at positions 291-379 and 5-64 with 100% match scores.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53), 'P00533' (EGFR), 'P01308' (Insulin)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "antigen"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      },
+      {
+        "accession": "P00533"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "antigenic_regions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "match_score": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "antigen_sequence": {
+                    "type": "string"
+                  },
+                  "evidences": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "source_name": {
+                          "type": "string"
+                        },
+                        "source_id": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_regions": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_coordinates",
+    "description": "Get genomic coordinate mappings for a protein from the EBI Proteins API. Maps UniProt protein to genomic coordinates including Ensembl gene/transcript IDs, chromosome location, strand, and exon structure. Essential for cross-referencing protein features with genomic data, variant mapping between coordinate systems, and genome browser integration. Example: P04637 (TP53) maps to ENSG00000141510 on chr17.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53), 'P00533' (EGFR), 'P38398' (BRCA1)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "coordinates"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      },
+      {
+        "accession": "P00533"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "sequence_length": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "genomic_mappings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "ensembl_gene_id": {
+                    "type": "string"
+                  },
+                  "ensembl_transcript_id": {
+                    "type": "string"
+                  },
+                  "chromosome": {
+                    "type": "string"
+                  },
+                  "start": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "end": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "reverseStrand": {
+                    "type": "boolean"
+                  },
+                  "num_exons": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  }
+                }
+              }
+            },
+            "total_mappings": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_proteomics_peptides",
+    "description": "Get mass spectrometry proteomics peptide evidence for a protein from the EBI Proteins API. Returns detected peptides with their positions, uniqueness status, and source databases (PeptideAtlas, ProteomicsDB, MaxQB, EPD). Shows which parts of the protein have been experimentally confirmed by mass spectrometry. Useful for validating protein expression and mapping coverage. Example: P04637 (TP53) returns 64 detected peptides, P00533 (EGFR) returns 241 peptides.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53), 'P00533' (EGFR), 'P38398' (BRCA1)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "proteomics"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      },
+      {
+        "accession": "P00533"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "peptides": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "peptide": {
+                    "type": "string"
+                  },
+                  "unique": {
+                    "type": "boolean"
+                  },
+                  "evidences": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_peptides": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_rna_editing",
+    "description": "Get RNA editing annotations (A-to-I / Q->R recoding sites) for a UniProt protein from the EBI Proteins API. Returns post-transcriptional RNA editing sites where a genomic adenosine is read as guanosine, recoding the protein. Each site includes the protein position, genomic location, codon, consequence type, wild-type and edited amino acid, and tissue/sample editing statistics. Distinct from DNA-level variation. NOTE (checked 2026-09-20): the upstream rna-editing dataset currently returns no features for any accession tried (GRIA2 P42262, HTR2C P28335), and a taxid=9606 query returns an empty list, so this tool returns an error until EBI restores the data. It previously returned e.g. the canonical GRIA2 Q/R site at residue 607.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P42262' (GRIA2, canonical Q/R editing site), 'P28335' (HTR2C, 5 editing sites)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "rna_editing"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P42262"
+      },
+      {
+        "accession": "P28335"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "RNA editing sites curated by UniProt. An entry with none returns an empty list, which is an answer rather than a failure.",
+          "properties": {
+            "accession": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "entry_name": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "UniProt entry name, e.g. GRIA2_HUMAN"
+            },
+            "rna_editing_sites": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Always 'RNA editing'"
+                  },
+                  "position": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "description": "Residue position in the protein sequence; null if UniProt gives a position it cannot parse as a number"
+                  },
+                  "evidences": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ECO evidence code, e.g. ECO:0000269"
+                        },
+                        "source": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "'PubMed' or 'UniProtKB'"
+                        },
+                        "id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The PubMed ID or UniProt accession the evidence points at"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_sites": {
+              "type": "integer"
+            },
+            "location_type": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "UniProt's 'Known', 'Not_applicable' or 'Undetermined' -- how precisely the positions are known, which is not the same as there being none. Null when the entry has no RNA editing comment."
+            },
+            "notes": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The curator's note, e.g. 'Partially edited. Fully edited in the brain'"
+                  },
+                  "evidences": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ECO evidence code, e.g. ECO:0000269"
+                        },
+                        "source": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "'PubMed' or 'UniProtKB'"
+                        },
+                        "id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "The PubMed ID or UniProt accession the evidence points at"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "accession",
+            "rna_editing_sites",
+            "total_sites"
+          ]
+        },
+        {
+          "type": "object",
+          "description": "The lookup failed.",
+          "properties": {
+            "error": {
+              "type": "string"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_variation_by_dbsnp",
+    "description": "Reverse variation lookup by dbSNP rsID from the EBI Proteins API. Given a dbSNP rsID, returns every UniProt protein (including isoforms) that carries that variant, each with the mapped natural-variant features (wild-type and alternative residue, protein position, genomic location, clinical significances, cross-references to ClinVar/COSMIC/dbSNP). Inverse of looking up variants by protein accession. Example: 'rs1042522' (TP53 codon 72 Pro/Arg) returns 11 UniProt entries including TP53 isoforms and A0AAQ5BHX5, each with the position-72 variant feature.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dbsnp_id": {
+          "type": "string",
+          "description": "dbSNP reference SNP ID (rsID). Examples: 'rs1042522' (TP53 Pro72Arg), 'rs429358' (APOE)."
+        }
+      },
+      "required": [
+        "dbsnp_id"
+      ]
+    },
+    "fields": {
+      "endpoint": "variation_dbsnp"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "dbsnp_id": "rs1042522"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "dbsnp_id": {
+              "type": "string"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "accession": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "entry_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "protein_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "gene_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "taxid": {
+                    "type": [
+                      "integer",
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "features": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "total_features": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  }
+                }
+              }
+            },
+            "total_entries": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "dbsnp_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_variation_by_hgvs",
+    "description": "Reverse variation lookup by HGVS genomic expression from the EBI Proteins API. Given an HGVS genomic-level expression (e.g. 'NC_000017.11:g.7676154G>A'), returns every overlapping UniProt protein with the resulting variant consequence projected onto the protein sequence (wild-type and alternative residue, protein position, genomic location). Use to translate a genomic DNA change into its protein consequence across all affected UniProt entries. Example: 'NC_000017.11:g.7676154G>A' returns 4 UniProt entries; the TP53 (P04637) entry reports VARIANT P->L at residue 72 (the Pro72Leu protein consequence).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "hgvs": {
+          "type": "string",
+          "description": "HGVS genomic expression using a RefSeq NC_ accession. Example: 'NC_000017.11:g.7676154G>A' (TP53 region)."
+        }
+      },
+      "required": [
+        "hgvs"
+      ]
+    },
+    "fields": {
+      "endpoint": "variation_hgvs"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "hgvs": "NC_000017.11:g.7676154G>A"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "hgvs": {
+              "type": "string"
+            },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "accession": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "entry_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "protein_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "gene_name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "taxid": {
+                    "type": [
+                      "integer",
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "features": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "total_features": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  }
+                }
+              }
+            },
+            "total_entries": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "hgvs"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "EBIProteins_get_hpp_peptides",
+    "description": "Get Human Proteome Project (HPP) peptide-level mass-spectrometry evidence mapped to a protein from the EBI Proteins API. Returns HPP-curated peptides that confirm protein expression, each with sequence, start/end position, uniqueness flag, and source (e.g. HppPeptideAtlas). This is the stringent HPP evidence set, distinct from and larger than the generic proteomics peptide set for the same protein. Example: P04637 (TP53) returns 237 HPP features (vs 82 from generic /proteomics), e.g. peptide 'SDSDGLAPPQHLI' at residues 183-195, unique.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "accession": {
+          "type": "string",
+          "description": "UniProt accession. Examples: 'P04637' (TP53), 'P00533' (EGFR), 'P38398' (BRCA1)."
+        }
+      },
+      "required": [
+        "accession"
+      ]
+    },
+    "fields": {
+      "endpoint": "proteomics_hpp"
+    },
+    "type": "EBIProteinsExtTool",
+    "test_examples": [
+      {
+        "accession": "P04637"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "accession": {
+              "type": "string"
+            },
+            "entry_name": {
+              "type": "string"
+            },
+            "peptides": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "position_start": {
+                    "type": "string"
+                  },
+                  "position_end": {
+                    "type": "string"
+                  },
+                  "peptide": {
+                    "type": "string"
+                  },
+                  "unique": {
+                    "type": "boolean"
+                  },
+                  "evidences": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "id": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "total_peptides": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "accession"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,148 @@
+[
+  {
+    "name": "USCensus_get_population",
+    "description": "Get population and demographic data from the US Census Bureau API. Access decennial census and American Community Survey (ACS) data at national, state, county, and city levels. A free CENSUS_API_KEY is required. Variables include total population, housing units, age groups, and race/ethnicity breakdowns. Useful for demographic research, urban planning, and social science analysis. Register at https://api.census.gov/data/key_signup.html.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "get": {
+          "type": "string",
+          "description": "Comma-separated variable codes to retrieve plus NAME. For 2020 decennial: 'P1_001N,NAME' (total pop). For ACS 5-year (B01003_001E=total pop, B19013_001E=median income, B01002_001E=median age). Example: 'NAME,B01003_001E,B19013_001E'"
+        },
+        "for": {
+          "type": "string",
+          "description": "Geographic unit. Examples: 'state:*' (all states), 'county:*' (all counties), 'state:06' (California), or 'county:001' together with in='state:06' (Alameda County CA)"
+        },
+        "dataset": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Dataset to query. Values: '2020/dec/pl' (2020 decennial), '2022/acs/acs5' (ACS 5-year 2022), '2021/acs/acs1' (ACS 1-year 2021). Default: 2022/acs/acs5",
+          "pattern": "^[0-9]{4}(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+$",
+          "default": "2022/acs/acs5"
+        },
+        "in": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Geographic filter for sub-national queries. Examples: 'state:06' (within California)"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Maximum number of data rows to return (the header row is preserved and is not counted)"
+        }
+      },
+      "required": [
+        "get",
+        "for"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.census.gov/data/{dataset}",
+      "params": {},
+      "path_param_safe": {
+        "dataset": "/"
+      },
+      "client_side_limit": true,
+      "client_side_limit_preserve_header": true,
+      "auth_param": {
+        "env_var": "CENSUS_API_KEY",
+        "param": "key"
+      }
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "get": "NAME,B01003_001E",
+        "for": "state:*"
+      },
+      {
+        "get": "NAME,B01003_001E,B19013_001E",
+        "for": "state:06"
+      },
+      {
+        "get": "NAME,B01003_001E",
+        "for": "county:*",
+        "in": "state:06"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "array",
+              "description": "Census data as a 2D array. First row is the header; subsequent rows are data.",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "url": {
+              "type": "string"
+            },
+            "count": {
+              "type": "integer"
+            },
+            "total_before_limit": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "status",
+            "data",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "error"
+          ]
+        }
+      ]
+    },
+    "required_api_keys": [
+      "CENSUS_API_KEY"
+    ],
+    "api_key_info": {
+      "CENSUS_API_KEY": {
+        "domain": "Clinical & Safety",
+        "type": "secret",
+        "register_url": "https://api.census.gov/data/key_signup.html",
+        "purpose": "Pull population, demographic, and economic data from the US Census Bureau (decennial + ACS).",
+        "without": "Census endpoints return an HTML rate-limit page that breaks the tool's JSON parser. Free to register."
+      }
+    }
+  }
+]

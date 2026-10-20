@@ -1,0 +1,186 @@
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    branches:
+      - main
+    # NOTE: deliberately no `paths:` filter. GitHub Actions has occasionally
+    # missed firing this workflow on large squash-merges that did modify
+    # pyproject.toml (observed for PR #161 merge: 727 files changed, the
+    # path filter did not trigger publish-pypi.yml even though pyproject.toml
+    # was in the diff). The version-check step below is cheap (~10s) and
+    # short-circuits on every push that doesn't actually bump the version,
+    # so always-fire is the safer default.
+
+jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.check_version.outputs.changed }}
+      new_version: ${{ steps.check_version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if version is newer than what's on PyPI
+        id: check_version
+        run: |
+          # Compare current pyproject.toml version against PyPI's published latest.
+          #
+          # This used to compare HEAD vs HEAD~1, which had two failure modes:
+          #   1. Large squash-merges sometimes don't fire the path filter on
+          #      pyproject.toml — the workflow never runs, and the version
+          #      bump is silently missed. There is no recovery on the next
+          #      push because HEAD~1 will then equal HEAD.
+          #   2. workflow_dispatch reruns hit the same gate (HEAD~1==HEAD),
+          #      so manual recovery was impossible without surgery.
+          #
+          # Comparing against PyPI directly makes the gate self-healing: any
+          # push to main with a pyproject version newer than PyPI's latest
+          # will publish, regardless of how it got into this state.
+
+          CURRENT_VERSION=$(python3 -c "
+          import re
+          with open('pyproject.toml') as f:
+              m = re.search(r'version\s*=\s*\"([^\"]+)\"', f.read())
+              print(m.group(1) if m else '')
+          ")
+          echo "Current pyproject.toml version: $CURRENT_VERSION"
+
+          # Query PyPI for the published latest. Tolerate transient outages
+          # by treating any failure as "publish allowed" — the publish step
+          # itself will reject duplicate uploads via twine, so a false
+          # positive here just makes that step fail loudly instead of
+          # silently skipping a real release.
+          PYPI_VERSION=$(curl -fsSL "https://pypi.org/pypi/tooluniverse/json" 2>/dev/null \
+              | python3 -c "import json, sys; print(json.load(sys.stdin)['info']['version'])" 2>/dev/null \
+              || echo "")
+          echo "PyPI latest version: ${PYPI_VERSION:-<unavailable>}"
+
+          # Use packaging.Version for PEP 440-aware comparison (handles
+          # 1.10.0 > 1.9.0, pre-releases, etc.). packaging ships with pip.
+          python3 -m pip install --quiet packaging || true
+
+          NEWER=$(python3 - <<PYEOF
+          from packaging.version import Version, InvalidVersion
+          cur, pypi = "$CURRENT_VERSION", "$PYPI_VERSION"
+          if not pypi:
+              # PyPI unavailable: allow publish, let twine arbitrate.
+              print("true")
+          else:
+              try:
+                  print("true" if Version(cur) > Version(pypi) else "false")
+              except InvalidVersion:
+                  # Unparseable version in pyproject — fail safely (don't publish).
+                  print("false")
+          PYEOF
+          )
+
+          if [ "$NEWER" = "true" ]; then
+            echo "Version $CURRENT_VERSION > PyPI latest ($PYPI_VERSION) — will publish"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version $CURRENT_VERSION not newer than PyPI ($PYPI_VERSION) — skipping publish"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Changed to write for branch creation
+      id-token: write  # For PyPI trusted publishing
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for branch creation
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+
+      - name: Sync server.json version from pyproject.toml
+        run: |
+          VERSION="${{ needs.check-version-change.outputs.new_version }}"
+          python3 -c "
+          import json
+          version = '$VERSION'
+          with open('server.json') as f:
+              data = json.load(f)
+          data['version'] = version
+          for pkg in data.get('packages', []):
+              pkg['version'] = version
+          with open('server.json', 'w') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+          print(f'Updated server.json to version {version}')
+          "
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add server.json
+          git diff --cached --quiet || git commit -m "chore: sync server.json version to $VERSION [skip ci]"
+          git push origin HEAD:main
+
+      - name: Create version branch
+        run: |
+          VERSION="${{ needs.check-version-change.outputs.new_version }}"
+          BRANCH_NAME="v$VERSION"
+          
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Check if branch already exists
+          if git show-ref --verify --quiet refs/heads/$BRANCH_NAME; then
+            echo "Branch $BRANCH_NAME already exists, skipping creation"
+          else
+            # Create and push the new branch
+            git checkout -b $BRANCH_NAME
+            git push origin $BRANCH_NAME
+            echo "Created and pushed branch: $BRANCH_NAME"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.check-version-change.outputs.new_version }}
+          name: Release v${{ needs.check-version-change.outputs.new_version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish to MCP Registry after PyPI publish succeeds
+  publish-mcp:
+    needs: [check-version-change, publish]
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    uses: ./.github/workflows/publish-mcp-registry.yml
+    with:
+      version: ${{ needs.check-version-change.outputs.new_version }}
+    permissions:
+      id-token: write
+      contents: read

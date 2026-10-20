@@ -1,0 +1,254 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+.DS_Store
+*.py[cod]
+*$py.class
+# *.json
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+!mcpb/.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+
+*pt
+
+# macOS
+.DS_Store
+
+# temporary files
+src/tooluniverse/test/MeSH_desc2025.xml
+src/tooluniverse/test/drugbank_full_database.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Auto-generated API documentation
+docs/api/tooluniverse.*.rst
+!docs/api/core.rst
+!docs/api/mcp.rst
+!docs/api/tools.rst
+!docs/api/modules.rst
+!docs/old_files/
+
+src/tooluniverse/web_tools/
+
+# Auto-generated tool files (moved to temporary folder)
+src/tooluniverse/tools_generated/FILE_ORGANIZATION_LIST.md
+temp_docs_and_tests/
+
+# Parked tools pending API keys (not ready for publishing)
+temp_tools/
+
+# Session documentation (temporary - never push)
+*_SUMMARY.md
+*_REPORT.md
+SESSION_*.md
+IMPLEMENTATION_*.md
+BUG_ANALYSIS_*.md
+FIX_SUMMARY.md
+CORRECT_FIX.md
+AGENT_*.md
+DEVTU_*.md
+!README.md
+!CHANGELOG.md
+!LICENSE.md
+
+# Root-level ad-hoc test scripts (not part of test suite)
+/test_*.py
+
+# Claude Code configuration
+.claude/
+.tooluniverse/
+
+# Benchmark harness — dev-only, kept locally but never tracked.
+# Plugin build doesn't include skills/evals/ in dist, and .gitattributes
+# already excludes it from `git archive` release tarballs.
+skills/evals/
+
+# Skill iteration / evaluation workspaces — `tooluniverse-*-workspace/`
+# directories hold with-skill-vs-without-skill comparison runs produced
+# by the skill evaluator. They have no SKILL.md (not real skills), match
+# the sync-skills.sh `tooluniverse-*` glob accidentally, and bloat plugin/
+# without ever shipping to users. Keep locally for dev, never track.
+**/tooluniverse-*-workspace/
+
+# One-off outputs from working-example scripts that write to cwd
+# (e.g. ddi_working_example.py). Outputs should go to /tmp or an explicit
+# --output-dir, never beside the example source.
+**/DDI_report_*.md
+**/*_metabolomics_report*.md
+
+# Superseded skill source — when SKILL.md is rewritten, keep the prior
+# version in git history (git log / git show) instead of beside the new
+# one as SKILL_OLD.md, where it ships to users and causes confusion.
+**/SKILL_OLD.md
+**/SKILL_v[0-9]*.md
+
+# Dev iteration notes that lived inside skill source: comparison
+# write-ups, test feedback diaries, "fixed" twin implementations.
+# Belong in git history or PR descriptions, not the shipped skill tree.
+**/COMPARISON_*.md
+**/*_FEEDBACK.md
+**/*_implementation_fixed.py
+**/*_implementation_v[0-9]*.py
+
+# Per-user auto-memory / private session notes (never push)
+memory/
+MEMORY.md
+CLAUDE.md
+
+# API keys & secrets
+.env
+.env.local
+credentials.json
+*_api_key*
+*_token*
+
+# ...but those two patterns match any path segment, and these words appear
+# legitimately in source, tests and docs. The generated wrapper for
+# ReactomeAnalysis_token_result is one: `git add` refuses it, so if that file
+# is ever cleaned and rebuilt it silently never returns, and the tool
+# disappears from tooluniverse.tools. Re-include the extensions that hold
+# code and prose; data files keep the broad guard, since a real leaked
+# credential is far likelier to be .json, .txt or .yaml than .py.
+!*_api_key*.py
+!*_token*.py
+!*_api_key*.md
+!*_token*.md
+!*_api_key*.rst
+!*_token*.rst
+
+# Local-only harness sweep artifacts (test-all command output)
+TOOL_TEST_REPORT.md
+TOOL_TEST_RESULTS.json
+TOOL_SWEEP_TRIAGE.md
+
+# Local-only runtime artifact from test_new_tools.py
+tool_relationship_graph.json
+
+# TDC downloads its datasets into ./data at call time, so running the sweep
+# leaves files in the working tree. Nothing under the repo root's data/ is
+# tracked; src/tooluniverse/data/ is a different, tracked directory.
+/data/
+
+# Four DrugBank tools used to set save_to_local_dir to this path, which drops a
+# 1.5 GB copy of drugbank_full_database.xml inside the package. They now share
+# the Hugging Face cache like the other fifteen; ignored so an older checkout or
+# a reintroduced setting cannot stage it.
+/src/tooluniverse/test/

@@ -1,0 +1,324 @@
+# neuromorpho_tool.py
+"""
+NeuroMorpho.Org REST API tool for ToolUniverse.
+
+NeuroMorpho.Org is the largest collection of publicly accessible 3D neuronal
+reconstructions, containing over 270,000 digitally reconstructed neurons from
+hundreds of species, brain regions, and cell types.
+
+API Documentation: https://neuromorpho.org/apiReference.html
+No authentication required.
+"""
+
+import requests
+from typing import Dict, Any
+from .base_tool import BaseTool
+from .tool_registry import register_tool
+
+NEUROMORPHO_BASE_URL = "https://neuromorpho.org/api"
+
+
+@register_tool("NeuroMorphoTool")
+class NeuroMorphoTool(BaseTool):
+    """
+    Tool for querying NeuroMorpho.Org neuron morphology database.
+
+    Provides access to:
+    - Neuron metadata (species, brain region, cell type, etc.)
+    - Morphometric measurements (surface area, volume, branch count)
+    - Associated literature
+    - Search/filtering by multiple neuron attributes
+
+    No authentication required.
+    """
+
+    def __init__(self, tool_config: Dict[str, Any]):
+        super().__init__(tool_config)
+        self.timeout = tool_config.get("timeout", 30)
+        self.endpoint_type = tool_config.get("fields", {}).get(
+            "endpoint_type", "neuron"
+        )
+        self.query_mode = tool_config.get("fields", {}).get("query_mode", "id")
+
+    def run(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the NeuroMorpho API call."""
+        try:
+            endpoint = self.endpoint_type
+            mode = self.query_mode
+
+            if endpoint == "neuron" and mode == "id":
+                return self._get_neuron_by_id(arguments)
+            elif endpoint == "neuron" and mode == "search":
+                return self._search_neurons(arguments)
+            elif endpoint == "morphometry":
+                return self._get_morphometry(arguments)
+            elif endpoint == "neuron" and mode == "fields":
+                return self._get_field_values(arguments)
+            elif endpoint == "literature" and mode == "search":
+                return self._search_literature(arguments)
+            elif endpoint == "literature" and mode == "id":
+                return self._get_literature_by_id(arguments)
+            elif endpoint == "pvec":
+                return self._get_persistence_vector(arguments)
+            else:
+                return {
+                    "status": "error",
+                    "error": f"Unknown endpoint/mode: {endpoint}/{mode}",
+                }
+
+        except requests.exceptions.Timeout:
+            return {
+                "status": "error",
+                "error": f"NeuroMorpho API request timed out after {self.timeout} seconds",
+            }
+        except requests.exceptions.ConnectionError:
+            return {
+                "status": "error",
+                "error": "Failed to connect to NeuroMorpho API. Check network connectivity.",
+            }
+        except requests.exceptions.HTTPError as e:
+            # `bool(e.response)` is `requests.Response.ok`, which is False for
+            # every 4xx/5xx response -- so `e.response else "unknown"` always
+            # discarded the real status code on an actual HTTP error. Use an
+            # explicit None check, and surface the upstream JSON body's own
+            # "message" field (e.g. "Requested neuron not found") when present.
+            status = e.response.status_code if e.response is not None else "unknown"
+            detail = None
+            if e.response is not None:
+                try:
+                    detail = e.response.json().get("message")
+                except ValueError:
+                    pass
+            base = f"NeuroMorpho API HTTP error: {status}"
+            return {
+                "status": "error",
+                "error": f"{base} ({detail})" if detail else base,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": f"Unexpected error querying NeuroMorpho: {str(e)}",
+            }
+
+    def _get_neuron_by_id(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get a neuron by its numeric ID or name."""
+        neuron_id = arguments.get("neuron_id")
+        neuron_name = arguments.get("neuron_name")
+
+        if neuron_id is not None:
+            url = f"{NEUROMORPHO_BASE_URL}/neuron/id/{neuron_id}"
+        elif neuron_name:
+            url = f"{NEUROMORPHO_BASE_URL}/neuron/name/{neuron_name}"
+        else:
+            return {
+                "status": "error",
+                "error": "Either neuron_id or neuron_name is required",
+            }
+
+        response = requests.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        return {
+            "status": "success",
+            "data": data,
+            "metadata": {"total_results": 1},
+        }
+
+    @staticmethod
+    def _lucene_term(value: Any) -> str:
+        """Quote a multi-word query value so it stays a single search term.
+
+        Fix-R4A-4: NeuroMorpho's Solr-style endpoint splits an unquoted
+        multi-word value on whitespace and matches only the trailing token, so
+        query_value="entorhinal cortex" was executed as "cortex". Confirmed
+        live that it returned the identical 872 hits as query_value="cortex"
+        -- topped by zebra-finch song-nucleus neurons -- while the quoted form
+        returns the correct 3431 entorhinal-cortex reconstructions.
+        """
+        text = str(value).strip()
+        if not text or (text.startswith('"') and text.endswith('"')):
+            return text
+        return f'"{text}"' if any(c.isspace() for c in text) else text
+
+    def _search_neurons(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Search neurons by field criteria."""
+        query_field = arguments.get("query_field", "species")
+        query_value = arguments.get("query_value", "")
+        filter_field = arguments.get("filter_field")
+        filter_value = arguments.get("filter_value")
+        page = arguments.get("page", 0)
+        size = arguments.get("size", 20)
+
+        if not query_value:
+            return {"status": "error", "error": "query_value parameter is required"}
+
+        # Clamp size to API max
+        size = min(size, 500)
+
+        url = f"{NEUROMORPHO_BASE_URL}/neuron/select"
+        params = {
+            "q": f"{query_field}:{self._lucene_term(query_value)}",
+            "page": page,
+            "size": size,
+        }
+
+        # Add filter query if specified
+        if filter_field and filter_value:
+            params["fq"] = f"{filter_field}:{self._lucene_term(filter_value)}"
+
+        response = requests.get(url, params=params, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        neurons = data.get("_embedded", {}).get("neuronResources", [])
+        page_info = data.get("page", {})
+
+        return {
+            "status": "success",
+            "data": neurons,
+            "metadata": {
+                "total_results": page_info.get("totalElements", len(neurons)),
+                "total_pages": page_info.get("totalPages", 1),
+                "current_page": page_info.get("number", page),
+                "page_size": page_info.get("size", size),
+            },
+        }
+
+    def _get_morphometry(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get morphometric measurements for a neuron."""
+        neuron_id = arguments.get("neuron_id")
+        neuron_name = arguments.get("neuron_name")
+
+        if neuron_id is not None:
+            url = f"{NEUROMORPHO_BASE_URL}/morphometry/id/{neuron_id}"
+        elif neuron_name:
+            url = f"{NEUROMORPHO_BASE_URL}/morphometry/name/{neuron_name}"
+        else:
+            return {
+                "status": "error",
+                "error": "Either neuron_id or neuron_name is required",
+            }
+
+        response = requests.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        return {
+            "status": "success",
+            "data": data,
+            "metadata": {"total_results": 1},
+        }
+
+    def _search_literature(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Search source-publication (literature) records by field criteria.
+
+        Searchable fields include neuroscience-specific ones such as
+        brainRegion, cellType, tracingSystem, species, journal, doi, pmid.
+        """
+        query_field = arguments.get("query_field", "brainRegion")
+        query_value = arguments.get("query_value", "")
+        page = arguments.get("page", 0)
+        size = arguments.get("size", 20)
+
+        if not query_value:
+            return {"status": "error", "error": "query_value parameter is required"}
+
+        # Clamp size to API max
+        size = min(size, 500)
+
+        url = f"{NEUROMORPHO_BASE_URL}/literature/select"
+        params = {
+            "q": f"{query_field}:{self._lucene_term(query_value)}",
+            "page": page,
+            "size": size,
+        }
+
+        response = requests.get(url, params=params, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        articles = data.get("_embedded", {}).get("publicationResources", [])
+        page_info = data.get("page", {})
+
+        return {
+            "status": "success",
+            "data": articles,
+            "metadata": {
+                "total_results": page_info.get("totalElements", len(articles)),
+                "total_pages": page_info.get("totalPages", 1),
+                "current_page": page_info.get("number", page),
+                "page_size": page_info.get("size", size),
+            },
+        }
+
+    def _get_literature_by_id(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get a single source-publication record by NeuroMorpho article_id."""
+        article_id = arguments.get("article_id")
+        if not article_id:
+            return {"status": "error", "error": "article_id is required"}
+
+        url = f"{NEUROMORPHO_BASE_URL}/literature/id/{article_id}"
+        response = requests.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        return {
+            "status": "success",
+            "data": data,
+            "metadata": {"total_results": 1},
+        }
+
+    def _get_persistence_vector(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get the persistence vector (TMD signature) for a neuron.
+
+        The persistence vector is a 100-coefficient Topological Morphology
+        Descriptor shape signature with a scaling factor, used for ML
+        clustering/classification of dendritic morphology.
+        """
+        neuron_id = arguments.get("neuron_id")
+        if neuron_id is None:
+            return {"status": "error", "error": "neuron_id is required"}
+
+        url = f"{NEUROMORPHO_BASE_URL}/pvec/id/{neuron_id}"
+        response = requests.get(url, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        coefficients = data.get("coefficients") or []
+        return {
+            "status": "success",
+            "data": data,
+            "metadata": {
+                "total_results": 1,
+                "neuron_id": data.get("neuron_id", neuron_id),
+                "num_coefficients": len(coefficients),
+            },
+        }
+
+    def _get_field_values(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Get available values for a neuron metadata field."""
+        field_name = arguments.get("field_name", "species")
+        page = arguments.get("page", 0)
+        size = arguments.get("size", 500)
+
+        url = f"{NEUROMORPHO_BASE_URL}/neuron/fields/{field_name}"
+        params = {"page": page, "size": size}
+
+        response = requests.get(url, params=params, timeout=self.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        fields = data.get("fields", [])
+        page_info = data.get("page", {})
+
+        return {
+            "status": "success",
+            "data": fields,
+            "metadata": {
+                "field_name": field_name,
+                "total_results": page_info.get("totalElements", len(fields)),
+                "total_pages": page_info.get("totalPages", 1),
+                "current_page": page_info.get("number", page),
+            },
+        }

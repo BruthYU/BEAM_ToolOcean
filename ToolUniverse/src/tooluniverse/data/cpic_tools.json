@@ -1,0 +1,1135 @@
+[
+  {
+    "name": "CPIC_get_gene_info",
+    "description": "Get pharmacogenomics information for a gene from the Clinical Pharmacogenomics Implementation Consortium (CPIC) database. Returns gene coordinates, sequence IDs, and cross-references to PharmGKB, HGNC, NCBI, and Ensembl. Use this to find which genes are pharmacogenomically relevant. Example genes: CYP2D6, CYP2C19, CYP2C9, SLCO1B1, TPMT, DPYD, UGT1A1, VKORC1, G6PD.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "symbol": {
+          "type": ["string", "null"],
+          "description": "Gene symbol (e.g., 'CYP2D6', 'CYP2C19', 'SLCO1B1', 'TPMT', 'DPYD')"
+        },
+        "gene": {
+          "type": ["string", "null"],
+          "description": "Gene symbol alias -- alternative to symbol."
+        },
+        "gene_symbol": {
+          "type": ["string", "null"],
+          "description": "Gene symbol alias -- alternative to symbol."
+        }
+      },
+      "required": [],
+      "anyOf": [
+        {"required": ["symbol"]},
+        {"required": ["gene"]},
+        {"required": ["gene_symbol"]}
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.cpicpgx.org/v1/gene?symbol=eq.{symbol}",
+      "path_aliases": {"gene": "symbol", "gene_symbol": "symbol"},
+      "uppercase_params": ["symbol", "gene", "gene_symbol"]
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "symbol": "CYP2D6"
+      },
+      {
+        "symbol": "CYP2C19"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "symbol": {
+                "type": "string"
+              },
+              "chr": {
+                "type": "string"
+              },
+              "genesequenceid": {
+                "type": "string"
+              },
+              "proteinsequenceid": {
+                "type": "string"
+              },
+              "chromosequenceid": {
+                "type": "string"
+              },
+              "mrnasequenceid": {
+                "type": "string"
+              },
+              "hgncid": {
+                "type": "string"
+              },
+              "ncbiid": {
+                "type": "string"
+              },
+              "ensemblid": {
+                "type": "string"
+              },
+              "clinpgxid": {
+                "type": "string"
+              },
+              "frequencymethods": {
+                "type": "string"
+              },
+              "lookupmethod": {
+                "type": "string"
+              },
+              "version": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "notesondiplotype": {
+                "type": "null"
+              },
+              "url": {
+                "type": "string"
+              },
+              "functionmethods": {
+                "type": "null"
+              },
+              "notesonallelenaming": {
+                "type": "string"
+              },
+              "includephenotypefrequencies": {
+                "type": "boolean"
+              },
+              "includediplotypefrequencies": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_list_pgx_genes",
+    "description": "List all pharmacogenomics genes curated by the Clinical Pharmacogenomics Implementation Consortium (CPIC). Returns 130+ genes with known drug interactions including CYP enzymes, transporters, and other pharmacogenes. Includes gene coordinates, sequence IDs, and database cross-references.",
+    "parameter": {
+      "type": "object",
+      "properties": {}
+    },
+    "fields": {
+      "endpoint": "https://api.cpicpgx.org/v1/gene"
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "symbol": {
+                "type": "string"
+              },
+              "chr": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "genesequenceid": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "proteinsequenceid": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "chromosequenceid": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "mrnasequenceid": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "hgncid": {
+                "type": "string"
+              },
+              "ncbiid": {
+                "type": "string"
+              },
+              "ensemblid": {
+                "type": "string"
+              },
+              "clinpgxid": {
+                "type": "string"
+              },
+              "frequencymethods": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "lookupmethod": {
+                "type": "string"
+              },
+              "version": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "notesondiplotype": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "url": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "functionmethods": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "notesonallelenaming": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "includephenotypefrequencies": {
+                "type": "boolean"
+              },
+              "includediplotypefrequencies": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_get_drug_info",
+    "description": "Get pharmacogenomics information for a drug from the CPIC database. Returns drug identifiers including PharmGKB ID, RxNorm, DrugBank, and ATC codes. Use to find pharmacogenomics guidelines for a specific drug. Example drugs: warfarin, codeine, clopidogrel, simvastatin, tamoxifen, fluorouracil, mercaptopurine.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Drug name in lowercase (e.g., 'warfarin', 'codeine', 'clopidogrel', 'simvastatin')"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "fields": {
+      "endpoint": "https://api.cpicpgx.org/v1/drug?name=eq.{name}",
+      "lowercase_params": ["name"],
+      "empty_result_note": "No exact match for this name in CPIC. CPIC indexes one canonical spelling/name per drug (e.g. 'cyclosporine' not 'cyclosporin', 'tacrolimus' not the alternate name 'FK506') -- try CPIC_list_drugs or CPIC_search_gene_drug_pairs to browse indexed names."
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {
+        "name": "warfarin"
+      },
+      {
+        "name": "codeine"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "drugid": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "clinpgxid": {
+                "type": "string"
+              },
+              "rxnormid": {
+                "type": "string"
+              },
+              "drugbankid": {
+                "type": "string"
+              },
+              "atcid": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "umlscui": {
+                "type": "null"
+              },
+              "flowchart": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "version": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "guidelineid": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_get_gene_drug_pairs",
+    "description": "Get all gene-drug pairs for a pharmacogene from CPIC. Shows which drugs are affected by variants in a specific gene, with CPIC evidence level and PharmGKB clinical annotation level. Evidence levels: A (strongest) to D (weakest). Useful for understanding the clinical significance of a pharmacogene. Provide gene as 'genesymbol', 'gene_symbol', or 'gene'.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "genesymbol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Gene symbol (e.g., 'CYP2D6', 'CYP2C19', 'SLCO1B1', 'TPMT', 'DPYD', 'VKORC1')"
+        },
+        "gene_symbol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Alias for genesymbol (e.g., 'CYP2D6')"
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Alias for genesymbol (e.g., 'CYP2D6')"
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://api.cpicpgx.org/v1/pair?genesymbol=eq.{genesymbol}",
+      "params": {
+        "select": "*,drug(name)"
+      }
+    },
+    "type": "CPICSearchPairsTool",
+    "test_examples": [
+      {
+        "genesymbol": "CYP2D6"
+      },
+      {
+        "genesymbol": "DPYD"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pairid": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "genesymbol": {
+                "type": "string"
+              },
+              "drugid": {
+                "type": "string"
+              },
+              "guidelineid": {
+                "type": [
+                  "integer",
+                  "null",
+                  "number"
+                ]
+              },
+              "usedforrecommendation": {
+                "type": "boolean"
+              },
+              "version": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "cpiclevel": {
+                "type": "string"
+              },
+              "clinpgxlevel": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "pgxtesting": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "citations": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removed": {
+                "type": "boolean"
+              },
+              "removeddate": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "removedreason": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "drug": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_list_guidelines",
+    "description": "List all CPIC pharmacogenomic guidelines. Returns ~29 evidence-based guidelines (count may vary as guidelines are added/updated) for using pharmacogenomic test results to optimize drug therapy. Each guideline covers one or more gene-drug pairs with specific dosing recommendations based on genotype/phenotype. Includes guideline ID, name, URL, associated genes, and PharmGKB IDs. Use the returned guideline ID with CPIC_get_recommendations to retrieve specific dosing recommendations.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "gene": {
+          "type": "string",
+          "description": "Filter by gene symbol (e.g., CYP2D6, TPMT). Returns only guidelines involving this gene."
+        },
+        "gene_symbol": {
+          "type": "string",
+          "description": "Alias for gene. Filter by gene symbol (e.g., CYP2D6, TPMT)."
+        },
+        "drug": {
+          "type": "string",
+          "description": "Filter by drug name (e.g., 'codeine', 'warfarin', 'clopidogrel'). Case-insensitive substring match against drug names in the guideline."
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Alias for drug."
+        }
+      },
+      "required": []
+    },
+    "type": "CPICListGuidelinesTool",
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "version": {
+                "type": [
+                  "integer",
+                  "number"
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "genes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "notesonusage": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "clinpgxid": {
+                "type": "string"
+              },
+              "drug": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_get_recommendations",
+    "description": "Get drug dosing recommendations from a CPIC pharmacogenomic guideline. Returns clinically actionable recommendations linking genotype/phenotype to prescribing actions (classification strength, recommendation text, allele status). Accepts drug name (e.g. 'codeine', 'abacavir') for auto-resolution to guideline_id, or provide guideline_id directly. Without gene/phenotype, returns ALL recommendation rows for every genotype/phenotype combination the guideline covers -- pass gene (e.g. 'CYP2C19') and/or phenotype (e.g. 'Poor Metabolizer', exact CPIC term) to filter to one specific recommendation. Key guideline IDs: 100421 (HLA-B/abacavir), 100416 (CYP2D6,OPRM1,COMT/opioids-codeine), 100414 (CYP2D6,CYP2C19/tricyclic-antidepressants), 100415 (CYP2D6/tamoxifen), 100412 (CYP2C9,HLA-B/phenytoin). Note: warfarin (guideline 100425) uses a dosing calculator and returns 0 rows from this endpoint.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "guideline_id": {
+          "type": "integer",
+          "description": "CPIC guideline numeric ID. Alternative to drug/drug_name. Use CPIC_list_guidelines to browse IDs."
+        },
+        "drug": {
+          "type": "string",
+          "description": "Drug name to auto-resolve guideline_id (e.g., 'codeine', 'abacavir', 'tamoxifen')."
+        },
+        "drug_name": {
+          "type": "string",
+          "description": "Alias for drug."
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter to recommendation rows for this pharmacogene (e.g. 'CYP2C19', 'CYP2D6'), matched case-insensitively against each row's own phenotypes dict. Combine with phenotype for an exact single-row lookup."
+        },
+        "phenotype": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Filter to recommendation rows whose phenotype exactly matches this CPIC term (case-insensitive), e.g. 'Poor Metabolizer', 'Likely Poor Metabolizer', 'Normal Metabolizer', 'Ultrarapid Metabolizer'. Note 'Poor Metabolizer' and 'Likely Poor Metabolizer' are distinct CPIC categories, not synonyms -- use the exact term. If gene is also given, matches only that gene's phenotype value; otherwise matches any gene's phenotype value in the row."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of recommendations to return (default 50). Applied after gene/phenotype filtering, if any."
+        },
+        "offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Number of recommendations to skip for pagination (default 0). Applied after gene/phenotype filtering, if any."
+        }
+      },
+      "required": []
+    },
+    "type": "CPICGetRecommendationsTool",
+    "test_examples": [
+      {
+        "drug": "codeine",
+        "limit": 10
+      },
+      {
+        "guideline_id": 100421,
+        "limit": 10
+      },
+      {
+        "drug": "clopidogrel",
+        "gene": "CYP2C19",
+        "phenotype": "Poor Metabolizer"
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "guideline_id": {
+              "type": [
+                "integer",
+                "number"
+              ]
+            },
+            "recommendations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "guidelineid": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "drugid": {
+                    "type": "string"
+                  },
+                  "implications": {
+                    "type": "object",
+                    "properties": {
+                      "CYP2D6": {
+                        "type": "string"
+                      },
+                      "HLA-B": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "drugrecommendation": {
+                    "type": "string"
+                  },
+                  "classification": {
+                    "type": "string"
+                  },
+                  "phenotypes": {
+                    "type": "object",
+                    "properties": {
+                      "CYP2D6": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "activityscore": {
+                    "type": "object",
+                    "properties": {
+                      "CYP2D6": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "allelestatus": {
+                    "type": "object",
+                    "properties": {
+                      "HLA-B": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "lookupkey": {
+                    "type": "object",
+                    "properties": {
+                      "CYP2D6": {
+                        "type": "string"
+                      },
+                      "HLA-B": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "population": {
+                    "type": "string"
+                  },
+                  "comments": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": [
+                      "integer",
+                      "number"
+                    ]
+                  },
+                  "dosinginformation": {
+                    "type": "boolean"
+                  },
+                  "alternatedrugavailable": {
+                    "type": "boolean"
+                  },
+                  "otherprescribingguidance": {
+                    "type": "boolean"
+                  },
+                  "drug": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "count": {
+              "type": [
+                "integer",
+                "number"
+              ],
+              "description": "Number of recommendation rows in this response. Compare with 'total_count' -- they differ whenever 'limit' truncated the result."
+            },
+            "total_count": {
+              "type": [
+                "integer",
+                "number"
+              ],
+              "description": "Total recommendation rows available for this guideline (or, when gene/phenotype filters are given, matching those filters) across all pages. 'limit' defaults to 50, so this is often larger than 'count'."
+            },
+            "offset": {
+              "type": [
+                "integer",
+                "number"
+              ],
+              "description": "Zero-based index of the first recommendation row in this response."
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Explains a truncated page, an empty filtered result, or a guideline that publishes no recommendation table."
+            }
+          },
+          "required": [
+            "guideline_id"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_search_gene_drug_pairs",
+    "description": "Search CPIC gene-drug pairs by gene symbol and/or CPIC evidence level. Gene symbol should be the standard HGNC symbol (e.g., \"CYP2D6\", \"DPYD\", \"TPMT\"). CPIC level indicates evidence strength: A=highest evidence, B=moderate, C=limited, D=for information only. Returns gene-drug pairs with guideline IDs for further lookup.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "genesymbol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Gene symbol to filter by (e.g., 'CYP2D6', 'DPYD', 'TPMT'). Omit to search all genes."
+        },
+        "cpiclevel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "CPIC evidence level to filter by (e.g., 'A', 'B', 'B/C', 'C', 'D'). Omit to include all levels."
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of pairs to return. Omit to get every matching pair (CPIC publishes 635 in total, 96 at level A); there is no default cap, so 'count' equals the full match count unless you set this."
+        },
+        "gene_symbol": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Gene symbol alias (e.g., 'CYP2D6', 'VKORC1') \u2014 alternative to genesymbol"
+        },
+        "gene": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Gene symbol alias (e.g., 'CYP2D6') \u2014 alternative to genesymbol"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "fields": {
+      "endpoint": "https://api.cpicpgx.org/v1/pair?select=genesymbol,drugid,cpiclevel,guidelineid,usedforrecommendation,clinpgxlevel,pgxtesting,drug(name)"
+    },
+    "type": "CPICSearchPairsTool",
+    "test_examples": [
+      {
+        "genesymbol": "CYP2D6",
+        "limit": 10
+      },
+      {
+        "cpiclevel": "A",
+        "limit": 20
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "genesymbol": {
+                "type": "string"
+              },
+              "drugid": {
+                "type": "string"
+              },
+              "cpiclevel": {
+                "type": "string"
+              },
+              "guidelineid": {
+                "type": [
+                  "integer",
+                  "null",
+                  "number"
+                ]
+              },
+              "usedforrecommendation": {
+                "type": "boolean"
+              },
+              "clinpgxlevel": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "pgxtesting": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "drug": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "The drug's generic name, embedded via CPIC's PostgREST resource-embedding join on drugid (e.g. {\"name\": \"codeine\"}) so callers don't need a separate RxNorm lookup just to identify which drug a row is about.",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_list_drugs",
+    "description": "List every drug in the CPIC database that has pharmacogenomic annotations (324 as of the last census). Returns drug names and their associated CPIC guideline IDs. Drugs without a guideline ID have annotations but no full CPIC dosing guideline yet. Use the guidelineid with CPIC_get_recommendations to retrieve dosing recommendations. The full list is returned by default -- pass 'limit'/'offset' only if you deliberately want a page of it. Includes commonly used medications like warfarin, codeine, clopidogrel, simvastatin, tamoxifen, fluorouracil, abacavir, efavirenz and clozapine.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional: return at most this many drugs instead of the full list. Omit to get all of them."
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Optional: skip this many drugs before returning results. Only meaningful together with 'limit'."
+        }
+      },
+      "required": []
+    },
+    "fields": {
+      "endpoint": "https://api.cpicpgx.org/v1/drug?select=name,guidelineid",
+      "echo_request_url": true
+    },
+    "type": "BaseRESTTool",
+    "test_examples": [
+      {}
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "guidelineid": {
+                "type": [
+                  "integer",
+                  "null",
+                  "number"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "CPIC_get_alleles",
+    "description": "Get pharmacogenomics alleles and their functional status for a gene from CPIC. Returns allele names, activity values, and functional status, plus 'total_count' -- the number of alleles CPIC curates for the gene, which is often far larger than one page (CYP2D6 has 208). Returns 50 per call by default; use 'limit' (max 1000) and 'offset' to retrieve the rest. Note: use 'clinicalfunctionalstatus' field for the active clinical classification (e.g., 'No function', 'Normal function'); the 'functionalstatus' field may be null for some genes. Critical for translating genotype to phenotype (e.g., CYP2D6 *4 = no function, CYP2D6 *1 = normal function). Each allele also carries 'frequency', CPIC's per-ancestry star-allele frequencies: a map keyed by CPIC's own biogeographic-group labels ('European', 'East Asian', 'Sub-Saharan African', 'Central/South Asian', 'African American/Afro-Caribbean', 'Latino', 'American', 'Near Eastern', 'Oceanian'), passed through verbatim and deliberately NOT remapped to gnomAD population codes. CPIC does not publish a frequency for every allele -- 'frequency' is null on 13 of CYP2C19's 49 alleles and 25 of CYP2D6's 208 -- and null means 'not published', never zero: a published 0.0 for a group is real data and appears as 0.0, and single groups inside the map can be null while others carry values. Alongside it, 'strength' is CPIC's evidence level for the function assignment, 'inferredfrequency' is true when CPIC inferred the frequency rather than measuring it, and 'citations' lists supporting PMIDs; these are null on the alleles that lack a frequency. CPIC's narrative 'findings' text is not returned (it restates 'strength' at ~78 KB per gene).",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "genesymbol": {
+          "type": "string",
+          "description": "Gene symbol (e.g., 'CYP2D6', 'CYP2C19', 'TPMT', 'DPYD')"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Maximum number of alleles to return per call (default 50, max 1000). Compare with 'total_count' in the response to see how many exist in total.",
+          "default": 50
+        },
+        "offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Zero-based index of the first allele to return, for paging through genes with more alleles than one page (e.g. offset=50 returns alleles 51-100). Default: 0.",
+          "default": 0
+        }
+      },
+      "required": [
+        "genesymbol"
+      ]
+    },
+    "type": "CPICGetAllelesTool",
+    "test_examples": [
+      {
+        "genesymbol": "CYP2D6",
+        "limit": 20
+      },
+      {
+        "genesymbol": "DPYD",
+        "limit": 20
+      },
+      {
+        "genesymbol": "CYP2D6",
+        "limit": 20,
+        "offset": 50
+      }
+    ],
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "array",
+          "description": "Alleles in this page of results",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Star allele name (e.g. '*4')"
+              },
+              "functionalstatus": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "activityvalue": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "clinicalfunctionalstatus": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "frequency": {
+                "type": [
+                  "null",
+                  "object"
+                ],
+                "description": "Per-ancestry allele frequency keyed by CPIC's own biogeographic-group labels, passed through verbatim. Null when CPIC publishes no frequency for the allele -- that is 'not published', not zero. A group's value may itself be null while other groups carry numbers, and a published 0.0 is real data.",
+                "additionalProperties": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                }
+              },
+              "inferredfrequency": {
+                "type": [
+                  "null",
+                  "boolean"
+                ],
+                "description": "True when CPIC inferred the frequency rather than measuring it."
+              },
+              "strength": {
+                "type": [
+                  "null",
+                  "string"
+                ],
+                "description": "CPIC's evidence level for the function assignment (e.g. 'Definitve', 'Limited'). Null on alleles CPIC has not graded."
+              },
+              "citations": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "description": "PMIDs supporting the function assignment and frequency. Null on alleles CPIC has not graded.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+]
