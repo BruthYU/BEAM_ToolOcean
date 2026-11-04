@@ -2,16 +2,16 @@
 
 顺序就是：**写 JSON → 修改 default_config.py → 写工具类并加装饰器 → 运行 test**。
 
-下面提供的是操作教程和示例文件。按步骤将示例放进相邻的 ToolUniverse 源码目录，即可完成接入。
-所有 shell 命令均从本教程目录执行：
+下面提供的是操作教程和示例文件。按步骤将示例放进仓库根目录下的 ToolUniverse 源码目录，即可完成接入。
+所有 shell 命令均从本教程目录 `NewTool_tutorial/h5ad_reader_tutorial` 执行。在仓库根目录运行：
 
 ```bash
-cd /mnt/shared-storage-gpfs2/beam-gpfs02/yulang/master/CELL/BEAM_ToolOcean/test_tooluniverse
+cd NewTool_tutorial/h5ad_reader_tutorial
 ```
 
 **第一步：在 data 文件夹下写 JSON**
 
-目标文件：`../ToolUniverse/src/tooluniverse/data/h5ad_tools.json`。
+目标文件：`../../ToolUniverse/src/tooluniverse/data/h5ad_tools.json`。
 这个文件声明工具的名字、用途和输入参数。内容如下，注意最外层是列表：
 
 ```json
@@ -38,15 +38,15 @@ cd /mnt/shared-storage-gpfs2/beam-gpfs02/yulang/master/CELL/BEAM_ToolOcean/test_
 ]
 ```
 
-示例已写在 [h5ad_tools.json](h5ad_reader_tutorial/h5ad_tools.json)，直接复制到目标位置：
+示例已写在 [h5ad_tools.json](./h5ad_tools.json)，直接复制到目标位置：
 
 ```bash
-cp h5ad_reader_tutorial/h5ad_tools.json ../ToolUniverse/src/tooluniverse/data/h5ad_tools.json
+cp ./h5ad_tools.json ../../ToolUniverse/src/tooluniverse/data/h5ad_tools.json
 ```
 
 **第二步：修改 default_config.py，让框架知道这个 JSON 在哪里**
 
-打开 [default_config.py](../ToolUniverse/src/tooluniverse/default_config.py)，在 `default_tool_files = { ... }` 字典内部添加一项：
+打开 [default_config.py](../../ToolUniverse/src/tooluniverse/default_config.py)，在 `default_tool_files = { ... }` 字典内部添加一项：
 
 ```python
 "h5ad": os.path.join(current_dir, "data", "h5ad_tools.json"),
@@ -56,7 +56,7 @@ cp h5ad_reader_tutorial/h5ad_tools.json ../ToolUniverse/src/tooluniverse/data/h5
 
 **第三步：实现工具类，加上装饰器**
 
-目标文件：`../ToolUniverse/src/tooluniverse/h5ad_tool.py`。
+目标文件：`../../ToolUniverse/src/tooluniverse/h5ad_tool.py`。
 内容如下：
 
 ```python
@@ -79,10 +79,10 @@ class H5ADReaderTool(BaseTool):
             adata.file.close()
 ```
 
-示例已写在 [h5ad_tool.py](h5ad_reader_tutorial/h5ad_tool.py)，复制到目标位置：
+示例已写在 [h5ad_tool.py](./h5ad_tool.py)，复制到目标位置：
 
 ```bash
-cp h5ad_reader_tutorial/h5ad_tool.py ../ToolUniverse/src/tooluniverse/h5ad_tool.py
+cp ./h5ad_tool.py ../../ToolUniverse/src/tooluniverse/h5ad_tool.py
 ```
 
 装饰器里的 `H5ADReaderTool` 必须和 JSON 的 `type` 一致。
@@ -93,10 +93,10 @@ cp h5ad_reader_tutorial/h5ad_tool.py ../ToolUniverse/src/tooluniverse/h5ad_tool.
 先在当前 Python 环境安装源码包和测试所需依赖：
 
 ```bash
-python -m pip install -e ../ToolUniverse 'anndata>=0.11' pytest
+python -m pip install -e ../../ToolUniverse 'anndata>=0.11' pytest
 ```
 
-测试文件是 [test_h5ad_tool.py](h5ad_reader_tutorial/test_h5ad_tool.py)。它生成一个小 h5ad，通过刚才添加的类别加载工具，再检查结果：
+测试文件是 [test_h5ad_tool.py](./test_h5ad_tool.py)。它生成一个小 h5ad，通过刚才添加的类别加载工具，再检查结果：
 
 ```python
 """完成教程前三步后运行，验证默认配置能够找到工具。"""
@@ -129,7 +129,7 @@ def test_read_h5ad(tmp_path):
 运行：
 
 ```bash
-python -m pytest h5ad_reader_tutorial/test_h5ad_tool.py -q
+python -m pytest ./test_h5ad_tool.py -q
 ```
 
 预期输出：`1 passed`。测试使用 `load_tools(categories=["h5ad"])`，会经过第二步添加的默认配置。
