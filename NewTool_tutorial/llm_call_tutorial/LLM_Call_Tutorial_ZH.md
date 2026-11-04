@@ -1,6 +1,6 @@
 # 分步骤模拟 LLM 调用 ToolUniverse 工具
 
-继续使用前面的 `read_h5ad` 工具，模拟这个过程：
+继续使用 [h5ad 工具教程](../h5ad_reader_tutorial/H5AD_Tool_Tutorial_ZH.md) 中的 `read_h5ad` 工具，模拟这个过程：
 
 ```text
 用户提出问题
@@ -13,14 +13,14 @@
 
 本例用 `mock_llm()` 模拟两次模型回复，不需要 API key；ToolUniverse 的调度和 h5ad 读取都使用真实代码。模拟函数针对一个固定问题选择工具，使用简化字典表示回复。
 
-完整代码：[llm_call_demo.py](llm_call_demo.py)。测试：[test_llm_call.py](test_llm_call.py)。
+完整代码：[llm_call_demo.py](./llm_call_demo.py)。测试：[test_llm_call.py](./test_llm_call.py)。
 
 **准备：先接入上一例的 h5ad 工具**
 
-下面所有命令都在本篇教程目录执行：
+下面所有命令都在本篇教程目录 `NewTool_tutorial/llm_call_tutorial` 执行。在仓库根目录运行：
 
 ```bash
-cd /mnt/shared-storage-gpfs2/beam-gpfs02/yulang/master/CELL/BEAM_ToolOcean/NewTool_tutorial/llm_call_tutorial
+cd NewTool_tutorial/llm_call_tutorial
 ```
 
 若尚未完成前面的注册步骤，先复制两个文件：
@@ -122,8 +122,8 @@ print(final_response["answer"])
 **第六步：运行演示和 test**
 
 ```bash
-python llm_call_demo.py
-python -m pytest test_llm_call.py -q
+python ./llm_call_demo.py
+python -m pytest ./test_llm_call.py -q
 ```
 
 演示脚本自动生成一个 2 行、3 列的小 h5ad，并依次打印用户问题、工具描述、调用请求、工具结果和最终回答。
