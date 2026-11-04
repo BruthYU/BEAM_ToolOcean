@@ -1,0 +1,21 @@
+[
+  {
+    "name": "read_h5ad",
+    "type": "H5ADReaderTool",
+    "description": "读取本地 h5ad 文件，返回观测数 n_obs 和特征数 n_vars。",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "本地 h5ad 文件路径"
+        }
+      },
+      "required": [
+        "file_path"
+      ],
+      "additionalProperties": false
+    },
+    "cacheable": false
+  }
+]
