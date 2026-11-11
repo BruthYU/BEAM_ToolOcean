@@ -4,12 +4,12 @@
 
 ## 注册与配置
 
-实现继承 `BaseTool`，以 `@register_tool("PerturbationDatasetLoaderTool")` 注册，实现 `run(arguments)`。构造阶段不读取用户数据。
+实现继承 `BaseTool`，以 `@register_tool("PerturbationTool")` 注册，实现 `run(arguments)`。构造阶段不读取用户数据。
 
 - category：`perturbation`，通过 `default_config.py` 映射配置。
 - name：`perturbation_load_dataset`，用于 SDK 与 MCP 导出；别名 `perturbation.load_dataset` 保持已有运行时请求兼容。
-- type：`PerturbationDatasetLoaderTool`，与注册名一致。
-- SDK callable：`perturbation_load_dataset`，直接调用规范名称。
+- type：`PerturbationTool`，与注册名一致。
+- SDK callable：`perturbation_load_dataset`，直接调用规范名称，不添加装饰器。
 
 配置文件为 `src/tooluniverse/data/perturbation_tools.json`，顶层为列表。参数 Schema 拒绝未声明字段；配置声明 `requires_local_input: true`、`cacheable: false` 和 anndata 依赖。完整输入与返回 Schema 以该 JSON 为准。
 
