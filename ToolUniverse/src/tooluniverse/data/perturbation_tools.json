@@ -1,0 +1,265 @@
+[
+  {
+    "name": "perturbation.load_dataset",
+    "type": "PerturbationDatasetLoaderTool",
+    "description": "Load local expression data from H5AD, modern 10x H5, 10x MTX directories, or numeric CSV/TSV (including gzip). Validate IDs and metadata joins and write a persistent reference with fingerprints for every input. Returns a JSON summary, not the full matrix. Does not normalize or predict. CSV/TSV requires explicit matrix_orientation and index_column.",
+    "parameter": {
+      "type": "object",
+      "required": [
+        "source",
+        "output_dir"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Local expression file or 10x MTX directory. MTX directory must directly contain matrix, features/genes and barcodes files.",
+          "minLength": 1
+        },
+        "output_dir": {
+          "type": "string",
+          "description": "Directory for persistent dataset references.",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+          "description": "Optional unique dataset name; generated when omitted."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "h5ad",
+            "10x_h5",
+            "10x_mtx",
+            "csv",
+            "tsv"
+          ],
+          "default": "auto",
+          "description": "auto detects H5AD, modern 10x H5, 10x MTX directory or CSV/TSV (optionally gzip)."
+        },
+        "matrix_key": {
+          "type": "string",
+          "description": "Expression matrix: X (default), raw/X or layers/<name>.",
+          "minLength": 1
+        },
+        "gene_id_column": {
+          "type": "string",
+          "description": "Variable annotation column containing unique gene IDs; default variable index.",
+          "minLength": 1
+        },
+        "obs_column_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Standard observation fields mapped to existing original columns."
+        },
+        "control_values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Control labels; requires obs_column_map.perturbation."
+        },
+        "expression_scale": {
+          "type": "string",
+          "enum": [
+            "counts",
+            "normalized",
+            "log1p",
+            "unknown"
+          ],
+          "default": "unknown",
+          "description": "Caller-declared expression scale; no normalization is performed."
+        },
+        "backed": {
+          "type": "boolean",
+          "description": "Read H5AD using backed mode. Layers can still be materialized by AnnData."
+        },
+        "metadata_path": {
+          "type": "string",
+          "description": "Optional CSV, TSV or Parquet metadata file.",
+          "minLength": 1
+        },
+        "metadata_join_keys": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "data",
+            "metadata"
+          ],
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "metadata": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "description": "Equal-length join key lists; data key __obs_index__ refers to observation IDs."
+        },
+        "metadata_match": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "allow_missing"
+          ],
+          "default": "strict",
+          "description": "Whether missing metadata matches fail or produce a counted warning."
+        },
+        "matrix_orientation": {
+          "type": "string",
+          "enum": [
+            "observations_by_features",
+            "features_by_observations"
+          ],
+          "description": "Required for CSV/TSV. Orientation of the input table; output always uses observations by features."
+        },
+        "index_column": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required for CSV/TSV. Exact header name of the column holding row IDs. Remaining columns must all be numeric expression values."
+        }
+      }
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "data",
+            "warnings"
+          ],
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "data": {
+              "type": "object",
+              "required": [
+                "dataset_ref",
+                "dataset_id",
+                "modality",
+                "format",
+                "shape",
+                "dtype",
+                "matrix_key",
+                "orientation",
+                "expression_scale",
+                "metadata_fields"
+              ],
+              "properties": {
+                "dataset_ref": {
+                  "type": "string"
+                },
+                "dataset_id": {
+                  "type": "string"
+                },
+                "modality": {
+                  "const": "expression"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "h5ad",
+                    "10x_h5",
+                    "10x_mtx",
+                    "csv",
+                    "tsv"
+                  ]
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "dtype": {
+                  "type": "string"
+                },
+                "matrix_key": {
+                  "type": "string"
+                },
+                "orientation": {
+                  "const": "observations_by_features"
+                },
+                "expression_scale": {
+                  "type": "string"
+                },
+                "metadata_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "n_controls": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "error",
+            "error_code"
+          ],
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "error_code": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "requires_local_input": true,
+    "required_packages": [
+      "anndata"
+    ],
+    "cacheable": false,
+    "test_examples": [
+      {
+        "source": "perturb_tools/test_data/real/molecular/adamson_2016.h5ad",
+        "output_dir": "/tmp/perturbation-example-workspace"
+      }
+    ]
+  }
+]

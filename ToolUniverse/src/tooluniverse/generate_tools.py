@@ -170,7 +170,7 @@ def validate_generated_code(
         content = generated_file.read_text(encoding="utf-8")
 
         # Check that function name matches tool name
-        if f"def {tool_name}(" not in content:
+        if f"def {sanitize_param_name(tool_name)}(" not in content:
             issues.append(f"Function definition not found for {tool_name}")
 
         # Check that all required parameters are present
@@ -204,7 +204,9 @@ def generate_tool_file(
     tool_config: Dict[str, Any],
     output_dir: Path,
 ) -> Path:
-    """Generate one file for one tool."""
+    """Generate one file for one tool, preserving its wire name in calls."""
+    wire_name = tool_name
+    tool_name = sanitize_param_name(tool_name)
     schema = tool_config.get("parameter", {}) or {}
     description = tool_config.get("description", f"Execute {tool_name}")
     # Wrap long descriptions
@@ -322,7 +324,7 @@ def {tool_name}(
     }}.items() if v is not None}}
     return get_shared_client().run_one_function(
         {{
-            "name": "{tool_name}",
+            "name": "{wire_name}",
             "arguments": _args,
         }},
         stream_callback=stream_callback,
@@ -341,6 +343,9 @@ __all__ = ["{tool_name}"]
 
 def generate_init(tool_names: list, output_dir: Path) -> Path:
     """Generate __init__.py with all imports."""
+    tool_names = [sanitize_param_name(name) for name in tool_names]
+    if len(tool_names) != len(set(tool_names)):
+        raise ValueError("Tool names collide after Python identifier conversion")
     imports = [f"from .{name} import {name}" for name in sorted(tool_names)]
 
     # Generate the content without f-string escape sequences
@@ -673,7 +678,7 @@ def main(
         if name in all_config_tool_names
     }
 
-    cleaned_count = cleanup_orphaned_files(output, all_config_tool_names)
+    cleaned_count = cleanup_orphaned_files(output, {sanitize_param_name(name) for name in all_config_tool_names})
     if cleaned_count > 0:
         print(f"🧹 Removed {cleaned_count} orphaned tool files")
 
@@ -696,7 +701,7 @@ def main(
     # Check for missing files - tools that exist in config but not as files
     missing_files = []
     for tool_name in builtin_tool_dict.keys():
-        tool_file = output / f"{tool_name}.py"
+        tool_file = output / f"{sanitize_param_name(tool_name)}.py"
         if not tool_file.exists():
             if tool_name not in new_tools and tool_name not in changed_tools:
                 missing_files.append(tool_name)
@@ -779,7 +784,7 @@ def main(
         exportable = sorted(
             name
             for name in all_config_tool_names
-            if (output / f"{name}.py").exists()
+            if (output / f"{sanitize_param_name(name)}.py").exists()
         )
         init_path = generate_init(exportable, output)
         generated_paths.append(str(init_path))

@@ -1,0 +1,6 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+/test_data/
+/test_runs/
+/tests/
