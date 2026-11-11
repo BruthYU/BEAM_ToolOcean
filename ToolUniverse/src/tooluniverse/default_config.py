@@ -127,6 +127,9 @@ default_tool_files = {
     "ipd_imgt_hla": os.path.join(current_dir, "data", "ipd_imgt_hla_tools.json"),
     "uniprot": os.path.join(current_dir, "data", "uniprot_tools.json"),
     "cellosaurus": os.path.join(current_dir, "data", "cellosaurus_tools.json"),
+    "spatial_transcriptomics": os.path.join(
+        current_dir, "data", "spatial_transcriptomics_tools.json"
+    ),
     # 'software': os.path.join(current_dir, 'data', 'software_tools.json'),
     # Package tools - categorized software tools
     "software_bioinformatics": os.path.join(
