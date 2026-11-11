@@ -1,0 +1,340 @@
+[
+  {
+    "name": "IMvigor210_get_dataset_info",
+    "type": "IMvigor210QueryTool",
+    "description": "Describe the locally deployed IMvigor210CoreBiologies 1.0.1 urothelial-carcinoma transcriptome snapshot, including sample/patient/gene counts, available fields, expression type and provenance. Does not return patient-level expression values.",
+    "fields": {
+      "operation": "info"
+    },
+    "requires_local_input": false,
+    "cacheable": true,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "info"
+          ],
+          "default": "info",
+          "description": "Fixed operation, normally injected by ToolUniverse."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "dataset_version": {
+              "type": "string"
+            },
+            "matched_samples": {
+              "type": "integer"
+            },
+            "matched_patients": {
+              "type": "integer"
+            }
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    }
+  },
+  {
+    "name": "IMvigor210_query_samples",
+    "type": "IMvigor210QueryTool",
+    "description": "Filter locally deployed IMvigor210 atezolizumab samples by documented clinical fields such as response (CR, PR, SD, PD, NE), immune phenotype (inflamed, excluded, desert), PD-L1 categories or patient ID. Returns paginated sample annotations and matched sample/patient counts. Use exact field names from IMvigor210_get_dataset_info; this is a read-only cohort query, not a clinical prediction.",
+    "fields": {
+      "operation": "samples"
+    },
+    "requires_local_input": false,
+    "cacheable": true,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "object",
+          "description": "Mapping of exact field names to nonempty lists of accepted values."
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Fields to return; defaults to sample_id, patient_id, response and immune_phenotype."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 50
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "samples"
+          ],
+          "default": "samples",
+          "description": "Fixed operation, normally injected by ToolUniverse."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "dataset_version": {
+              "type": "string"
+            },
+            "matched_samples": {
+              "type": "integer"
+            },
+            "matched_patients": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "returned_samples": {
+              "type": "integer"
+            },
+            "next_offset": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    }
+  },
+  {
+    "name": "IMvigor210_get_expression",
+    "type": "IMvigor210QueryTool",
+    "description": "Retrieve raw gene read counts for selected IMvigor210 samples and genes by exact gene ID or symbol. Provide 1-100 genes and 1-500 sample IDs; values follow sample_ids order. Only raw_counts is available in this snapshot, not TPM or FPKM. Filters may restrict sample IDs. Returns missing or ambiguous gene information and does not perform differential expression or clinical interpretation.",
+    "fields": {
+      "operation": "expression"
+    },
+    "requires_local_input": false,
+    "cacheable": true,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "genes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Exact Entrez gene IDs or gene symbols."
+        },
+        "sample_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sample IDs returned by query_samples."
+        },
+        "expression_type": {
+          "type": "string",
+          "enum": [
+            "raw_counts"
+          ],
+          "default": "raw_counts"
+        },
+        "filters": {
+          "type": "object",
+          "description": "Optional exact sample filters."
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "expression"
+          ],
+          "default": "expression",
+          "description": "Fixed operation, normally injected by ToolUniverse."
+        }
+      },
+      "required": [
+        "genes",
+        "sample_ids"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "dataset_version": {
+              "type": "string"
+            },
+            "matched_samples": {
+              "type": "integer"
+            },
+            "matched_patients": {
+              "type": "integer"
+            },
+            "expression_type": {
+              "const": "raw_counts"
+            },
+            "units": {
+              "type": "string"
+            },
+            "sample_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "genes": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "missing_genes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    }
+  },
+  {
+    "name": "IMvigor210_summarize_cohort",
+    "type": "IMvigor210QueryTool",
+    "description": "Summarize a filtered IMvigor210 cohort by an exact documented field such as response, immune phenotype or PD-L1 category. Returns sample and distinct patient counts plus missing-value counts. Counts are descriptive only; this tool does not claim statistical association, survival benefit or treatment recommendation.",
+    "fields": {
+      "operation": "summary"
+    },
+    "requires_local_input": false,
+    "cacheable": true,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "object",
+          "description": "Mapping of exact field names to accepted values."
+        },
+        "group_by": {
+          "type": "string",
+          "default": "response",
+          "description": "Exact field used for grouping."
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "summary"
+          ],
+          "default": "summary",
+          "description": "Fixed operation, normally injected by ToolUniverse."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "data": {
+          "type": "object",
+          "properties": {
+            "dataset_version": {
+              "type": "string"
+            },
+            "matched_samples": {
+              "type": "integer"
+            },
+            "matched_patients": {
+              "type": "integer"
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "missing_values": {
+              "type": "object"
+            },
+            "group_by": {
+              "type": "string"
+            }
+          }
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    }
+  }
+]
