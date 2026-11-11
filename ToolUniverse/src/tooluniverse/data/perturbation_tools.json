@@ -1,7 +1,7 @@
 [
   {
     "name": "perturbation_load_dataset",
-    "type": "PerturbationTool",
+    "type": "PerturbationDatasetTool",
     "description": "Load local expression data from H5AD, modern 10x H5, 10x MTX directories, or numeric CSV/TSV (including gzip). Validate IDs and metadata joins and write a persistent reference with fingerprints for every input. Returns a JSON summary, not the full matrix. Does not normalize or predict. CSV/TSV requires explicit matrix_orientation and index_column.",
     "parameter": {
       "type": "object",
