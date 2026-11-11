@@ -134,3 +134,42 @@ tu run SpatialAssociation '{
 - **Between-group permutation.** Each patient supplies one score. The effect is the mean score in the first requested group minus the mean in the second. The two-sided test shuffles patient labels while preserving group sizes, enumerating all assignments when they fit the permutation budget. It requires at least two usable patients in each group and assumes patient labels are exchangeable under the null. The comparison is unadjusted and expects one group per patient.
 
 Outputs include `slices.csv` with slice scores and any reason a score or permutation could not be computed, `patients.csv` with one row per patient and the spatial p-value, `group_comparison.json` with the patient-level comparison, and `patients.png` with one dot per scored patient. With one group or insufficient patient replication, the tool still writes descriptive results and returns a null group p-value.
+
+### Exploratory screening across cell types
+
+Call `SpatialAssociation` with `request.operation="screen_spatial_associations"` to screen every unordered pair of explicitly selected abundance columns. Multiple model outputs can be included in one call so that all pairs share one multiple-testing correction:
+
+```json
+{
+  "name": "SpatialAssociation",
+  "arguments": {
+    "request": {
+      "operation": "screen_spatial_associations",
+      "datasets": [
+        {"dataset_id": "cell2location", "input_path": "/data/cell2location_cohort.csv"},
+        {"dataset_id": "Tangram", "input_path": "/data/Tangram_cohort.csv"}
+      ],
+      "output_dir": "/results/screen",
+      "cell_types": ["CD4_CM_C35", "CD8_CTL_C1", "TAM_C6_TREM2"],
+      "patient_key": "patient_id",
+      "group_key": "response",
+      "domain_key": "domain",
+      "slice_key": "slice_id",
+      "compare_groups": ["nonresponder", "responder"],
+      "n_permutations": 9999,
+      "fdr_method": "bh",
+      "fdr_threshold": 0.05,
+      "top_n": 20,
+      "random_seed": 0
+    }
+  }
+}
+```
+
+Each dataset accepts CSV or h5ad, with the same metadata keys and selected cell types. CSV coordinates default to `x`/`y` (override per dataset with `x_key`/`y_key`). For h5ad, coordinates default to `obsm['spatial']` (`coordinate_key`); abundances are named columns in `obs`, or in an `obsm` DataFrame selected by `abundance_key`. Dataset IDs must be unique and patient group labels must agree across datasets. Optional `domains` restricts spots before scoring.
+
+The score is same-spot Pearson correlation within each slice. Valid slices receive equal weight within a patient, then patients receive equal weight within a group. The difference is the first `compare_groups` group minus the second. Two-sided tests permute patient labels, enumerating all assignments when the budget permits; otherwise they use seeded Monte Carlo permutations. At least two valid patients per group are required. No spot-level hypothesis tests are used. Missing/constant profiles and slices with fewer than three spots are reported; invalid patient scores are excluded and counted, so inspect exclusions before comparing pairs.
+
+Global Benjamini-Hochberg correction (`bh`) includes every dataset/pair, including untestable pairs conservatively counted as p=1 internally (their reported p and q remain null). `by` selects the more conservative Benjamini-Yekutieli correction for arbitrary dependence. `top_n` limits inline results only. Files include the complete ranked `screen.csv`, `patients.csv`, `slices.csv`, and `summary.json`. Leave-one-patient-out effect ranges describe sensitivity, not confidence intervals or additional significance tests.
+
+Inputs are used as supplied, without normalization. Avoid mixing aggregate cell labels with their own subtypes, and choose comparable abundance scales. Tangram mapping weights are not measured cell counts. Correlation can reflect composition, shared tissue regions, or technical effects: it does not establish contact or causality. Follow up selected pairs using `analyze_spatial_association` for neighborhood analysis, independent cohorts, and appropriate biological validation. FDR covers only this call's declared family, not prior searches or repeated parameter tuning. Screening does not automatically assert agreement between models.

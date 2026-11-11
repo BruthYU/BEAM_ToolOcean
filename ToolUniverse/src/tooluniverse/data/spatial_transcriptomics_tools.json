@@ -2078,7 +2078,7 @@
   {
     "name": "SpatialAssociation",
     "type": "SpatialAssociationTool",
-    "description": "Compare two spatial cell abundance profiles, then compare groups using one score per patient.",
+    "description": "Analyze a selected spatial abundance pair or screen all selected pairs with patient-level group tests and global FDR correction.",
     "parameter": {
       "type": "object",
       "properties": {
@@ -2248,6 +2248,163 @@
                   ]
                 }
               }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Screen every unordered cell-type pair across supplied datasets.",
+                  "enum": [
+                    "screen_spatial_associations"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for CSV, JSON, and PNG results."
+                },
+                "cell_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 2,
+                  "description": "Explicit abundance columns to pair. Exclude overlapping aggregate labels unless intended."
+                },
+                "patient_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column with patient IDs. Each patient contributes one score."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column with one group per patient."
+                },
+                "domain_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column with spatial domain labels."
+                },
+                "slice_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column for sections. Defaults to slice_id or library_id when present, otherwise one slice per patient."
+                },
+                "domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "description": "Optional domain labels to retain before calculating association."
+                },
+                "compare_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 2,
+                  "description": "Two patient groups in subtraction order: first minus second.",
+                  "maxItems": 2
+                },
+                "n_permutations": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 9999,
+                  "description": "Maximum patient-label permutations per pair; exact enumeration when feasible. No spot-level inference."
+                },
+                "random_seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Seed for reproducible permutations."
+                },
+                "datasets": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "dataset_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "input_path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Local h5ad or CSV with coordinates, abundances, and spot metadata."
+                      },
+                      "abundance_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Name of an obsm DataFrame for h5ad input. Omit to read abundances from obs."
+                      },
+                      "coordinate_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Name of the coordinate matrix in h5ad obsm. Defaults to spatial."
+                      },
+                      "x_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "CSV x column. Defaults to x."
+                      },
+                      "y_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "CSV y column. Defaults to y."
+                      }
+                    },
+                    "required": [
+                      "dataset_id",
+                      "input_path"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Distinct named model results. One global multiple-testing family across all datasets and pairs."
+                },
+                "fdr_method": {
+                  "type": "string",
+                  "enum": [
+                    "bh",
+                    "by"
+                  ],
+                  "default": "bh",
+                  "description": "Benjamini-Hochberg, or more conservative Benjamini-Yekutieli for arbitrary dependence."
+                },
+                "fdr_threshold": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1,
+                  "default": 0.05
+                },
+                "top_n": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 20,
+                  "description": "Limit inline ranked results only; never reduce the tested family or output table."
+                }
+              },
+              "required": [
+                "operation",
+                "datasets",
+                "output_dir",
+                "cell_types",
+                "patient_key",
+                "group_key",
+                "domain_key",
+                "compare_groups"
+              ],
+              "additionalProperties": false
             }
           ]
         }
@@ -2258,112 +2415,307 @@
       "additionalProperties": false
     },
     "return_schema": {
-      "type": "object",
-      "properties": {
-        "operation": {
-          "const": "analyze_spatial_association"
-        },
-        "method": {
-          "enum": [
-            "colocalization",
-            "neighborhood"
-          ]
-        },
-        "cell_types": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "minItems": 2,
-          "maxItems": 2
-        },
-        "patient_summary_path": {
-          "type": "string"
-        },
-        "slice_summary_path": {
-          "type": "string"
-        },
-        "group_comparison_path": {
-          "type": "string"
-        },
-        "figure_path": {
-          "type": "string"
-        },
-        "group_comparison": {
+      "oneOf": [
+        {
           "type": "object",
           "properties": {
-            "unit": {
-              "const": "patient"
+            "operation": {
+              "const": "analyze_spatial_association"
             },
-            "groups": {
+            "method": {
+              "enum": [
+                "colocalization",
+                "neighborhood"
+              ]
+            },
+            "cell_types": {
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "minItems": 2,
+              "maxItems": 2
             },
-            "n_patients_by_group": {
+            "patient_summary_path": {
+              "type": "string"
+            },
+            "slice_summary_path": {
+              "type": "string"
+            },
+            "group_comparison_path": {
+              "type": "string"
+            },
+            "figure_path": {
+              "type": "string"
+            },
+            "group_comparison": {
               "type": "object",
-              "additionalProperties": {
-                "type": "integer",
-                "minimum": 0
-              }
-            },
-            "status": {
-              "enum": [
-                "ok",
-                "insufficient_patients"
-              ]
-            },
-            "difference": {
-              "type": [
-                "number",
-                "null"
-              ]
-            },
-            "p_value": {
-              "type": [
-                "number",
-                "null"
+              "properties": {
+                "unit": {
+                  "const": "patient"
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "n_patients_by_group": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "status": {
+                  "enum": [
+                    "ok",
+                    "insufficient_patients"
+                  ]
+                },
+                "difference": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "p_value": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "n_permutations": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "permutation_method": {
+                  "enum": [
+                    "exact",
+                    "monte_carlo",
+                    null
+                  ]
+                }
+              },
+              "required": [
+                "unit",
+                "groups",
+                "n_patients_by_group",
+                "status",
+                "difference",
+                "p_value",
+                "n_permutations",
+                "permutation_method"
               ],
-              "minimum": 0,
-              "maximum": 1
-            },
-            "n_permutations": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "permutation_method": {
-              "enum": [
-                "exact",
-                "monte_carlo",
-                null
-              ]
+              "additionalProperties": false
             }
           },
           "required": [
+            "operation",
+            "method",
+            "cell_types",
+            "patient_summary_path",
+            "slice_summary_path",
+            "group_comparison_path",
+            "figure_path",
+            "group_comparison"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "screen_spatial_associations"
+            },
+            "method": {
+              "const": "colocalization"
+            },
+            "unit": {
+              "const": "patient"
+            },
+            "compare_groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true,
+              "minItems": 2,
+              "description": "Optional two groups in subtraction order. Defaults to sorted labels when there are at most two.",
+              "maxItems": 2
+            },
+            "number_tests": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "number_testable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "number_significant": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fdr_method": {
+              "type": "string",
+              "enum": [
+                "bh",
+                "by"
+              ],
+              "default": "bh",
+              "description": "Benjamini-Hochberg, or more conservative Benjamini-Yekutieli for arbitrary dependence."
+            },
+            "fdr_threshold": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1,
+              "default": 0.05
+            },
+            "top_pairs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "unit": {
+                    "const": "patient"
+                  },
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "n_patients_by_group": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "status": {
+                    "enum": [
+                      "ok",
+                      "insufficient_patients"
+                    ]
+                  },
+                  "difference": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "p_value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "n_permutations": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "permutation_method": {
+                    "enum": [
+                      "exact",
+                      "monte_carlo",
+                      null
+                    ]
+                  },
+                  "dataset_id": {
+                    "type": "string"
+                  },
+                  "cell_a": {
+                    "type": "string"
+                  },
+                  "cell_b": {
+                    "type": "string"
+                  },
+                  "loo_min": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "loo_max": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "q_value": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "n_patients_excluded": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "unit",
+                  "groups",
+                  "n_patients_by_group",
+                  "status",
+                  "difference",
+                  "p_value",
+                  "n_permutations",
+                  "permutation_method",
+                  "dataset_id",
+                  "cell_a",
+                  "cell_b",
+                  "loo_min",
+                  "loo_max",
+                  "q_value",
+                  "n_patients_excluded"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "interpretation": {
+              "type": "string"
+            },
+            "screen_table_path": {
+              "type": "string"
+            },
+            "patient_summary_path": {
+              "type": "string"
+            },
+            "slice_summary_path": {
+              "type": "string"
+            },
+            "summary_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "method",
             "unit",
-            "groups",
-            "n_patients_by_group",
-            "status",
-            "difference",
-            "p_value",
-            "n_permutations",
-            "permutation_method"
+            "compare_groups",
+            "number_tests",
+            "number_testable",
+            "number_significant",
+            "fdr_method",
+            "fdr_threshold",
+            "top_pairs",
+            "interpretation",
+            "screen_table_path",
+            "patient_summary_path",
+            "slice_summary_path",
+            "summary_path"
           ],
           "additionalProperties": false
         }
-      },
-      "required": [
-        "operation",
-        "method",
-        "cell_types",
-        "patient_summary_path",
-        "slice_summary_path",
-        "group_comparison_path",
-        "figure_path",
-        "group_comparison"
-      ],
-      "additionalProperties": false
+      ]
     },
     "cacheable": false,
     "mcp_schema_mode": "passthrough",

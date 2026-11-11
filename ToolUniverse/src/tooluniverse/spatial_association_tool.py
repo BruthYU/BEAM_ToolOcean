@@ -21,6 +21,7 @@ def _input_table(request):
         "domain": request["domain_key"],
     }
     kinds = request["cell_types"]
+    columns = ["a", "b"] if len(kinds) == 2 else [f"feature_{i}" for i in range(len(kinds))]
     slice_key = request.get("slice_key")
     suffix = path.suffix.lower()
     if suffix == ".h5ad":
@@ -43,7 +44,7 @@ def _input_table(request):
             abundance = adata.obs if abundance_key is None else adata.obsm.get(abundance_key)
             if not isinstance(abundance, pd.DataFrame) or not abundance.columns.is_unique:
                 raise ToolValidationError("Abundances must be named columns in obs or in a DataFrame in obsm.")
-            for column, kind in zip(("a", "b"), kinds):
+            for column, kind in zip(columns, kinds):
                 if kind not in abundance:
                     raise ToolValidationError(f"Abundance column {kind!r} was not found.")
                 table[column] = abundance[kind]
@@ -59,8 +60,9 @@ def _input_table(request):
         if slice_key is not None:
             fields["slice"] = slice_key
         fields.update(
-            x=request.get("x_key", "x"), y=request.get("y_key", "y"), a=kinds[0], b=kinds[1],
+            x=request.get("x_key", "x"), y=request.get("y_key", "y"),
         )
+        fields.update(zip(columns, kinds))
         missing = [key for key in fields.values() if key not in frame]
         if missing:
             raise ToolValidationError(f"CSV columns were not found: {missing}.")
@@ -79,11 +81,11 @@ def _input_table(request):
         table[key] = values
     if table.groupby("patient")["group"].nunique().gt(1).any():
         raise ToolValidationError("Each patient must belong to exactly one group.")
-    for key in ("x", "y", "a", "b"):
+    for key in ["x", "y", *columns]:
         table[key] = pd.to_numeric(table[key], errors="coerce")
-    if not np.isfinite(table[["x", "y", "a", "b"]]).to_numpy().all():
+    if not np.isfinite(table[["x", "y", *columns]]).to_numpy().all():
         raise ToolValidationError("Coordinates and abundances must contain finite numbers.")
-    if table[["a", "b"]].lt(0).to_numpy().any():
+    if table[columns].lt(0).to_numpy().any():
         raise ToolValidationError("Cell abundances must be nonnegative.")
     return table
 
@@ -207,7 +209,7 @@ def _plot_patients(patients, groups, path):
 
 @register_tool("SpatialAssociationTool")
 class SpatialAssociationTool(_SpatialTool):
-    operations = ("analyze_spatial_association",)
+    operations = ("analyze_spatial_association", "screen_spatial_associations")
 
     def analyze_spatial_association(self, request):
         import numpy as np
@@ -275,3 +277,85 @@ class SpatialAssociationTool(_SpatialTool):
             "group_comparison_path": str(comparison_path), "figure_path": str(figure_path),
             "group_comparison": comparison,
         }
+
+    def screen_spatial_associations(self, request):
+        """Screen a declared family of pairs with patient-level inference."""
+        import numpy as np
+        import pandas as pd
+        from scipy.stats import false_discovery_control
+
+        datasets = request["datasets"]
+        identifiers = [item["dataset_id"] for item in datasets]
+        if len(set(identifiers)) != len(identifiers):
+            raise ToolValidationError("dataset_id values must be unique.")
+        kinds = request["cell_types"]
+        columns = ["a", "b"] if len(kinds) == 2 else [f"feature_{i}" for i in range(len(kinds))]
+        groups = request["compare_groups"]
+        rng = np.random.default_rng(request.get("random_seed", 0))
+        rows, patients, slices = [], [], []
+        known_groups = {}
+        for dataset in datasets:
+            table = _input_table({**request, **dataset})
+            if not set(groups).issubset(set(table["group"])):
+                raise ToolValidationError("Both compare_groups must be present in every dataset.")
+            for patient, group in table.groupby("patient")["group"].first().items():
+                if patient in known_groups and known_groups[patient] != group:
+                    raise ToolValidationError("Patient group labels must agree across datasets.")
+                known_groups[patient] = group
+            table = table[table["group"].isin(groups)]
+            if "domains" in request and not set(request["domains"]).issubset(set(table["domain"])):
+                raise ToolValidationError("Requested domains were not found in the selected groups.")
+            for i, j in combinations(range(len(kinds)), 2):
+                identity = {"dataset_id": dataset["dataset_id"], "cell_a": kinds[i], "cell_b": kinds[j]}
+                pair_patients = []
+                for (patient, group), frame in table.groupby(["patient", "group"], sort=True):
+                    scores = []
+                    for slice_id, section in frame.groupby("slice", sort=True):
+                        if "domains" in request:
+                            section = section[section["domain"].isin(request["domains"])]
+                        section = section[["domain", columns[i], columns[j]]].rename(
+                            columns={columns[i]: "a", columns[j]: "b"})
+                        # Zero spatial shuffles: inference here permutes patient labels only.
+                        score, _, status = _slice_score(section, {"method": "colocalization", "n_permutations": 0}, rng)
+                        slices.append({**identity, "patient_id": patient, "group": group,
+                                       "slice_id": slice_id, "n_spots": len(section), "score": score, "status": status})
+                        if score is not None:
+                            scores.append(score)
+                    row = {**identity, "patient_id": patient, "group": group,
+                           "score": float(np.mean(scores)) if scores else None, "n_slices_used": len(scores)}
+                    pair_patients.append(row)
+                    patients.append(row)
+                comparison = _patient_comparison(pair_patients, groups, request.get("n_permutations", 9999), rng)
+                valid = [row for row in pair_patients if row["score"] is not None]
+                loo = []
+                for omitted in range(len(valid)):
+                    remaining = valid[:omitted] + valid[omitted + 1:]
+                    values = [[row["score"] for row in remaining if row["group"] == group] for group in groups]
+                    if all(values):
+                        loo.append(float(np.mean(values[0]) - np.mean(values[1])))
+                rows.append({**identity, **comparison, "n_patients_excluded": len(pair_patients) - len(valid),
+                             "loo_min": min(loo) if loo else None, "loo_max": max(loo) if loo else None})
+        # Untestable pairs remain in the declared family, conservatively assigned p=1 for adjustment.
+        adjusted = false_discovery_control(
+            [row["p_value"] if row["p_value"] is not None else 1.0 for row in rows],
+            method=request.get("fdr_method", "bh"))
+        for row, q in zip(rows, adjusted):
+            row["q_value"] = float(q) if row["p_value"] is not None else None
+        ranked = sorted(rows, key=lambda row: (row["p_value"] if row["p_value"] is not None else 2,
+                                               -abs(row["difference"] or 0), row["dataset_id"], row["cell_a"], row["cell_b"]))
+        summary = {
+            "method": "colocalization", "unit": "patient", "compare_groups": groups,
+            "number_tests": len(rows), "number_testable": sum(row["p_value"] is not None for row in rows),
+            "fdr_method": request.get("fdr_method", "bh"), "fdr_threshold": request.get("fdr_threshold", 0.05),
+            "number_significant": sum(row["q_value"] is not None and row["q_value"] <= request.get("fdr_threshold", 0.05) for row in rows),
+            "top_pairs": ranked[:request.get("top_n", 20)],
+            "interpretation": "Exploratory same-spot Pearson association, not cell contact or causality. Equal slice means per patient; difference is first group minus second. FDR covers all pairs across all supplied datasets. Leave-one-patient-out ranges are descriptive, not confidence intervals.",
+        }
+        with _result_directory(request["output_dir"], "spatial_screen") as output:
+            paths = {"screen_table_path": output / "screen.csv", "patient_summary_path": output / "patients.csv",
+                     "slice_summary_path": output / "slices.csv", "summary_path": output / "summary.json"}
+            pd.DataFrame(ranked).to_csv(paths["screen_table_path"], index=False)
+            pd.DataFrame(patients).to_csv(paths["patient_summary_path"], index=False)
+            pd.DataFrame(slices).to_csv(paths["slice_summary_path"], index=False)
+            paths["summary_path"].write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+        return {**summary, **{key: str(value) for key, value in paths.items()}}

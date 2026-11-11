@@ -391,3 +391,44 @@ def test_spatial_association_uses_patient_as_unit(universe, tmp_path):
     pd.DataFrame(rows).to_csv(path, index=False)
     rejected = _data_call(universe, "SpatialAssociation", "analyze_spatial_association", **request)
     assert "Each patient must belong to exactly one group" in rejected["error"]
+
+
+def test_spatial_screen_global_family_and_slice_weighting(universe, tmp_path):
+    """Retain untestable pairs in global FDR and weight patients independently of spot counts."""
+    import pandas as pd
+    import numpy as np
+    import anndata as ad
+
+    rows = []
+    for patient, group, section, n, direction in [
+        ('p1', 'R', 's1', 30, 1), ('p1', 'R', 's2', 5, -1),
+        ('p2', 'R', 's1', 7, 1), ('p3', 'NR', 's1', 5, -1), ('p4', 'NR', 's1', 5, -1),
+    ]:
+        for i in range(n):
+            rows.append(dict(patient=patient, group=group, slice_id=section, domain='d',
+                             x=i, y=0, A=i + 1, B=i + 1 if direction == 1 else n - i, C=1))
+    frame = pd.DataFrame(rows)
+    csv = tmp_path / 'screen.csv'
+    frame.to_csv(csv, index=False)
+    h5ad = tmp_path / 'screen.h5ad'
+    obs = frame.drop(columns=['x', 'y']).copy()
+    obs.index = obs.index.astype(str)
+    ad.AnnData(X=np.zeros((len(obs), 1)), obs=obs, obsm={'spatial': frame[['x', 'y']].to_numpy()}).write_h5ad(h5ad)
+    request = dict(datasets=[dict(dataset_id='csv', input_path=str(csv)), dict(dataset_id='h5ad', input_path=str(h5ad))],
+                   output_dir=str(tmp_path), cell_types=['A', 'B', 'C'], patient_key='patient',
+                   group_key='group', domain_key='domain', compare_groups=['R', 'NR'], top_n=1)
+    result = _data_call(universe, 'SpatialAssociation', 'screen_spatial_associations', **request)
+    assert result['number_tests'] == 6
+    assert result['number_testable'] == 2
+    assert len(result['top_pairs']) == 1
+    table = pd.read_csv(result['screen_table_path'])
+    valid = table[table.status == 'ok']
+    assert valid.difference.tolist() == pytest.approx([1.5, 1.5])
+    assert valid.p_value.tolist() == pytest.approx([1/3, 1/3])
+    assert valid.q_value.tolist() == pytest.approx([1, 1])
+    assert table[table.status != 'ok'].q_value.isna().all()
+    patients = pd.read_csv(result['patient_summary_path'])
+    assert patients.query("patient_id == 'p1' and cell_a == 'A' and cell_b == 'B'").score.tolist() == pytest.approx([0, 0])
+    request['datasets'][1]['dataset_id'] = 'csv'
+    rejected = _data_call(universe, 'SpatialAssociation', 'screen_spatial_associations', **request)
+    assert 'dataset_id values must be unique' in rejected['error']
