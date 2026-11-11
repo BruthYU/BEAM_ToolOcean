@@ -593,7 +593,7 @@ STATIC_LAZY_REGISTRY = {
     "PathwayCommonsTool": "pathwaycommons_tool",
     "PepCalcTool": "pepcalc_tool",
     "PeptideAtlasGetObservedPeptidesTool": "peptideatlas_tool",
-    "PerturbationDatasetLoaderTool": "perturbation_dataset_tool",
+    "PerturbationTool": "perturbation_dataset_tool",
     "PfamTool": "pfam_tool",
     "PharmGKBTool": "pharmgkb_tool",
     "PharmacoDBTool": "pharmacodb_tool",
