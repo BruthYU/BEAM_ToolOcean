@@ -440,8 +440,8 @@ def resolve_dataset_ref(dataset_ref):
     return descriptor
 
 
-@register_tool("PerturbationTool")
-class PerturbationTool(BaseTool):
+@register_tool("PerturbationDatasetTool")
+class PerturbationDatasetTool(BaseTool):
     def run(self, arguments):
         directory = None
         try:
