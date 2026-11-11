@@ -1078,5 +1078,1298 @@
       "readOnlyHint": false,
       "destructiveHint": false
     }
+  },
+  {
+    "name": "SpatialIO",
+    "type": "SpatialIOTool",
+    "description": "Import Visium data, inspect an AnnData file, or export selected spatial results.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "description": "Choose an operation and supply its parameters.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Import a classic Visium Space Ranger directory",
+                  "minLength": 1,
+                  "enum": [
+                    "import_visium"
+                  ]
+                },
+                "input_dir": {
+                  "type": "string",
+                  "description": "Space Ranger outs directory containing a count matrix and spatial subdirectory.",
+                  "minLength": 1
+                },
+                "output_path": {
+                  "type": "string",
+                  "description": "Path to a new local output file. Existing files are never overwritten.",
+                  "minLength": 1
+                },
+                "matrix_kind": {
+                  "type": "string",
+                  "description": "Select the filtered or raw count matrix.",
+                  "minLength": 1,
+                  "enum": [
+                    "filtered",
+                    "raw"
+                  ],
+                  "default": "filtered"
+                },
+                "library_id": {
+                  "type": "string",
+                  "description": "Stable slice identifier. Defaults to the input directory name or the parent of outs.",
+                  "minLength": 1
+                },
+                "tissue_only": {
+                  "type": "boolean",
+                  "description": "Keep only positions flagged as in tissue.",
+                  "default": true
+                },
+                "image_levels": {
+                  "type": "array",
+                  "description": "Requested tissue images. An empty list imports coordinates only.",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "lowres",
+                      "hires"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "default": [
+                    "lowres"
+                  ]
+                }
+              },
+              "required": [
+                "operation",
+                "input_dir",
+                "output_path"
+              ],
+              "additionalProperties": false,
+              "title": "Import a classic Visium Space Ranger directory"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Inspect a slice or reference without modifying it",
+                  "minLength": 1,
+                  "enum": [
+                    "inspect_spatial_h5ad"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "description": "Path to a local AnnData .h5ad file.",
+                  "minLength": 1
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Check requirements for a spatial slice or a reference.",
+                  "minLength": 1,
+                  "enum": [
+                    "spatial",
+                    "reference"
+                  ],
+                  "default": "spatial"
+                },
+                "count_layer": {
+                  "type": "string",
+                  "description": "Count layer name. Use X for the main expression matrix.",
+                  "minLength": 1,
+                  "default": "X"
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "description": "Observation column containing reference cell type labels.",
+                  "minLength": 1
+                },
+                "coordinate_key": {
+                  "type": "string",
+                  "description": "Coordinate key in obsm.",
+                  "minLength": 1,
+                  "default": "spatial"
+                },
+                "count_check": {
+                  "type": "string",
+                  "description": "Check up to 128 evenly spaced rows, all rows, or only the file structure.",
+                  "minLength": 1,
+                  "enum": [
+                    "sample",
+                    "full",
+                    "none"
+                  ],
+                  "default": "sample"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path"
+              ],
+              "additionalProperties": false,
+              "title": "Inspect a slice or reference without modifying it"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Export selected per-spot values",
+                  "minLength": 1,
+                  "enum": [
+                    "export_spatial_table"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "description": "Path to a local AnnData .h5ad file.",
+                  "minLength": 1
+                },
+                "output_path": {
+                  "type": "string",
+                  "description": "Path to a new local output file. Existing files are never overwritten.",
+                  "minLength": 1
+                },
+                "obs_columns": {
+                  "type": "array",
+                  "description": "Observation columns to export.",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "default": []
+                },
+                "matrix_columns": {
+                  "type": "array",
+                  "description": "Selected columns from per-spot matrices in obsm.",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "description": "Name of the matrix in obsm.",
+                        "minLength": 1
+                      },
+                      "columns": {
+                        "type": "array",
+                        "description": "Column names or zero-based column indices. Unnamed matrices require indices.",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          ]
+                        },
+                        "uniqueItems": true,
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "columns"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "default": []
+                },
+                "genes": {
+                  "type": "array",
+                  "description": "Exact gene IDs from var_names.",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "default": []
+                },
+                "expression_layer": {
+                  "type": "string",
+                  "description": "Layer to use for gene values. Use X for the main matrix.",
+                  "minLength": 1,
+                  "default": "X"
+                },
+                "spot_ids": {
+                  "type": "array",
+                  "description": "Subset in the requested spot order. Omit to export all spots.",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
+                },
+                "include_coordinates": {
+                  "type": "boolean",
+                  "description": "Include x and y from obsm['spatial'].",
+                  "default": true
+                },
+                "format": {
+                  "type": "string",
+                  "description": "Output table format.",
+                  "minLength": 1,
+                  "enum": [
+                    "csv",
+                    "tsv"
+                  ],
+                  "default": "csv"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_path"
+              ],
+              "additionalProperties": false,
+              "title": "Export selected per-spot values"
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "import_visium"
+              ]
+            },
+            "output_path": {
+              "type": "string"
+            },
+            "library_id": {
+              "type": "string"
+            },
+            "matrix_path": {
+              "type": "string"
+            },
+            "n_spots": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_genes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "matched_barcodes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_outside_tissue": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_outside_tissue_retained": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "coordinate_system": {
+              "type": "string"
+            },
+            "image_levels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "library_id",
+            "matrix_path",
+            "n_spots",
+            "n_genes",
+            "matched_barcodes",
+            "n_outside_tissue",
+            "n_outside_tissue_retained",
+            "coordinate_system",
+            "image_levels"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "inspect_spatial_h5ad"
+              ]
+            },
+            "input_path": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            },
+            "n_obs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_genes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "count_layer": {
+              "type": "string"
+            },
+            "count_check": {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "rows_checked": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "invalid_values": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "mode",
+                "status",
+                "rows_checked"
+              ],
+              "additionalProperties": false
+            },
+            "coordinate_check": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "present": {
+                  "type": "boolean"
+                },
+                "valid": {
+                  "type": "boolean"
+                },
+                "invalid_rows": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "key",
+                "present"
+              ],
+              "additionalProperties": false
+            },
+            "cell_type_check": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "present": {
+                  "type": "boolean"
+                },
+                "missing": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "counts": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "key",
+                "checked"
+              ],
+              "additionalProperties": false
+            },
+            "obs_columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "layers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "obsm_keys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "duplicate_obs_ids": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "duplicate_gene_ids": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "input_path",
+            "role",
+            "n_obs",
+            "n_genes",
+            "count_layer",
+            "count_check",
+            "coordinate_check",
+            "cell_type_check",
+            "obs_columns",
+            "layers",
+            "obsm_keys",
+            "duplicate_obs_ids",
+            "duplicate_gene_ids",
+            "issues"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "export_spatial_table"
+              ]
+            },
+            "output_path": {
+              "type": "string"
+            },
+            "n_rows": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "column_sources": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "n_rows",
+            "column_sources"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "SpatialPreprocess",
+    "type": "SpatialPreprocessTool",
+    "description": "Measure and filter spot quality, harmonize gene IDs, or normalize expression without replacing counts.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "description": "Choose an operation and supply its parameters.",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Report spatial QC or filter spots with explicit thresholds",
+                  "minLength": 1,
+                  "enum": [
+                    "filter_spatial_qc"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "description": "Path to a local AnnData .h5ad file.",
+                  "minLength": 1
+                },
+                "count_layer": {
+                  "type": "string",
+                  "description": "Count layer name. Use X for the main expression matrix.",
+                  "minLength": 1,
+                  "default": "X"
+                },
+                "mode": {
+                  "type": "string",
+                  "description": "Report metrics only or write a filtered h5ad.",
+                  "minLength": 1,
+                  "enum": [
+                    "report",
+                    "filter"
+                  ],
+                  "default": "report"
+                },
+                "output_path": {
+                  "type": "string",
+                  "description": "New h5ad path in filter mode or optional CSV path in report mode.",
+                  "minLength": 1
+                },
+                "min_counts": {
+                  "type": "integer",
+                  "description": "Inclusive minimum total count per spot.",
+                  "minimum": 0
+                },
+                "max_counts": {
+                  "type": "integer",
+                  "description": "Inclusive maximum total count per spot.",
+                  "minimum": 0
+                },
+                "min_detected_genes": {
+                  "type": "integer",
+                  "description": "Inclusive minimum detected genes per spot.",
+                  "minimum": 0
+                },
+                "max_detected_genes": {
+                  "type": "integer",
+                  "description": "Inclusive maximum detected genes per spot.",
+                  "minimum": 0
+                },
+                "max_pct_mito": {
+                  "type": "number",
+                  "description": "Inclusive maximum mitochondrial count percentage.",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "mito_flag_key": {
+                  "type": "string",
+                  "description": "Boolean var column identifying mitochondrial genes.",
+                  "minLength": 1
+                },
+                "gene_symbol_key": {
+                  "type": "string",
+                  "description": "var column containing gene symbols for MT- prefix matching.",
+                  "minLength": 1
+                },
+                "group_by": {
+                  "type": "string",
+                  "description": "Observation column used to summarize retention by group.",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path"
+              ],
+              "additionalProperties": false,
+              "title": "Report spatial QC or filter spots with explicit thresholds",
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "filter"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "required": [
+                  "output_path"
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Harmonize gene IDs for a slice and a reference",
+                  "minLength": 1,
+                  "enum": [
+                    "align_gene_ids"
+                  ]
+                },
+                "spatial_path": {
+                  "type": "string",
+                  "description": "Path to the spatial h5ad.",
+                  "minLength": 1
+                },
+                "reference_path": {
+                  "type": "string",
+                  "description": "Path to the single-cell or single-nucleus h5ad.",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "description": "Parent directory for aligned files and the audit table.",
+                  "minLength": 1
+                },
+                "spatial_id_key": {
+                  "type": "string",
+                  "description": "Spatial var column or var_names.",
+                  "minLength": 1,
+                  "default": "var_names"
+                },
+                "reference_id_key": {
+                  "type": "string",
+                  "description": "Reference var column or var_names.",
+                  "minLength": 1,
+                  "default": "var_names"
+                },
+                "mapping_path": {
+                  "type": "string",
+                  "description": "CSV or TSV containing source_id and target_id columns.",
+                  "minLength": 1
+                },
+                "mapping_side": {
+                  "type": "string",
+                  "description": "Side to convert with the supplied mapping.",
+                  "minLength": 1,
+                  "enum": [
+                    "spatial",
+                    "reference"
+                  ]
+                },
+                "strip_ensembl_version": {
+                  "type": "boolean",
+                  "description": "Remove numeric version suffixes from Ensembl gene IDs.",
+                  "default": false
+                },
+                "mode": {
+                  "type": "string",
+                  "description": "Preserve side-specific genes or keep shared genes in the same order.",
+                  "minLength": 1,
+                  "enum": [
+                    "preserve",
+                    "intersection"
+                  ],
+                  "default": "preserve"
+                }
+              },
+              "required": [
+                "operation",
+                "spatial_path",
+                "reference_path",
+                "output_dir"
+              ],
+              "additionalProperties": false,
+              "title": "Harmonize gene IDs for a slice and a reference",
+              "dependentRequired": {
+                "mapping_path": [
+                  "mapping_side"
+                ],
+                "mapping_side": [
+                  "mapping_path"
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "description": "Write normalized expression to a new layer",
+                  "minLength": 1,
+                  "enum": [
+                    "normalize_spatial_expression"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "description": "Path to a local AnnData .h5ad file.",
+                  "minLength": 1
+                },
+                "output_path": {
+                  "type": "string",
+                  "description": "Path to a new local output file. Existing files are never overwritten.",
+                  "minLength": 1
+                },
+                "count_layer": {
+                  "type": "string",
+                  "description": "Count layer name. Use X for the main expression matrix.",
+                  "minLength": 1,
+                  "default": "X"
+                },
+                "target_sum": {
+                  "type": "number",
+                  "description": "Total after scaling each nonempty spot.",
+                  "exclusiveMinimum": 0,
+                  "default": 10000
+                },
+                "log1p": {
+                  "type": "boolean",
+                  "description": "Apply log(1 + x) after scaling.",
+                  "default": true
+                },
+                "output_layer": {
+                  "type": "string",
+                  "description": "New layer name. Defaults to lognorm with log1p or normalized without it.",
+                  "minLength": 1
+                },
+                "size_factor_key": {
+                  "type": "string",
+                  "description": "Optional new obs column storing original total divided by target_sum.",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_path"
+              ],
+              "additionalProperties": false,
+              "title": "Write normalized expression to a new layer"
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "filter_spatial_qc"
+              ]
+            },
+            "mode": {
+              "type": "string"
+            },
+            "n_spots": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_pass": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_fail": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mitochondrial_metric_available": {
+              "type": "boolean"
+            },
+            "failed_by_rule": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "group": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "n_spots": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "n_pass": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "pass_fraction": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "group",
+                  "n_spots",
+                  "n_pass",
+                  "pass_fraction"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "report_path": {
+              "type": "string",
+              "description": "Absolute path to the audit CSV."
+            },
+            "output_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "mode",
+            "n_spots",
+            "n_pass",
+            "n_fail",
+            "mitochondrial_metric_available",
+            "failed_by_rule",
+            "groups",
+            "report_path"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "align_gene_ids"
+              ]
+            },
+            "spatial_path": {
+              "type": "string"
+            },
+            "reference_path": {
+              "type": "string"
+            },
+            "report_path": {
+              "type": "string",
+              "description": "Absolute path to the audit CSV."
+            },
+            "mode": {
+              "type": "string"
+            },
+            "n_shared": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_spatial_only": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_reference_only": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_unmapped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_spatial_genes_written": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "n_reference_genes_written": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "spatial_path",
+            "reference_path",
+            "report_path",
+            "mode",
+            "n_shared",
+            "n_spatial_only",
+            "n_reference_only",
+            "n_unmapped",
+            "n_spatial_genes_written",
+            "n_reference_genes_written"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "normalize_spatial_expression"
+              ]
+            },
+            "output_path": {
+              "type": "string"
+            },
+            "output_layer": {
+              "type": "string"
+            },
+            "count_layer": {
+              "type": "string"
+            },
+            "target_sum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "log1p": {
+              "type": "boolean"
+            },
+            "n_zero_spots": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "output_layer",
+            "count_layer",
+            "target_sum",
+            "log1p",
+            "n_zero_spots"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "SpatialAssociation",
+    "type": "SpatialAssociationTool",
+    "description": "Compare two spatial cell abundance profiles, then compare groups using one score per patient.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Analyze spatial association of two cell abundances.",
+                  "enum": [
+                    "analyze_spatial_association"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Local h5ad or CSV with coordinates, abundances, and spot metadata."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for CSV, JSON, and PNG results."
+                },
+                "cell_types": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 2,
+                  "description": "Two distinct abundance column names.",
+                  "maxItems": 2
+                },
+                "patient_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column with patient IDs. Each patient contributes one score."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column with one group per patient."
+                },
+                "domain_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column with spatial domain labels."
+                },
+                "slice_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column for sections. Defaults to slice_id or library_id when present, otherwise one slice per patient."
+                },
+                "abundance_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of an obsm DataFrame for h5ad input. Omit to read abundances from obs."
+                },
+                "coordinate_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Name of the coordinate matrix in h5ad obsm. Defaults to spatial."
+                },
+                "x_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV x column. Defaults to x."
+                },
+                "y_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV y column. Defaults to y."
+                },
+                "method": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Compare abundances at the same spot or across neighboring spots.",
+                  "enum": [
+                    "colocalization",
+                    "neighborhood"
+                  ],
+                  "default": "neighborhood"
+                },
+                "n_neighbors": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 6,
+                  "description": "Nearest neighbors per spot before symmetrization. Neighborhood only."
+                },
+                "max_neighbor_distance": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Optional distance cap in input coordinate units. Neighborhood only."
+                },
+                "domains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1,
+                  "description": "Optional domain labels to retain before calculating association."
+                },
+                "compare_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true,
+                  "minItems": 2,
+                  "description": "Optional two groups in subtraction order. Defaults to sorted labels when there are at most two.",
+                  "maxItems": 2
+                },
+                "n_permutations": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 999,
+                  "description": "Number of spatial permutations and maximum number of patient-group permutations."
+                },
+                "random_seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Seed for reproducible permutations."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "cell_types",
+                "patient_key",
+                "group_key",
+                "domain_key"
+              ],
+              "additionalProperties": false,
+              "if": {
+                "properties": {
+                  "method": {
+                    "const": "colocalization"
+                  }
+                },
+                "required": [
+                  "method"
+                ]
+              },
+              "then": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "n_neighbors"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "max_neighbor_distance"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "const": "analyze_spatial_association"
+        },
+        "method": {
+          "enum": [
+            "colocalization",
+            "neighborhood"
+          ]
+        },
+        "cell_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "patient_summary_path": {
+          "type": "string"
+        },
+        "slice_summary_path": {
+          "type": "string"
+        },
+        "group_comparison_path": {
+          "type": "string"
+        },
+        "figure_path": {
+          "type": "string"
+        },
+        "group_comparison": {
+          "type": "object",
+          "properties": {
+            "unit": {
+              "const": "patient"
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "n_patients_by_group": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "status": {
+              "enum": [
+                "ok",
+                "insufficient_patients"
+              ]
+            },
+            "difference": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "p_value": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "n_permutations": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "permutation_method": {
+              "enum": [
+                "exact",
+                "monte_carlo",
+                null
+              ]
+            }
+          },
+          "required": [
+            "unit",
+            "groups",
+            "n_patients_by_group",
+            "status",
+            "difference",
+            "p_value",
+            "n_permutations",
+            "permutation_method"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "operation",
+        "method",
+        "cell_types",
+        "patient_summary_path",
+        "slice_summary_path",
+        "group_comparison_path",
+        "figure_path",
+        "group_comparison"
+      ],
+      "additionalProperties": false
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
   }
 ]

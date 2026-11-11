@@ -37,6 +37,8 @@ def _expression(adata, layer=None, *, counts=False):
     if matrix is None:
         raise ToolValidationError("The selected expression matrix is empty.")
     values = matrix.data if issparse(matrix) else np.asarray(matrix)
+    if values.dtype.kind not in "buif":
+        raise ToolValidationError("Expression values must be real numbers.")
     if not np.isfinite(values).all() or (values < 0).any():
         raise ToolValidationError("Expression values must be finite and nonnegative.")
     if counts and (values != np.floor(values)).any():
@@ -102,8 +104,12 @@ class _SpatialTool(BaseTool):
             properties = branch["properties"]
             if operation not in properties["operation"]["enum"]:
                 continue
-            if "mode" in properties and request.get("mode", "cells") not in properties["mode"]["enum"]:
-                continue
+            if "mode" in properties:
+                mode = request.get("mode", properties["mode"].get("default"))
+                if mode is None and "mode" in branch.get("required", []):
+                    continue
+                if mode is not None and mode not in properties["mode"]["enum"]:
+                    continue
             problem = best_match(Draft202012Validator(branch).iter_errors(request))
             if problem is not None:
                 path = self._format_instance_path(["request", *problem.path])

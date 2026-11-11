@@ -9,7 +9,9 @@ from jsonschema import Draft202012Validator
 from tooluniverse import ToolUniverse
 
 CATEGORY = "spatial_transcriptomics"
-TOOL_NAMES = {"cell2location", "Tangram", "GraphST"}
+TOOL_NAMES = {
+    "cell2location", "Tangram", "GraphST", "SpatialIO", "SpatialPreprocess", "SpatialAssociation",
+}
 pytestmark = pytest.mark.integration
 
 
@@ -69,7 +71,7 @@ def _call(tu, name, operation, output_dir, **kwargs):
 
 
 def test_category_and_invalid_request(universe, tmp_path):
-    """Expose exactly three named tools and reject invalid operation arguments."""
+    """Expose exactly the expected tools and reject invalid operation arguments."""
     assert set(universe.all_tool_dict) == TOOL_NAMES
     assert set(universe.tool_category_dicts) >= {CATEGORY}
 
@@ -205,3 +207,187 @@ def test_mcp_schemas(universe):
             await server.close()
 
     asyncio.run(check())
+
+
+def _data_call(tu, name, operation, **request):
+    args = {"name": name, "arguments": {"request": {"operation": operation, **request}}}
+    result = tu.run_one_function(args)
+    if "error" not in result:
+        Draft202012Validator(tu.all_tool_dict[name]["return_schema"]).validate(result)
+    return result
+
+
+def test_import_visium_matrix_market(universe, tmp_path):
+    """Read a raw matrix and match a headered position file by barcode."""
+    ad = pytest.importorskip("anndata")
+    pytest.importorskip("scanpy")
+    from scipy.io import mmwrite
+    from scipy.sparse import coo_matrix
+
+    source = tmp_path / "sample" / "outs"
+    matrix = source / "raw_feature_bc_matrix"
+    spatial = source / "spatial"
+    matrix.mkdir(parents=True)
+    spatial.mkdir()
+    mmwrite(matrix / "matrix.mtx", coo_matrix([[1, 0], [3, 5]]))
+    (matrix / "genes.tsv").write_text("ENSG0001\tA\nENSG0002\tA\n")
+    (matrix / "barcodes.tsv").write_text("spot-a\nspot-b\n")
+    (spatial / "tissue_positions.csv").write_text(
+        "barcode,in_tissue,array_row,array_col,pxl_row_in_fullres,pxl_col_in_fullres\n"
+        "spot-b,0,1,2,100,200\nspot-a,1,0,1,70,90\n"
+    )
+    result = _data_call(
+        universe, "SpatialIO", "import_visium", input_dir=str(source),
+        output_path=str(tmp_path / "imported.h5ad"), matrix_kind="raw",
+        image_levels=[], tissue_only=False,
+    )
+    imported = ad.read_h5ad(result["output_path"])
+    assert imported.obs_names.tolist() == ["spot-a", "spot-b"]
+    assert imported.var_names.tolist() == ["ENSG0001", "ENSG0002"]
+    assert imported.obsm["spatial"].tolist() == [[90, 70], [200, 100]]
+    assert result["library_id"] == "sample"
+    assert result["n_outside_tissue_retained"] == 1
+
+
+def test_spatial_qc_normalization_and_export(universe, tmp_path):
+    """Preserve counts and coordinates while filtering, normalizing, and exporting."""
+    ad = pytest.importorskip("anndata")
+    pytest.importorskip("scanpy")
+    import numpy as np
+    import pandas as pd
+    from scipy.sparse import csr_matrix
+
+    spots = pd.DataFrame({"slice_id": ["a", "a", "b"]}, index=["s1", "s2", "s3"])
+    genes = pd.DataFrame({"gene_symbol": ["MT-A", "B"]}, index=["gene1", "gene2"])
+    adata = ad.AnnData(
+        X=csr_matrix([[1, 3], [0, 0], [0, 9]]),
+        obs=spots, var=genes,
+        obsm={"spatial": np.array([[0, 0], [1, 1], [2, 2]])},
+    )
+    source = str(tmp_path / "source.h5ad")
+    adata.write_h5ad(source)
+    inspection = _data_call(universe, "SpatialIO", "inspect_spatial_h5ad", input_path=source)
+    assert inspection["issues"] == []
+    assert inspection["count_check"]["rows_checked"] == 3
+
+    preview = _data_call(
+        universe, "SpatialPreprocess", "filter_spatial_qc",
+        input_path=source, output_path=str(tmp_path / "preview.csv"),
+        max_pct_mito=20, group_by="slice_id",
+    )
+    assert preview["n_pass"] == 1
+    assert preview["failed_by_rule"] == {"max_pct_mito": 2}
+    assert [group["n_pass"] for group in preview["groups"]] == [0, 1]
+    filtered = _data_call(
+        universe, "SpatialPreprocess", "filter_spatial_qc", mode="filter",
+        input_path=source, output_path=str(tmp_path / "filtered.h5ad"), min_counts=1,
+    )
+    assert ad.read_h5ad(filtered["output_path"]).obs_names.tolist() == ["s1", "s3"]
+
+    normalized = _data_call(
+        universe, "SpatialPreprocess", "normalize_spatial_expression",
+        input_path=source, output_path=str(tmp_path / "norm.h5ad"),
+        log1p=False, target_sum=100, size_factor_key="size_factor",
+    )
+    data = ad.read_h5ad(normalized["output_path"])
+    np.testing.assert_array_equal(data.X.toarray(), adata.X.toarray())
+    np.testing.assert_allclose(data.layers["normalized"].sum(axis=1).A1, [100, 0, 100])
+    np.testing.assert_allclose(data.obs["size_factor"], [0.04, 0, 0.09])
+    assert normalized["n_zero_spots"] == 1
+
+    request = {
+        "input_path": normalized["output_path"], "output_path": str(tmp_path / "spots.tsv"),
+        "spot_ids": ["s3", "s1"], "format": "tsv", "obs_columns": ["slice_id"],
+        "genes": ["gene2"], "expression_layer": "normalized",
+    }
+    exported = _data_call(universe, "SpatialIO", "export_spatial_table", **request)
+    table = pd.read_csv(exported["output_path"], sep="\t")
+    assert table["spot_id"].tolist() == ["s3", "s1"]
+    assert exported["column_sources"]["gene:gene2"] == "layers/normalized/gene2"
+    np.testing.assert_allclose(table["gene:gene2"], [100, 75])
+    rejected = _data_call(universe, "SpatialIO", "export_spatial_table", **request)
+    assert "Output already exists" in rejected["error"]
+
+
+def test_align_gene_ids_with_mapping(universe, tmp_path):
+    """Keep reference-only genes and reject ambiguous mappings."""
+    ad = pytest.importorskip("anndata")
+    import numpy as np
+    import pandas as pd
+
+    spatial = ad.AnnData(X=np.array([[1, 2]]), var=pd.DataFrame(index=["A", "B"]))
+    reference = ad.AnnData(
+        X=np.array([[3, 4, 5]]),
+        var=pd.DataFrame(index=["ENSG0001.1", "ENSG0002.2", "ENSG0003.1"]),
+    )
+    paths = {side: str(tmp_path / f"{side}.h5ad") for side in ("spatial", "reference")}
+    spatial.write_h5ad(paths["spatial"])
+    reference.write_h5ad(paths["reference"])
+    mapping = tmp_path / "mapping.csv"
+    mapping.write_text("source_id,target_id\nA,ENSG0002\nB,ENSG0001\n")
+    request = {
+        "spatial_path": paths["spatial"], "reference_path": paths["reference"],
+        "output_dir": str(tmp_path), "mapping_path": str(mapping), "mapping_side": "spatial",
+        "strip_ensembl_version": True,
+    }
+    preserved = _data_call(universe, "SpatialPreprocess", "align_gene_ids", **request)
+    assert preserved["n_shared"] == 2
+    assert preserved["n_reference_only"] == 1
+    assert ad.read_h5ad(preserved["reference_path"]).var_names.tolist() == [
+        "ENSG0001", "ENSG0002", "ENSG0003",
+    ]
+    aligned = _data_call(universe, "SpatialPreprocess", "align_gene_ids", mode="intersection", **request)
+    result = ad.read_h5ad(aligned["reference_path"])
+    assert result.var_names.tolist() == ["ENSG0002", "ENSG0001"]
+    np.testing.assert_array_equal(result.X, [[4, 3]])
+    mapping.write_text("source_id,target_id\nA,ENSG0001\nB,ENSG0001\n")
+    rejected = _data_call(universe, "SpatialPreprocess", "align_gene_ids", **request)
+    assert "Duplicate target gene IDs" in rejected["error"]
+
+
+def test_spatial_association_uses_patient_as_unit(universe, tmp_path):
+    """Weight slices within patients and permute patient labels across groups."""
+    pytest.importorskip("matplotlib")
+    import pandas as pd
+
+    rows = []
+    sections = [
+        ("P01", "response", "large", 30, 1),
+        ("P01", "response", "small", 5, -1),
+        ("P02", "response", "large", 7, 1),
+        ("P03", "no_response", "large", 5, -1),
+        ("P04", "no_response", "large", 5, -1),
+    ]
+    for patient, group, slice_id, n, direction in sections:
+        for i in range(n):
+            rows.append({
+                "patient": patient, "response": group, "slice_id": slice_id,
+                "domain": "d", "x": i, "y": 0,
+                "T": i + 1, "B": i + 1 if direction == 1 else n - i,
+            })
+    path = tmp_path / "abundance.csv"
+    pd.DataFrame(rows).to_csv(path, index=False)
+    request = {
+        "input_path": str(path), "output_dir": str(tmp_path), "cell_types": ["T", "B"],
+        "patient_key": "patient", "group_key": "response", "domain_key": "domain",
+        "method": "colocalization", "compare_groups": ["response", "no_response"],
+        "n_permutations": 99,
+    }
+    result = _data_call(universe, "SpatialAssociation", "analyze_spatial_association", **request)
+    comparison = result["group_comparison"]
+    assert comparison["unit"] == "patient"
+    assert comparison["n_patients_by_group"] == {"response": 2, "no_response": 2}
+    assert comparison["permutation_method"] == "exact"
+    assert comparison["n_permutations"] == 6
+    assert comparison["difference"] == pytest.approx(1.5)
+    assert comparison["p_value"] == pytest.approx(1 / 3)
+    patients = pd.read_csv(result["patient_summary_path"]).set_index("patient_id")
+    assert patients.loc["P01", "n_spots_used"] == 35
+    assert patients.loc["P01", "score"] == pytest.approx(0)
+    assert patients["spatial_p_value"].notna().all()
+    assert Path(result["figure_path"]).is_file()
+
+    rows[0]["response"] = "no_response"
+    pd.DataFrame(rows).to_csv(path, index=False)
+    rejected = _data_call(universe, "SpatialAssociation", "analyze_spatial_association", **request)
+    assert "Each patient must belong to exactly one group" in rejected["error"]
