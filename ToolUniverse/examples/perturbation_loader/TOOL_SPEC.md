@@ -4,11 +4,11 @@
 
 ## 注册与配置
 
-实现继承 `BaseTool`，以 `@register_tool("PerturbationTool")` 注册，实现 `run(arguments)`。构造阶段不读取用户数据。
+实现继承 `BaseTool`，以 `@register_tool("PerturbationDatasetLoaderTool")` 注册，实现 `run(arguments)`。构造阶段不读取用户数据。
 
 - category：`perturbation`，通过 `default_config.py` 映射配置。
 - name：`perturbation_load_dataset`，用于 SDK 与 MCP 导出；别名 `perturbation.load_dataset` 保持已有运行时请求兼容。
-- type：`PerturbationTool`，与注册名一致。
+- type：`PerturbationDatasetLoaderTool`，与注册名一致。
 - SDK callable：`perturbation_load_dataset`，直接调用规范名称，不添加装饰器。
 
 配置文件为 `src/tooluniverse/data/perturbation_tools.json`，顶层为列表。参数 Schema 拒绝未声明字段；配置声明 `requires_local_input: true`、`cacheable: false` 和 anndata 依赖。完整输入与返回 Schema 以该 JSON 为准。
@@ -47,7 +47,7 @@ H5AD 使用 backed 读取时，layers 仍可能被 AnnData 载入内存；选中
 
 ## 元数据关联
 
-`metadata_join_keys.data` 引用表达观测列，其中保留键 `__obs_index__` 表示观测索引。`metadata_join_keys.metadata` 引用外部列，支持复合键。保留键与原始列冲突必须失败。
+`metadata_join_keys.data` 引用表达观测列，其中保留键 `__obs_index__` 表示观测索引。`metadata_join_keys.metad  ata` 引用外部列，支持复合键。保留键与原始列冲突必须失败。
 
 关联按键进行并保留观测顺序，禁止按行号拼接。关联键不得为空，元数据键必须唯一，禁止一对多展开。默认每条数据记录必须匹配，元数据允许有未使用额外行；allow_missing 保留未匹配观测并在 warnings 返回数量。
 
