@@ -51,7 +51,7 @@ finally:
 PY
 ```
 
-也可使用 Python SDK 包装入口 `from tooluniverse.tools import perturbation_load_dataset`；它映射到同一个带点号的工具名。
+也可使用 Python SDK 包装入口 `from tooluniverse.tools import perturbation_load_dataset`；它调用规范名称 `perturbation_load_dataset`，带点号的 `perturbation.load_dataset` 作为兼容别名继续支持。
 
 10x MTX 的 `source` 应指向 `perturb_tools/test_data/real/format_reference/pbmc3k_mtx/filtered_gene_bc_matrices/hg19`。CSV/TSV 另外需要：
 

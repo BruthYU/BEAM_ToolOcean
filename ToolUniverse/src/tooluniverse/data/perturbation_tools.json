@@ -1,6 +1,6 @@
 [
   {
-    "name": "perturbation.load_dataset",
+    "name": "perturbation_load_dataset",
     "type": "PerturbationDatasetLoaderTool",
     "description": "Load local expression data from H5AD, modern 10x H5, 10x MTX directories, or numeric CSV/TSV (including gzip). Validate IDs and metadata joins and write a persistent reference with fingerprints for every input. Returns a JSON summary, not the full matrix. Does not normalize or predict. CSV/TSV requires explicit matrix_orientation and index_column.",
     "parameter": {
@@ -260,6 +260,9 @@
         "source": "perturb_tools/test_data/real/molecular/adamson_2016.h5ad",
         "output_dir": "/tmp/perturbation-example-workspace"
       }
+    ],
+    "aliases": [
+      "perturbation.load_dataset"
     ]
   }
 ]

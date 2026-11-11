@@ -103,7 +103,7 @@ def perturbation_load_dataset(
     }
     return get_shared_client().run_one_function(
         {
-            "name": "perturbation.load_dataset",
+            "name": "perturbation_load_dataset",
             "arguments": _args,
         },
         stream_callback=stream_callback,
