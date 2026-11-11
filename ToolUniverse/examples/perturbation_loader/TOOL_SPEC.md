@@ -47,7 +47,7 @@ H5AD 使用 backed 读取时，layers 仍可能被 AnnData 载入内存；选中
 
 ## 元数据关联
 
-`metadata_join_keys.data` 引用表达观测列，其中保留键 `__obs_index__` 表示观测索引。`metadata_join_keys.metad  ata` 引用外部列，支持复合键。保留键与原始列冲突必须失败。
+`metadata_join_keys.data` 引用表达观测列，其中保留键 `__obs_index__` 表示观测索引。`metadata_join_keys.metadata` 引用外部列，支持复合键。保留键与原始列冲突必须失败。
 
 关联按键进行并保留观测顺序，禁止按行号拼接。关联键不得为空，元数据键必须唯一，禁止一对多展开。默认每条数据记录必须匹配，元数据允许有未使用额外行；allow_missing 保留未匹配观测并在 warnings 返回数量。
 
