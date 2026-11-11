@@ -11,6 +11,7 @@ from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 default_tool_files = {
+    "perturbation": os.path.join(current_dir, "data", "perturbation_tools.json"),
     "special_tools": os.path.join(current_dir, "data", "special_tools.json"),
     "tooluniverse_page": os.path.join(
         current_dir, "data", "tooluniverse_page_tools.json"
