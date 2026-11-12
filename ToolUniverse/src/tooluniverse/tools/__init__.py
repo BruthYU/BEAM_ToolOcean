@@ -25,6 +25,8 @@ from tooluniverse.exceptions import (
 from ._shared_client import get_shared_client, reset_shared_client
 
 # Import all tools
+from .perturbation_load_dataset import perturbation_load_dataset
+from .image_perturbation_load_images import image_perturbation_load_images
 from .ACC_list_guidelines import ACC_list_guidelines
 from .ADA_get_standards_section import ADA_get_standards_section
 from .ADA_list_standards_sections import ADA_list_standards_sections
@@ -3452,6 +3454,8 @@ from .web_api_documentation_search import web_api_documentation_search
 from .web_search import web_search
 
 __all__ = [
+    "perturbation_load_dataset",
+    "image_perturbation_load_images",
     "get_shared_client",
     "reset_shared_client",
     "ACC_list_guidelines",

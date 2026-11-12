@@ -1,0 +1,274 @@
+[
+  {
+    "name": "image_perturbation_load_images",
+    "aliases": [
+      "image_perturbation.load_images"
+    ],
+    "type": "PerturbationImageDatasetTool",
+    "description": "Index microscopy TIFF/OME-TIFF filesets, BigTIFF, CZI, ND2, LIF, PNG/JPEG/BMP and local or anonymous remote OME-Zarr 0.4/0.5. Preserve axes, channels, scales and explicit scene/series/level selections. Returns JSONL index and reference, not pixels. Native backends are optional. Remote references verify metadata only, not pixel content. No segmentation or prediction.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "source_type",
+        "output_dir"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local image, vendor file, OME fileset entry, local store, manifest, or anonymous OME-Zarr URL (remote mode)."
+        },
+        "source_type": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory",
+            "manifest",
+            "remote"
+          ],
+          "description": "file, directory or manifest for local sources; remote for one anonymous HTTP(S)/S3 OME-Zarr image."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory for image index and dataset reference."
+        },
+        "dataset_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+          "description": "Unique dataset ID; generated if omitted."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "tiff",
+            "ome_tiff",
+            "ome_zarr",
+            "png",
+            "jpeg",
+            "bmp",
+            "czi",
+            "nd2",
+            "lif"
+          ],
+          "description": "Default auto; applies to image files, not manifest table format."
+        },
+        "file_pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory glob, default top-level supported raster files and OME-Zarr stores; recursive patterns exclude store internals."
+        },
+        "image_root": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Root for manifest relative image paths; default manifest directory."
+        },
+        "image_path_columns": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Manifest wide channel name to path-column mapping. Each row represents one field."
+        },
+        "metadata_column_map": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Standard metadata field to manifest column name."
+        },
+        "field_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Mapped metadata fields that uniquely identify each manifest row; otherwise row index is used."
+        },
+        "missing_images": {
+          "type": "string",
+          "enum": [
+            "error",
+            "skip_field"
+          ],
+          "description": "Default error; explicit skip_field skips entire incomplete fields and reports count."
+        },
+        "axes": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Explicit axis order from TCZYX; required if TIFF axes are ambiguous."
+        },
+        "channel_map": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Internal zero-based channel index to name. Must cover every channel; incompatible with manifest channel names."
+        },
+        "lazy": {
+          "type": "boolean",
+          "description": "Default true indexes metadata without pixel decoding. False decodes one selected TIFF series/level, or OME-Zarr chunks sequentially."
+        },
+        "series_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based TIFF series or OME-Zarr multiscales index. Required when more than one series exists."
+        },
+        "resolution_level": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based pyramid resolution, default zero (full resolution)."
+        },
+        "group_path": {
+          "type": "string",
+          "description": "OME-Zarr image group inside source store (e.g. A/1/0); default root. No path traversal."
+        },
+        "position_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based mosaic position for LIF; required when the selected image has multiple positions."
+        },
+        "remote_timeout": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "description": "Remote request timeout in seconds, default 30; remote mode only."
+        },
+        "remote_endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional anonymous S3-compatible endpoint URL, e.g. https://uk1s3.embassy.ebi.ac.uk. s3 remote mode only; no embedded credentials or query."
+        }
+      }
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "data",
+            "warnings"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "required": [
+                "dataset_ref",
+                "index_path",
+                "dataset_id",
+                "modality",
+                "n_files",
+                "n_fields",
+                "channels",
+                "metadata_fields",
+                "pixel_validation",
+                "n_input_files",
+                "integrity_scope"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "dataset_ref": {
+                  "type": "string"
+                },
+                "index_path": {
+                  "type": "string"
+                },
+                "dataset_id": {
+                  "type": "string"
+                },
+                "modality": {
+                  "const": "image"
+                },
+                "n_files": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "n_fields": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "channels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "metadata_fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "pixel_validation": {
+                  "enum": [
+                    "header",
+                    "decoded"
+                  ]
+                },
+                "n_input_files": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "integrity_scope": {
+                  "type": "string",
+                  "enum": [
+                    "full_content",
+                    "metadata_only"
+                  ]
+                }
+              }
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "error_code",
+            "error"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error_code": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "requires_local_input": true,
+    "cacheable": false
+  }
+]
