@@ -432,3 +432,54 @@ def test_spatial_screen_global_family_and_slice_weighting(universe, tmp_path):
     request['datasets'][1]['dataset_id'] = 'csv'
     rejected = _data_call(universe, 'SpatialAssociation', 'screen_spatial_associations', **request)
     assert 'dataset_id values must be unique' in rejected['error']
+
+
+def test_dataset_description_matches_background_to_samples(universe, tmp_path):
+    """Attribute only matched metadata and preserve unrecorded biological fields."""
+    import anndata as ad
+    import numpy as np
+    import pandas as pd
+
+    data = ad.AnnData(
+        np.ones((3, 2)),
+        obs=pd.DataFrame(
+            {"donor": ["p1", "p1", "p2"], "section": ["s1", "s1", "s2"], "response": ["R", "R", "NR"]},
+            index=["spot1", "spot2", "spot3"],
+        ),
+        var=pd.DataFrame(index=["g1", "g2"]),
+    )
+    path = tmp_path / "unknown_disease.h5ad"
+    data.write_h5ad(path)
+    result = _data_call(universe, "SpatialIO", "describe_spatial_dataset", input_path=str(path))
+    assert "Disease: Not recorded in the supplied data." in result["biological_metadata"]
+    assert any("'R': 1" in text and "'NR': 1" in text for text in result["sample_annotations"])
+    background = tmp_path / "background.csv"
+    pd.DataFrame({"sample": ["s1", "unrelated"], "diagnosis": ["recorded disease", "irrelevant disease"]}).to_csv(background, index=False)
+    request = dict(input_path=str(path), metadata_path=str(background), metadata_columns={
+        "obs": {"sample_id": "section"}, "background": {"sample_id": "sample", "disease": "diagnosis"},
+    })
+    result = _data_call(universe, "SpatialIO", "describe_spatial_dataset", **request)
+    assert "recorded disease" in str(result["biological_metadata"])
+    assert "irrelevant disease" not in str(result)
+    assert any("missing for 1" in text for text in result["sample_annotations"])
+    pd.DataFrame({"sample": ["s1", "s1"], "diagnosis": ["a", "b"]}).to_csv(background, index=False)
+    rejected = _data_call(universe, "SpatialIO", "describe_spatial_dataset", **request)
+    assert "repeated sample_id" in rejected["error"]
+
+
+def test_reference_description_background_uses_dataset_path(universe, tmp_path):
+    """Link fitted-reference provenance by path and report cell names in English."""
+    reference = tmp_path / "reference.csv"
+    reference.write_text("gene,T_cell,B_cell\ng1,1,2\ng2,2,1\n")
+    background = tmp_path / "study.csv"
+    background.write_text("dataset_path,disease\nreference.csv,recorded disease\nother.csv,unrelated\n")
+    result = _data_call(
+        universe, "SpatialIO", "describe_spatial_dataset", input_path=str(reference), metadata_path=str(background)
+    )
+    assert "2 genes and 2 cell type columns" in result["dataset_summary"]
+    assert "T_cell" in str(result["cell_annotations"])
+    assert "recorded disease" in str(result["biological_metadata"])
+    assert set(result) == {"operation", "dataset_summary", "biological_metadata", "sample_annotations", "cell_annotations", "data_contents"}
+    reference.write_text("gene,T_cell,B_cell\ng1,1,-2\n")
+    rejected = _data_call(universe, "SpatialIO", "describe_spatial_dataset", input_path=str(reference))
+    assert "nonnegative" in rejected["error"]

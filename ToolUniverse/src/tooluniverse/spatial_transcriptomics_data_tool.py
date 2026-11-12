@@ -151,7 +151,59 @@ def _read_visium_positions(directory):
 
 @register_tool("SpatialIOTool")
 class SpatialIOTool(_SpatialTool):
-    operations = ("import_visium", "inspect_spatial_h5ad", "export_spatial_table")
+    operations = ("import_visium", "inspect_spatial_h5ad", "export_spatial_table", "describe_spatial_dataset", "inspect_author_annotations")
+
+    def describe_spatial_dataset(self, request):
+        from .spatial_dataset_description import describe_spatial_dataset
+
+        return describe_spatial_dataset(request)
+
+    def inspect_author_annotations(self, request):
+        import pandas as pd
+
+        spot_key = request.get("spot_key")
+        cluster_key = request["cluster_key"]
+        try:
+            frame = pd.read_csv(_path(request["annotation_path"]), dtype=str, keep_default_na=False)
+        except (OSError, ValueError) as exc:
+            raise ToolValidationError(f"Cannot read annotation CSV: {exc}") from exc
+        if not len(frame.columns):
+            raise ToolValidationError("The annotation CSV must contain columns.")
+        spot_key = frame.columns[0] if spot_key is None else spot_key
+        if spot_key == cluster_key or not {spot_key, cluster_key}.issubset(frame.columns):
+            raise ToolValidationError("The annotation CSV must contain distinct spot and cluster columns.")
+        frame = frame.set_index(spot_key)
+        if not frame.index.is_unique or any(not spot.strip() for spot in frame.index):
+            raise ToolValidationError("Annotation spot IDs must be unique and nonempty.")
+        with _open_h5ad(request["spatial_path"]) as spatial:
+            ids = spatial.obs_names.copy()
+        if not len(ids) or not ids.is_unique or any(not spot.strip() for spot in ids):
+            raise ToolValidationError("Spatial spot IDs must be unique and nonempty.")
+
+        clusters = frame[cluster_key].reindex(ids)
+        missing = clusters.isna() | clusters.eq("")
+        if missing.any():
+            raise ToolValidationError(f"{int(missing.sum())} spatial spots lack an author cluster annotation.")
+        mapping = request["cluster_mapping"]
+        labels = clusters.map({key: value["label"] for key, value in mapping.items()})
+        regions = clusters.map({key: value["region"] for key, value in mapping.items()})
+        aligned = pd.DataFrame({
+            "spot_id": ids, "author_cluster": clusters.to_numpy(),
+            "author_label": labels.fillna("unassigned").to_numpy(),
+            "author_region": regions.fillna("unassigned").to_numpy(),
+        })
+        summary = {
+            "n_spots": len(ids), "n_extra_annotations": len(frame.index.difference(ids)),
+            "region_counts": aligned["author_region"].value_counts().to_dict(),
+            "unmapped_clusters": sorted(set(clusters) - set(mapping)),
+            "source": request.get("source"), "cluster_mapping": mapping,
+        }
+        with _result_directory(request["output_dir"], "author_annotations") as output:
+            annotations = output / "annotations.csv"
+            audit = output / "audit.json"
+            aligned.to_csv(annotations, index=False)
+            audit.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+        return {**summary, "annotations_path": str(annotations), "audit_path": str(audit)}
 
     def import_visium(self, request):
         import numpy as np

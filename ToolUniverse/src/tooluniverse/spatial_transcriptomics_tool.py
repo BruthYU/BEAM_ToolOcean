@@ -247,7 +247,12 @@ class Cell2locationTool(_SpatialTool):
 
 @register_tool("TangramTool")
 class TangramTool(_SpatialTool):
-    operations = ("map_to_space",)
+    operations = ("map_to_space", "validate_gene_projection")
+
+    def validate_gene_projection(self, request):
+        from .spatial_projection_validation import validate_gene_projection
+
+        return validate_gene_projection(request)
 
     def map_to_space(self, request):
         import tangram as tg
