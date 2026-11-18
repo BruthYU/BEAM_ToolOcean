@@ -440,17 +440,6 @@ class CellposeTool(BaseTool):
                     "status": "error",
                     "error": f"Cellpose dependency unavailable: {_IMPORT_ERROR}",
                 }
-            if not hasattr(_cp_models, "Cellpose"):
-                unsupported = [
-                    key for key in ("model_type", "channels") if key in arguments
-                ]
-                if unsupported:
-                    raise ValueError(
-                        "Cellpose 4.x does not apply "
-                        + ", ".join(unsupported)
-                        + "; omit these legacy parameters. Use pretrained_model for weights "
-                        "and channel_names/channel_indices for physical channels."
-                    )
             device = self._resolve_device(arguments.get("device", "auto"))
             items, descriptor = image_items(arguments)
             if not 1 <= len(items) <= 512:

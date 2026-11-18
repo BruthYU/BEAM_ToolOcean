@@ -125,8 +125,8 @@ mask 为二维实例标签，0 表示背景。对象面积单位是像素，质�
 
 不设置 `output_dir` 的旧单图调用继续返回完整对象统计，默认不保存 mask。
 旧接口的 `save_mask`、`mask_output_path` 不能与完整输出模式同时使用。
-Cellpose 4.x 下显式填写旧 `model_type`、`channels` 会报错；应省略它们，使用 `pretrained_model`
-选择权重，用 `channel_names` / `channel_indices` 选择实际输入通道。
+Cellpose 4.x 接受并忽略旧 `model_type`、`channels`，结果会说明实际使用的模型。
+使用 `pretrained_model` 选择权重，用 `channel_names` / `channel_indices` 选择实际输入通道。
 
 ## 已验证范围
 

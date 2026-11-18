@@ -16,9 +16,9 @@ JSON 参数契约以 `src/tooluniverse/data/cellpose_tools.json` 为准；运行
 | `resume` | bool / false | 续跑已有 run_id；需显式 run_id，缺失运行拒绝 |
 | `device` | string / auto | auto 使用可用 CUDA:0，否则 CPU；cpu、cuda、cuda:N、mps 显式不可用时报错 |
 | `pretrained_model` | string | 4.x 支持安装版本内置名称或可信的已有 checkpoint 路径；未知名称拒绝；3.x 不接受此选项 |
-| `model_type` | string / cyto3 | cyto3、cyto2、cyto、nuclei；仅 3.x 生效；4.x 显式填写时报错，省略则使用安装版本默认权重 |
+| `model_type` | string / cyto3 | cyto3、cyto2、cyto、nuclei；仅 3.x 生效。4.x 接受并忽略此参数，通过 `pretrained_model` 选择权重 |
 | `diameter` | number / 后端默认 | 非负有限数；0 同未指定。3.x 可估计尺寸，4.x 默认缩放，不自动估计尺寸 |
-| `channels` | int[2] / [0,0] | 旧 3.x 细胞/细胞核通道码，取值 0–3；4.x 显式填写时报错 |
+| `channels` | int[2] / [0,0] | 旧 3.x 细胞/细胞核通道码，取值 0–3。4.x 接受并忽略此参数 |
 | `channel_names` | string[] | 1–3 个唯一的 loader 声明通道名，按请求顺序输入模型；与 channel_indices 互斥 |
 | `channel_indices` | int[] | 1–3 个唯一的非负物理通道索引；宽表按 image_path_columns 顺序；所有后端均生效 |
 | `z_index`, `t_index` | int / 单例为 0 | 多平面轴必须明确选择；不存在的轴只接受 0；不做隐式投影 |

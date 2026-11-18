@@ -1,7 +1,7 @@
 [
   {
     "name": "Cellpose_segment_image",
-    "description": "Local Cellpose 2D segmentation with legacy single-image statistics or complete persistent results. Accept exactly one image_path, image_paths batch, or image_ref from the microscopy loader. Complete mode (output_dir) writes lossless uint32 masks, full object tables, selected input pixels, previews and optional native flows/styles. Batch calls reuse a model serially, record per-image failures, and support fingerprint-validated resume. Explicit device selection supports CPU/CUDA/MPS. Z/T planes and up to three physical channels must be selected explicitly when ambiguous. Explicit legacy model_type/channels are rejected on Cellpose 4.x; use pretrained_model and channel_names/channel_indices. Progress callbacks, cooperative time budgets and cancellation markers support long calls. No training, volumetric inference or background job service.",
+    "description": "Local Cellpose 2D segmentation with legacy single-image statistics or complete persistent results. Accept exactly one image_path, image_paths batch, or image_ref from the microscopy loader. Complete mode (output_dir) writes lossless uint32 masks, full object tables, selected input pixels, previews and optional native flows/styles. Batch calls reuse a model serially, record per-image failures, and support fingerprint-validated resume. Explicit device selection supports CPU/CUDA/MPS. Z/T planes and up to three physical channels must be selected explicitly when ambiguous. Cellpose 4.x accepts legacy model_type/channels for compatibility and ignores them. Use pretrained_model and channel_names/channel_indices to select weights and physical channels. Progress callbacks, cooperative time budgets and cancellation markers support long calls. No training, volumetric inference or background job service.",
     "parameter": {
       "type": "object",
       "properties": {
@@ -11,7 +11,7 @@
         },
         "model_type": {
           "type": "string",
-          "description": "Legacy Cellpose 3.x model selector (default cyto3). Explicitly supplying this parameter on 4.x fails; use pretrained_model instead. Omit it for the installed default model.",
+          "description": "Legacy Cellpose 3.x model selector (default cyto3). Accepted but ignored on 4.x; use pretrained_model to select weights.",
           "enum": [
             "cyto3",
             "cyto2",
@@ -31,7 +31,7 @@
             "minimum": 0,
             "maximum": 3
           },
-          "description": "Legacy 3.x [cytoplasm,nucleus] codes. Explicitly supplying this parameter on 4.x fails. Use channel_names/channel_indices for physical input channels.",
+          "description": "Legacy 3.x [cytoplasm,nucleus] codes. Accepted but ignored on 4.x. Use channel_names/channel_indices for physical input channels.",
           "minItems": 2,
           "maxItems": 2
         },

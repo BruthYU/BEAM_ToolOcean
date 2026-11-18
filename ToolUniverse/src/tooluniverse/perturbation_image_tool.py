@@ -67,6 +67,14 @@ def _directory_files(source, pattern=None):
     return files
 
 
+def _image_fileset(path):
+    if _SUFFIXES.get(path.suffix.lower()) == "tiff":
+        from .microscopy_image_readers import ome_tiff_members
+
+        return ome_tiff_members(path)
+    return [path]
+
+
 def _image_header(path, arguments):
     from .microscopy_image_readers import read_native, read_tiff, read_zarr
 
@@ -409,13 +417,7 @@ def _inspect_images(arguments):
                 raise DatasetLoadError(
                     "INVALID_DATA", f"Image appears more than once: {path}"
                 )
-            from .microscopy_image_readers import ome_tiff_members
-
-            related = (
-                ome_tiff_members(path)
-                if _SUFFIXES.get(path.suffix.lower()) == "tiff"
-                else [path]
-            )
+            related = _image_fileset(path)
             related_set = set(related)
             if mode == "directory" and related_set.issubset(seen):
                 continue
@@ -509,10 +511,11 @@ def resolve_image_dataset_ref(dataset_ref):
     options = descriptor["read_options"]
     if options["source_type"] == "directory":
         files = {
-            str(p)
-            for p in _directory_files(
+            str(member)
+            for path in _directory_files(
                 Path(options["source"]), options.get("file_pattern")
             )
+            for member in _image_fileset(path)
         }
         if files != {s["path"] for s in descriptor["inputs"]}:
             raise DatasetLoadError(
