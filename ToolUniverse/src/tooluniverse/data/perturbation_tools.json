@@ -264,5 +264,311 @@
     "aliases": [
       "perturbation.load_dataset"
     ]
+  },
+  {
+    "name": "perturbation_load_metadata",
+    "aliases": [
+      "perturbation.load_metadata"
+    ],
+    "type": "PerturbationMetadataTool",
+    "description": "Load and standardize perturbation experiment annotations for expression or image experiments: perturbation labels, doses, times, controls, repeats and batches. Validate explicit experiment-level association keys and control annotations; return standardized metadata reference, summary and bounded actual-record preview. Use for perturbation semantics, not generic table reading. Does not guess units or controls, attach to or modify datasets, infer mechanism, or assess full experimental design.",
+    "parameter": {
+      "type": "object",
+      "required": [
+        "source",
+        "output_dir",
+        "experiment_level",
+        "field_map",
+        "association_keys"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local perturbation experiment metadata table or H5AD whose obs is read without loading expression matrices."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory for standardized JSONL and persistent metadata reference."
+        },
+        "experiment_level": {
+          "type": "string",
+          "enum": [
+            "cell",
+            "sample",
+            "well",
+            "field"
+          ],
+          "description": "One row per cell, sample, well or image field; level IDs are required and must be part of association_keys."
+        },
+        "field_map": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "perturbation",
+              "perturbation_type",
+              "cell_id",
+              "sample_id",
+              "plate_id",
+              "well_id",
+              "site_id",
+              "cell_type",
+              "dose",
+              "dose_unit",
+              "time",
+              "time_unit",
+              "batch",
+              "replicate",
+              "is_control"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Standard field to original column. perturbation and level IDs must be mapped or supplied as constants. H5AD observation IDs are exposed as __obs_index__."
+        },
+        "association_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "perturbation",
+              "perturbation_type",
+              "cell_id",
+              "sample_id",
+              "plate_id",
+              "well_id",
+              "site_id",
+              "cell_type",
+              "dose",
+              "dose_unit",
+              "time",
+              "time_unit",
+              "batch",
+              "replicate",
+              "is_control"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Standardized columns uniquely identifying records. Include cell_id; sample_id; plate_id+well_id; or plate_id+well_id+site_id according to experiment_level."
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "csv",
+            "tsv",
+            "xlsx",
+            "parquet",
+            "h5ad_obs"
+          ],
+          "description": "Default auto; CSV/TSV also support gzip. H5AD reads obs only."
+        },
+        "sheet_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "XLSX sheet name; default first sheet, invalid for other formats."
+        },
+        "constants": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "perturbation",
+              "perturbation_type",
+              "cell_id",
+              "sample_id",
+              "plate_id",
+              "well_id",
+              "site_id",
+              "cell_type",
+              "dose",
+              "dose_unit",
+              "time",
+              "time_unit",
+              "batch",
+              "replicate",
+              "is_control"
+            ]
+          },
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "description": "Explicit standard field constants, e.g. dose_unit=uM. Cannot overlap field_map. No units or biological meaning are inferred."
+        },
+        "control_values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Exact perturbation labels denoting controls. Must match at least one row; must agree with any mapped is_control column."
+        },
+        "duplicate_keys": {
+          "type": "string",
+          "enum": [
+            "error",
+            "collapse_identical"
+          ],
+          "description": "Default error. collapse_identical only collapses identical standardized rows; conflicting annotations always fail."
+        },
+        "missing_optional": {
+          "type": "string",
+          "enum": [
+            "preserve",
+            "error"
+          ],
+          "description": "Default preserve: optional blanks become null with counts. Keys, perturbation and provided is_control must not be missing."
+        },
+        "preview_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "description": "Number of actual standardized records returned for preview; default 5."
+        },
+        "metadata_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+          "description": "Unique metadata artifact ID; auto-generated when omitted."
+        },
+        "missing_perturbation": {
+          "type": "string",
+          "enum": [
+            "error",
+            "drop_rows"
+          ],
+          "description": "Default error. Explicit drop_rows removes records whose perturbation label is missing and reports count; never infers controls or treatment."
+        }
+      }
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "data",
+            "warnings"
+          ],
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metadata_ref",
+                "table_path",
+                "metadata_id",
+                "experiment_level",
+                "n_source_rows",
+                "n_rows",
+                "fields",
+                "association_keys",
+                "n_perturbations",
+                "n_controls",
+                "preview"
+              ],
+              "properties": {
+                "metadata_ref": {
+                  "type": "string"
+                },
+                "table_path": {
+                  "type": "string"
+                },
+                "metadata_id": {
+                  "type": "string"
+                },
+                "experiment_level": {
+                  "enum": [
+                    "cell",
+                    "sample",
+                    "well",
+                    "field"
+                  ]
+                },
+                "n_source_rows": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "n_rows": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "association_keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "n_perturbations": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "n_controls": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "preview": {
+                  "type": "array",
+                  "maxItems": 20,
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "error",
+            "error_code"
+          ],
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "error_code": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "requires_local_input": true,
+    "cacheable": false
   }
 ]

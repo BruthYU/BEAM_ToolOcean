@@ -86,41 +86,41 @@ H5AD backed 模式可将主矩阵保留在磁盘，obs 和部分 layers 仍可�
 
 完整构造、参数、错误和验收要求见 [工具规范](TOOL_SPEC.md)。
 
-## 两个 dataloader 的组合调用
+## 数据加载工具组合
 
-本 PR 提供表达数据和图像数据两个通用入口，通过 `format="auto"` 自动识别支持的格式，也可通过 `format` 显式选择；不按文件后缀拆分工具名。
+本次包含三个通用入口，按数据用途选择；每个入口通过 `format="auto"` 自动识别，或通过 `format` 参数显式选择格式，无须按后缀选择不同工具名。
 
-| 工具名 | 实现类（JSON type） | 分类 |
+| 工具名 | 实现类（JSON type） | 说明 |
 |---|---|---|
-| `perturbation_load_dataset` | `PerturbationDatasetTool` | `perturbation` |
-| `image_perturbation_load_images` | `PerturbationImageDatasetTool` | `image_perturbation` |
+| `perturbation_load_dataset` | `PerturbationDatasetTool` | 表达矩阵：H5AD、现代 10x H5、10x MTX、CSV/TSV |
+| `image_perturbation_load_images` | `PerturbationImageDatasetTool` | 显微图像、目录、图像清单及 OME-Zarr |
+| `perturbation_load_metadata` | `PerturbationMetadataTool` | 扰动实验注释表或 H5AD obs |
+
+表达数据和元数据配置位于 `data/perturbation_tools.json`，类别为 `perturbation`；图像配置位于 `data/image_perturbation_tools.json`，类别为 `image_perturbation`。可一次加载这两个类别以使用全部三个工具。
 
 ```python
-from tooluniverse import ToolUniverse
+from tooluniverse.tools import (
+    perturbation_load_dataset,
+    image_perturbation_load_images,
+    perturbation_load_metadata,
+)
 
-engine = ToolUniverse(load_workspace=False)
-try:
-    engine.load_tools(categories=["perturbation", "image_perturbation"])
-    expression = engine.run_one_function({
-        "name": "perturbation_load_dataset",
-        "arguments": {
-            "source": "/data/expression.h5ad",
-            "output_dir": "/tmp/expression-datasets",
-            "format": "auto",
-        },
-    }, validate=True, use_cache=False)
-    images = engine.run_one_function({
-        "name": "image_perturbation_load_images",
-        "arguments": {
-            "source": "/data/images",
-            "source_type": "directory",
-            "file_pattern": "*.png",
-            "output_dir": "/tmp/image-datasets",
-            "format": "auto",
-        },
-    }, validate=True, use_cache=False)
-finally:
-    engine.close()
+result = perturbation_load_dataset(
+    source="/data/expression.h5ad",
+    output_dir="/tmp/expression-datasets",
+    format="auto",
+)
 ```
 
-完整图像参数、可选读取依赖及持久化引用说明见 [图像加载说明](../image_perturbation_loader/README.md)。这两个入口独立加载各自数据，不自动匹配细胞与图像。
+图像和元数据的参数与示例分别见 [图像加载说明](../image_perturbation_loader/README.md) 和 [元数据加载说明](../perturbation_metadata_loader/README.md)。
+
+## 可选读取依赖
+
+本机验证环境为 Python 3.12。可安装数据读取扩展（不包含模型权重）：
+
+```bash
+python -m pip install -e './ToolUniverse[perturbation]'
+```
+
+基础 SDK 不要求这些读取依赖；不同格式仍按需导入。CZI 后端要求 Python 3.12。
+CellFlux / IMPA 的模型环境保持独立，按各自说明配置。
