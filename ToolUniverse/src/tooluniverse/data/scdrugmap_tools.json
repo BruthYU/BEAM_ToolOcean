@@ -1,0 +1,975 @@
+[
+  {
+    "name": "scDrugMap_list_datasets",
+    "type": "ScDrugMapQueryTool",
+    "description": "Find scDrugMap primary/external groups by accession, regimen, tissue, source or other catalog field. Returns qualified dataset IDs, observed cell/gene counts and verified sample/patient counts when available.",
+    "fields": {
+      "operation": "list"
+    },
+    "requires_local_input": false,
+    "cacheable": false,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "object",
+          "description": "Exact matches. OR among values within a field, AND between fields.",
+          "properties": {
+            "collection": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for collection."
+            },
+            "accession": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for accession."
+            },
+            "subgroup": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for subgroup."
+            },
+            "source": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for source."
+            },
+            "tissue": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for tissue."
+            },
+            "cancer": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for cancer."
+            },
+            "treatment_type": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for treatment_type."
+            },
+            "regimen": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for regimen."
+            },
+            "platform": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for platform."
+            }
+          },
+          "additionalProperties": false
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "default": 0
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "list"
+          ],
+          "default": "list",
+          "description": "Fixed backend operation."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                },
+                "offset": {
+                  "type": "integer"
+                },
+                "next_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "rows",
+                "total",
+                "limit",
+                "offset",
+                "next_offset"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "error",
+            "code"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "scDrugMap_get_dataset_info",
+    "type": "ScDrugMapQueryTool",
+    "description": "Describe one indexed group, including source, treatment, matrix orientation and units, exact label counts and clinical linkage coverage. Counts are scoped to the group.",
+    "fields": {
+      "operation": "info"
+    },
+    "requires_local_input": false,
+    "cacheable": false,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "Qualified scDrugMap group ID from list_datasets (e.g. external:Data20)."
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "info"
+          ],
+          "default": "info",
+          "description": "Fixed backend operation."
+        }
+      },
+      "required": [
+        "dataset_id"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "dataset_id": {
+                  "type": "string"
+                },
+                "n_cells": {
+                  "type": "integer"
+                },
+                "n_genes": {
+                  "type": "integer"
+                },
+                "n_samples": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "n_patients": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "expression_scale": {
+                  "type": "string"
+                },
+                "sample_mapping_available": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "dataset_id",
+                "n_cells",
+                "n_genes",
+                "n_samples",
+                "n_patients",
+                "expression_scale",
+                "sample_mapping_available"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "error",
+            "code"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "scDrugMap_query_cells",
+    "type": "ScDrugMapQueryTool",
+    "description": "Page archive cell IDs and source drug-response labels within a group. For clinically linked cells also return source patient, biopsy, timepoint, original outcome and regimen. A lesion label is shared by cells in that lesion.",
+    "fields": {
+      "operation": "cells"
+    },
+    "requires_local_input": false,
+    "cacheable": false,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "Qualified scDrugMap group ID from list_datasets (e.g. external:Data20)."
+        },
+        "filters": {
+          "type": "object",
+          "description": "Exact matches. OR among values within a field, AND between fields.",
+          "properties": {
+            "label": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for label."
+            },
+            "patient_id": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for patient_id."
+            },
+            "sample_id": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for sample_id."
+            },
+            "timepoint": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for timepoint."
+            },
+            "response_original": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for response_original."
+            },
+            "sample_regimen": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for sample_regimen."
+            }
+          },
+          "additionalProperties": false
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "default": 0
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "cells"
+          ],
+          "default": "cells",
+          "description": "Fixed backend operation."
+        }
+      },
+      "required": [
+        "dataset_id"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                },
+                "offset": {
+                  "type": "integer"
+                },
+                "next_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "rows",
+                "total",
+                "limit",
+                "offset",
+                "next_offset"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "error",
+            "code"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "scDrugMap_query_samples",
+    "type": "ScDrugMapQueryTool",
+    "description": "Page verified biological biopsies, grouped by patient, sample and timepoint. Returns n_cells, archived label and original response; mixed labels are null. Reports an explicit error when clinical linkage is unavailable.",
+    "fields": {
+      "operation": "samples"
+    },
+    "requires_local_input": false,
+    "cacheable": false,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "Qualified scDrugMap group ID from list_datasets (e.g. external:Data20)."
+        },
+        "filters": {
+          "type": "object",
+          "description": "Exact matches. OR among values within a field, AND between fields.",
+          "properties": {
+            "label": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for label."
+            },
+            "patient_id": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for patient_id."
+            },
+            "sample_id": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for sample_id."
+            },
+            "timepoint": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for timepoint."
+            },
+            "response_original": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for response_original."
+            },
+            "sample_regimen": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "minItems": 1,
+              "maxItems": 50,
+              "uniqueItems": true,
+              "description": "Allowed exact values for sample_regimen."
+            }
+          },
+          "additionalProperties": false
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "default": 0
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "samples"
+          ],
+          "default": "samples",
+          "description": "Fixed backend operation."
+        }
+      },
+      "required": [
+        "dataset_id"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                },
+                "offset": {
+                  "type": "integer"
+                },
+                "next_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "rows",
+                "total",
+                "limit",
+                "offset",
+                "next_offset"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "error",
+            "code"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "scDrugMap_list_genes",
+    "type": "ScDrugMapQueryTool",
+    "description": "Page exact source gene IDs for one group. Optional case-sensitive literal prefix, in source order. Use returned IDs for expression lookup.",
+    "fields": {
+      "operation": "genes"
+    },
+    "requires_local_input": false,
+    "cacheable": false,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "Qualified scDrugMap group ID from list_datasets (e.g. external:Data20)."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Literal case-sensitive prefix (empty string matches all)."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000,
+          "default": 0
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "genes"
+          ],
+          "default": "genes",
+          "description": "Fixed backend operation."
+        }
+      },
+      "required": [
+        "dataset_id"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "rows": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "limit": {
+                  "type": "integer"
+                },
+                "offset": {
+                  "type": "integer"
+                },
+                "next_offset": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "rows",
+                "total",
+                "limit",
+                "offset",
+                "next_offset"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "error",
+            "code"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "scDrugMap_get_expression",
+    "type": "ScDrugMapQueryTool",
+    "description": "Read a bounded gene-by-cell slice of author-deposited values in requested order from either matrix orientation. Unknown IDs are errors. Missing/nonfinite source values are JSON null. This operation does not normalize the matrix.",
+    "fields": {
+      "operation": "expression"
+    },
+    "requires_local_input": false,
+    "cacheable": false,
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "description": "Qualified scDrugMap group ID from list_datasets (e.g. external:Data20)."
+        },
+        "genes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "description": "Exact source gene IDs."
+        },
+        "cell_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "description": "Exact scDrugMap cell IDs within this group."
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "expression"
+          ],
+          "default": "expression",
+          "description": "Fixed backend operation."
+        }
+      },
+      "required": [
+        "dataset_id",
+        "genes",
+        "cell_ids"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "success"
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "dataset_id": {
+                  "type": "string"
+                },
+                "genes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cell_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                },
+                "axis_order": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expression_scale": {
+                  "type": "string"
+                },
+                "missing_values": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "dataset_id",
+                "genes",
+                "cell_ids",
+                "values",
+                "axis_order",
+                "expression_scale",
+                "missing_values"
+              ]
+            }
+          },
+          "required": [
+            "status",
+            "data"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "error",
+            "code"
+          ]
+        }
+      ]
+    }
+  }
+]
