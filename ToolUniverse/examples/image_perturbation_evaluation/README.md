@@ -9,7 +9,7 @@ Each tool registers a backend named for its operation. The backends share the ev
 
 `model_name` is a report label. It never selects a generator, checkpoint,
 preprocessing branch or metric. The tools neither import CellFlux nor call any
-generator. CellFlux, PerturbBridge, IMPA and other models can supply
+generator. CellFlux, IMPA, and other models can supply
 the same canonical prediction index. Current profiles implement the **BBBC021
 96×96 three-channel uint8 contract**; other image modalities need explicit
 profiles and compatible evaluators.
@@ -98,7 +98,7 @@ from tooluniverse.tools import ImagePerturbation_calculate_fid_kid
 
 result = ImagePerturbation_calculate_fid_kid(
     predictions="/results/model/generated_images.jsonl",
-    model_name="PerturbBridge",
+    model_name="IMPA",
     evaluation_profile="bbbc021_standard",
     reference_images="/data/real_test_images.csv",
     feature_extractor_weights="/models/inception_from_moa_standard.pth",

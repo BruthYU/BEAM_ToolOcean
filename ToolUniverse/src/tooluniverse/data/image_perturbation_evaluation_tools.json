@@ -29,7 +29,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Report label such as CellFlux, PerturbBridge, IMPA or a custom model. Never selects evaluator logic or weights."
+          "description": "Report label such as CellFlux, IMPA, or a custom model. Never selects evaluator logic or weights."
         },
         "evaluation_profile": {
           "type": "string",
@@ -258,7 +258,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Report label such as CellFlux, PerturbBridge, IMPA or a custom model. Never selects evaluator logic or weights."
+          "description": "Report label such as CellFlux, IMPA, or a custom model. Never selects evaluator logic or weights."
         },
         "evaluation_profile": {
           "type": "string",
