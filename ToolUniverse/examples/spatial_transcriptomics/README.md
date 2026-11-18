@@ -1,6 +1,14 @@
 # Spatial transcriptomics
 
-The `spatial_transcriptomics` category contains `SpatialIO`, `SpatialPreprocess`, `SpatialAssociation`, `cell2location`, `Tangram`, and `GraphST`. Each tool accepts a `request` object whose `operation` selects the workflow.
+The `spatial_transcriptomics` category exposes the tools below. Each tool accepts a `request` object whose `operation` selects the workflow. These subsets describe workflow roles; they are not separate category names.
+
+| Subset | Tools | Purpose |
+| --- | --- | --- |
+| Data processing | `SpatialIO`, `SpatialPreprocess`, **`SpatialSingleCellIO`** | Visium I/O and QC; import segmented Xenium/MERFISH/CosMx RNA counts, attach labels, and prepare single-cell references. |
+| Models | `cell2location`, `Tangram`, `GraphST`, **`SpatialFormer`** | Deconvolution, spatial mapping, domains, and pretrained cell embeddings/pair proximity inference. |
+| Post-analysis | `SpatialAssociation`, **`SpatialPairValidation`**, **`SpatialPairSummary`** | Abundance associations, coordinate-based prediction evaluation, and cell-type-pair/patient summaries. |
+
+See [SpatialFormer and imaging single-cell data](spatialformer.md) for complete import examples and the serial inference/validation workflow. SpatialFormer exposes only `extract_embeddings` and `predict_pairs`: weights are prepared by deployment scripts, and there are no model-listing, download, training, or fine-tuning tool APIs.
 
 ## Installation
 
@@ -30,7 +38,7 @@ python -m pip install 'scanpy[skmisc]>=1.12,<1.13' torch POT igraph \
   'GraphST @ git+https://github.com/JinmiaoChenLab/GraphST.git@d62b0b7b6cd38ee285f3ac8cd67b7341a10bcc74'
 ```
 
-The local wrappers run on CPU. GraphST clustering uses Scanpy's igraph Leiden implementation. The reference and mapping stages of cell2location use Pyro 1.9.1 because this upstream revision imports a helper removed in Pyro 1.9.2.
+The original model wrappers default to CPU; `TOOLOCEAN_SPATIAL_DEVICE=cuda` enables their supported CUDA path. SpatialFormer uses an explicit `device` parameter. GraphST clustering uses Scanpy's igraph Leiden implementation. The reference and mapping stages of cell2location use Pyro 1.9.1 because this upstream revision imports a helper removed in Pyro 1.9.2.
 
 ## Call a tool
 
@@ -102,7 +110,7 @@ For Tangram, `mode` defaults to `cells`. Set `cell_type_key` for `clusters` mode
 
 For GraphST, provide raw counts in `X` and two spatial coordinates per spot in `obsm["spatial"]`. The slice integration operation expects coordinates already registered in the same coordinate system. The `resolution` argument for clustering and integration controls Leiden granularity. Cell-type projection retains the highest-weighted 10% of reference cells per spot (at least one) before normalizing the resulting cell-type weights.
 
-All six model operations accept `max_epochs`. The JSON schema lists the default for each workflow.
+The cell2location, Tangram mapping, and GraphST training operations accept `max_epochs`. SpatialFormer is inference-only and does not accept a training budget. The JSON schema lists the defaults for each workflow.
 
 ## Spatial association and patient groups
 

@@ -1,0 +1,762 @@
+[
+  {
+    "name": "AgingDifferentialExpression",
+    "type": "AgingDifferentialExpressionTool",
+    "description": "Donor-level PyDESeq2 negative-binomial Wald contrasts on raw bulk or pseudobulk counts. Unpaired analyses require one sample per donor; paired analyses require one sample per donor per condition. Test one cell type at a time. Missing p-values remain missing, not significant.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "compare_groups"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Observations x genes CSV (first column is observation ID) or h5ad."
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "sample_id"
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_dense_elements": {
+                  "type": "integer",
+                  "default": 25000000,
+                  "minimum": 1,
+                  "maximum": 100000000
+                },
+                "expression_scale": {
+                  "type": "string",
+                  "enum": [
+                    "counts"
+                  ]
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "donor_id"
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "min_total_count": {
+                  "type": "integer",
+                  "default": 10,
+                  "minimum": 0
+                },
+                "n_cpus": {
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 1,
+                  "maximum": 32
+                },
+                "alpha": {
+                  "type": "number",
+                  "default": 0.05,
+                  "exclusiveMinimum": 0,
+                  "exclusiveMaximum": 1
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "group"
+                },
+                "compare_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "Reference level first; test level second. Input must contain exactly these groups."
+                },
+                "cell_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional single cell type to select from pseudobulk metadata before fitting."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "cell_type"
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "input_path",
+                "expression_scale",
+                "compare_groups"
+              ],
+              "additionalProperties": false,
+              "dependentRequired": {
+                "cell_type_key": [
+                  "cell_type"
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "associate_with_score"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Observations x genes CSV (first column is observation ID) or h5ad."
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "sample_id"
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_dense_elements": {
+                  "type": "integer",
+                  "default": 25000000,
+                  "minimum": 1,
+                  "maximum": 100000000
+                },
+                "expression_scale": {
+                  "type": "string",
+                  "enum": [
+                    "counts"
+                  ]
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "donor_id"
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "min_total_count": {
+                  "type": "integer",
+                  "default": 10,
+                  "minimum": 0
+                },
+                "n_cpus": {
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 1,
+                  "maximum": 32
+                },
+                "alpha": {
+                  "type": "number",
+                  "default": 0.05,
+                  "exclusiveMinimum": 0,
+                  "exclusiveMaximum": 1
+                },
+                "score_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cell_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional single cell type to select from pseudobulk metadata before fitting."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "cell_type"
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "input_path",
+                "expression_scale",
+                "score_key"
+              ],
+              "additionalProperties": false,
+              "dependentRequired": {
+                "cell_type_key": [
+                  "cell_type"
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "analyze_paired_change"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Observations x genes CSV (first column is observation ID) or h5ad."
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "sample_id"
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_dense_elements": {
+                  "type": "integer",
+                  "default": 25000000,
+                  "minimum": 1,
+                  "maximum": 100000000
+                },
+                "expression_scale": {
+                  "type": "string",
+                  "enum": [
+                    "counts"
+                  ]
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "donor_id"
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "min_total_count": {
+                  "type": "integer",
+                  "default": 10,
+                  "minimum": 0
+                },
+                "n_cpus": {
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 1,
+                  "maximum": 32
+                },
+                "alpha": {
+                  "type": "number",
+                  "default": 0.05,
+                  "exclusiveMinimum": 0,
+                  "exclusiveMaximum": 1
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "group"
+                },
+                "compare_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "Reference level first; test level second. Input must contain exactly these groups."
+                },
+                "cell_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional single cell type to select from pseudobulk metadata before fitting."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "cell_type"
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "input_path",
+                "expression_scale",
+                "compare_groups"
+              ],
+              "additionalProperties": false,
+              "dependentRequired": {
+                "cell_type_key": [
+                  "cell_type"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "results": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "shape": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "required": [
+            "path",
+            "shape"
+          ]
+        },
+        "provenance": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation",
+        "results"
+      ]
+    }
+  },
+  {
+    "name": "AgingPathway",
+    "type": "AgingPathwayTool",
+    "description": "Offline gene-set enrichment: hypergeometric ORA with an explicit tested background, GSEApy preranked permutation GSEA, or mean log-normalized expression scoring with coverage reports. Supply local gene sets and their source/version.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "run_overrepresentation"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_sets": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "gmt_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_set_source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "User-supplied library name/version or DOI; no runtime download."
+                },
+                "selected_genes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "background_genes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "selected_genes",
+                "background_genes",
+                "gene_set_source"
+              ],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "gene_sets"
+                  ],
+                  "not": {
+                    "required": [
+                      "gmt_path"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "gmt_path"
+                  ],
+                  "not": {
+                    "required": [
+                      "gene_sets"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "run_preranked_gsea"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_sets": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "gmt_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_set_source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "User-supplied library name/version or DOI; no runtime download."
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "gene_id"
+                },
+                "rank_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "stat"
+                },
+                "min_size": {
+                  "type": "integer",
+                  "default": 5,
+                  "minimum": 1
+                },
+                "max_size": {
+                  "type": "integer",
+                  "default": 500,
+                  "minimum": 2
+                },
+                "n_permutations": {
+                  "type": "integer",
+                  "default": 1000,
+                  "minimum": 10,
+                  "maximum": 100000
+                },
+                "random_seed": {
+                  "type": "integer",
+                  "default": 0,
+                  "minimum": 0
+                },
+                "n_cpus": {
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 1,
+                  "maximum": 32
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "input_path",
+                "gene_set_source"
+              ],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "gene_sets"
+                  ],
+                  "not": {
+                    "required": [
+                      "gmt_path"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "gmt_path"
+                  ],
+                  "not": {
+                    "required": [
+                      "gene_sets"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "score_gene_sets"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_sets": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "uniqueItems": true
+                  }
+                },
+                "gmt_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "gene_set_source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "User-supplied library name/version or DOI; no runtime download."
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Observations x genes CSV (first column is observation ID) or h5ad."
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "sample_id"
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_dense_elements": {
+                  "type": "integer",
+                  "default": 25000000,
+                  "minimum": 1,
+                  "maximum": 100000000
+                },
+                "expression_scale": {
+                  "type": "string",
+                  "enum": [
+                    "log_normalized"
+                  ]
+                },
+                "min_genes": {
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 1
+                },
+                "min_coverage": {
+                  "type": "number",
+                  "default": 0.5,
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "input_path",
+                "expression_scale",
+                "gene_set_source"
+              ],
+              "additionalProperties": false,
+              "oneOf": [
+                {
+                  "required": [
+                    "gene_sets"
+                  ],
+                  "not": {
+                    "required": [
+                      "gmt_path"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "gmt_path"
+                  ],
+                  "not": {
+                    "required": [
+                      "gene_sets"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "results": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "shape": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "required": [
+            "path",
+            "shape"
+          ]
+        },
+        "provenance": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "operation",
+        "results"
+      ]
+    }
+  }
+]

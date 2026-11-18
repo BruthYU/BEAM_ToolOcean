@@ -1,0 +1,74 @@
+[
+  {
+    "filename": "RNAAgeCalc.tar.gz",
+    "url": "https://codeload.github.com/reese3928/RNAAgeCalc/tar.gz/refs/heads/master",
+    "sha256": "de0b04d8f0616d7a2d54c0de77d2ad177d19c50a0f339e345b30f455ebad33b4",
+    "bytes": 3234641
+  },
+  {
+    "filename": "SenCID.tar.gz",
+    "url": "https://codeload.github.com/JackieHanLab/SenCID/tar.gz/refs/heads/main",
+    "sha256": "37deb6202dbcb57e6307b36b8bf5743a13c15407d3d62d977b7bfbeeaf6d0bbc",
+    "bytes": 3574005
+  },
+  {
+    "filename": "GatedMultiheadAttention.py",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/scageclock/model/GatedMultiheadAttention.py",
+    "sha256": "8e4334f85737e8b3af6773024194d1aee8fabb177b1a1f9c91703cf0dd2b2cb9",
+    "bytes": 30809
+  },
+  {
+    "filename": "scage_formatting.py",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/scageclock/formatting.py",
+    "sha256": "4bc92bb7c39536854c485c34b377a1072e1219869e6cd16825574ac1d788c618",
+    "bytes": 8928
+  },
+  {
+    "filename": "h5ad_var.tsv",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/metadata/h5ad_var.tsv",
+    "sha256": "d3f1a49ac4ac408a1b86eabc718c6b6554f109bc08a1e5b3f58a9272fa3b7207",
+    "bytes": 234634
+  },
+  {
+    "filename": "scAgeClock_GMA_model_state_dict.pth",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/trained_models/scAgeClock_GMA_model_state_dict.pth",
+    "sha256": "4b7552db3e27ce83808503a205a5904dea735b5a5d67693b1327539d8340948f",
+    "bytes": 44386437
+  },
+  {
+    "filename": "scage_example.h5ad",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/pytest_data/k_fold_mode/train_val/Fold1/Pytest_Fold1_200K_chunk27.h5ad",
+    "sha256": "e5558e278d92f10966c82005568499c27042626a8409f395fe1f92700d9d34f2",
+    "bytes": 8276112
+  },
+  {
+    "filename": "scage_LICENSE",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/LICENSE",
+    "sha256": "34bb1ba747b40d676482f14a77fee76b78360be66cc430c8365b3b865d48846a",
+    "bytes": 1498
+  },
+  {
+    "filename": "assay_numeric_index.tsv",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/metadata/categorical_features_index/assay_numeric_index.tsv",
+    "sha256": "0c89aeed85f313ccc86eeab593fe32ff6279a6e5a32f1a96140683198be5cf9d",
+    "bytes": 416
+  },
+  {
+    "filename": "cell_type_numeric_index.tsv",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/metadata/categorical_features_index/cell_type_numeric_index.tsv",
+    "sha256": "847e817f4cf7ff6ff057fa75a2e511c78fe9c290250c081e931bb2ca2d639752",
+    "bytes": 19993
+  },
+  {
+    "filename": "tissue_general_numeric_index.tsv",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/metadata/categorical_features_index/tissue_general_numeric_index.tsv",
+    "sha256": "8c278f3c9e383a3e528e75f50dbcdfade76c38e5d90b72ee2a07294946b67f46",
+    "bytes": 761
+  },
+  {
+    "filename": "sex_numeric_index.tsv",
+    "url": "https://raw.githubusercontent.com/gangcai/scageclock/main/data/metadata/categorical_features_index/sex_numeric_index.tsv",
+    "sha256": "11503867e9c40721d44cc1aacfb1e7b79a72244d39aafd83288ac481b0fd5792",
+    "bytes": 58
+  }
+]

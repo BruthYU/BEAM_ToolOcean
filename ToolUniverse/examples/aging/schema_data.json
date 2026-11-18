@@ -1,0 +1,1052 @@
+[
+  {
+    "name": "AgingIO",
+    "type": "AgingIOTool",
+    "description": "Inspect, import, annotate and export local expression data with explicit biological metadata.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "inspect_dataset"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "import_expression"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "orientation": {
+                  "type": "string",
+                  "enum": [
+                    "observations_by_genes",
+                    "genes_by_observations"
+                  ]
+                },
+                "species": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tissue": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "expression_scale": {
+                  "type": "string",
+                  "enum": [
+                    "counts",
+                    "fpkm",
+                    "tpm",
+                    "cpm",
+                    "log_normalized"
+                  ]
+                },
+                "gene_id_type": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "bulk",
+                    "single_cell",
+                    "pseudobulk"
+                  ]
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "id_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "orientation",
+                "species",
+                "tissue",
+                "expression_scale",
+                "gene_id_type",
+                "data_kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "attach_metadata"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "id_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "metadata_path",
+                "id_key"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "export_results"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "obs_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "genes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "inspect_dataset"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "shape": {
+              "type": "array"
+            },
+            "obs_columns": {
+              "type": "array"
+            },
+            "var_columns": {
+              "type": "array"
+            },
+            "layers": {
+              "type": "array"
+            },
+            "integer_valued": {
+              "type": "boolean"
+            },
+            "recorded_metadata": {
+              "type": "object"
+            },
+            "zero_total_observations": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "shape",
+            "obs_columns",
+            "var_columns",
+            "layers",
+            "integer_valued",
+            "recorded_metadata",
+            "zero_total_observations"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "import_expression"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "attach_metadata"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "extra_metadata_rows": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression",
+            "extra_metadata_rows"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "export_results"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "table"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "AgingPreprocess",
+    "type": "AgingPreprocessTool",
+    "description": "Prepare model-specific aging inputs without silently changing gene IDs or expression scales.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "filter_qc"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "min_counts": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "min_genes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "max_counts": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "align_gene_ids"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "mapping_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target_gene_id_type": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "strip_ensembl_version": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "normalize_expression"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target_sum": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "output_layer": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "prepare_model_input"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "model": {
+                  "type": "string",
+                  "enum": [
+                    "RNAAgeCalc",
+                    "scAgeClock",
+                    "SenCID"
+                  ]
+                },
+                "species": {
+                  "type": "string",
+                  "enum": [
+                    "human"
+                  ]
+                },
+                "expression_scale": {
+                  "type": "string",
+                  "enum": [
+                    "counts",
+                    "fpkm",
+                    "tpm",
+                    "cpm"
+                  ]
+                },
+                "data_kind": {
+                  "type": "string",
+                  "enum": [
+                    "bulk",
+                    "single_cell",
+                    "pseudobulk"
+                  ]
+                },
+                "feature_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "min_gene_coverage": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "categorical_keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "gene_length_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "model",
+                "species",
+                "expression_scale",
+                "data_kind"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "filter_qc"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "audit": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "retained": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "excluded": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression",
+            "audit",
+            "retained",
+            "excluded"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "align_gene_ids"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "audit": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression",
+            "audit"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "normalize_expression"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "minLength": 1
+            },
+            "target_sum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression",
+            "layer",
+            "target_sum",
+            "method"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "prepare_model_input"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "coverage": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "preprocessing": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression",
+            "coverage",
+            "preprocessing"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "AgingPseudobulk",
+    "type": "AgingPseudobulkTool",
+    "description": "Aggregate raw single-cell counts within donor, sample and cell type; preserve biological replicate identities.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "aggregate_counts"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "min_cells": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "summarize_cell_counts"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "layer": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "min_cells": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "aggregate_counts"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "expression": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            },
+            "metadata": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "expression",
+            "table",
+            "metadata"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "summarize_cell_counts"
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "provenance",
+            "table"
+          ]
+        }
+      ]
+    }
+  }
+]

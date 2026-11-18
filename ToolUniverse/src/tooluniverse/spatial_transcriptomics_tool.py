@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 import shutil
+import os
 import tempfile
 from threading import Lock
 
@@ -11,6 +12,17 @@ from .exceptions import ToolUnavailableError, ToolValidationError
 from .tool_registry import register_tool
 
 _PYRO_LOCK = Lock()
+
+
+def _spatial_device(lightning=False):
+    device = os.environ.get("TOOLOCEAN_SPATIAL_DEVICE", "cpu")
+    if device not in {"cpu", "cuda"}:
+        raise ToolValidationError("TOOLOCEAN_SPATIAL_DEVICE must be cpu or cuda")
+    if device == "cuda":
+        import torch
+        if not torch.cuda.is_available():
+            raise ToolUnavailableError("CUDA was requested but is unavailable")
+    return "gpu" if lightning and device == "cuda" else device
 
 
 def _read_h5ad(file_path):
@@ -155,10 +167,10 @@ class Cell2locationTool(_SpatialTool):
             model = RegressionModel(adata)
             model.train(
                 max_epochs=request.get("max_epochs", 250),
-                accelerator="cpu",
+                accelerator=_spatial_device(lightning=True),
                 enable_progress_bar=False,
             )
-            adata = model.export_posterior(adata, sample_kwargs={"accelerator": "cpu"})
+            adata = model.export_posterior(adata, sample_kwargs={"accelerator": _spatial_device(lightning=True)})
             types = list(adata.uns["mod"]["factor_names"])
             key = "means_per_cluster_mu_fg"
             columns = [f"{key}_{cell_type}" for cell_type in types]
@@ -220,13 +232,13 @@ class Cell2locationTool(_SpatialTool):
             )
             model.train(
                 max_epochs=request.get("max_epochs", 30000),
-                accelerator="cpu",
+                accelerator=_spatial_device(lightning=True),
                 enable_progress_bar=False,
             )
             aligned = model.export_posterior(
                 aligned,
                 add_to_obsm=["means", "q05"],
-                sample_kwargs={"accelerator": "cpu"},
+                sample_kwargs={"accelerator": _spatial_device(lightning=True)},
             )
 
         keys = ["means_cell_abundance_w_sf", "q05_cell_abundance_w_sf"]
@@ -283,7 +295,7 @@ class TangramTool(_SpatialTool):
             mapping_spatial,
             mode=mode,
             cluster_label=cluster_label,
-            device="cpu",
+            device=_spatial_device(),
             num_epochs=request.get("max_epochs", 1000),
             verbose=False,
         )
@@ -357,7 +369,7 @@ def _graph_domains(adata, request):
     if adata.n_obs < 4:
         raise ToolValidationError("GraphST requires at least four spots to build its spatial graph.")
     model_input = _graph_input(adata)
-    trained = GraphST(model_input, epochs=request.get("max_epochs", 600)).train()
+    trained = GraphST(model_input, device=_spatial_device(), epochs=request.get("max_epochs", 600)).train()
     sc.pp.neighbors(trained, use_rep="emb", n_neighbors=min(15, trained.n_obs - 1))
     sc.tl.leiden(
         trained, resolution=request.get("resolution", 1.0), key_added="domain",
@@ -432,7 +444,7 @@ class GraphSTTool(_SpatialTool):
         spatial_input, reference_input = spatial_input.copy(), reference_input.copy()
         get_feature(spatial_input)
         model = GraphST(
-            spatial_input, reference_input, deconvolution=True,
+            spatial_input, reference_input, deconvolution=True, device=_spatial_device(),
             epochs=request.get("max_epochs", 1200),
         )
         mapped, mapped_reference = model.train_map()

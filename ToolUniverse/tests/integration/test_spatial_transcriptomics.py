@@ -11,6 +11,7 @@ from tooluniverse import ToolUniverse
 CATEGORY = "spatial_transcriptomics"
 TOOL_NAMES = {
     "cell2location", "Tangram", "GraphST", "SpatialIO", "SpatialPreprocess", "SpatialAssociation",
+    "SpatialSingleCellIO", "SpatialFormer", "SpatialPairValidation", "SpatialPairSummary",
 }
 pytestmark = pytest.mark.integration
 

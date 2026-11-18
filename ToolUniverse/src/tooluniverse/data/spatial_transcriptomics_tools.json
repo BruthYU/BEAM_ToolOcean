@@ -3254,5 +3254,1152 @@
       "readOnlyHint": false,
       "destructiveHint": false
     }
+  },
+  {
+    "name": "SpatialSingleCellIO",
+    "type": "SpatialSingleCellIOTool",
+    "description": "Import segmented Xenium, MERFISH, or CosMx RNA counts as standardized single-cell AnnData; attach exact-ID annotations and prepare a checked reference for cell2location or Tangram. No segmentation, automatic typing, or missing-gene imputation.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "import_cells"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Local segmented RNA expression file; h5ad, 10x H5, CSV/TSV/Parquet, or Xenium output directory."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                },
+                "platform": {
+                  "type": "string",
+                  "enum": [
+                    "Xenium",
+                    "MERFISH",
+                    "CosMx"
+                  ]
+                },
+                "sample_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Stable sample identifier; prefixes cell IDs without ambiguity."
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "h5ad",
+                    "10x_h5",
+                    "csv"
+                  ],
+                  "default": "auto"
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional cell metadata CSV/TSV/Parquet; exact identifier alignment."
+                },
+                "cell_id_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Column name"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Expression table identifier columns; default cell_id. Composite columns support FOV plus local cell ID."
+                },
+                "metadata_id_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Column name"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Metadata identifier columns, ordered identically to expression identifiers."
+                },
+                "gene_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Column name"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Required for tabular counts: explicitly selected RNA gene columns, excluding controls and metadata."
+                },
+                "count_layer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "h5ad raw integer count layer; default X."
+                },
+                "gene_name_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Existing var column to copy into gene_name."
+                },
+                "coordinate_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Column name"
+                  },
+                  "minItems": 2,
+                  "uniqueItems": true,
+                  "description": "Two metadata columns for x and y. Xenium x_centroid/y_centroid are recognized.",
+                  "maxItems": 2
+                },
+                "coordinate_unit": {
+                  "type": "string",
+                  "enum": [
+                    "micrometer",
+                    "pixel"
+                  ]
+                },
+                "coordinate_frame": {
+                  "type": "string",
+                  "enum": [
+                    "global",
+                    "local"
+                  ]
+                },
+                "fov_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Metadata column identifying independent fields of view; required for local coordinates."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "platform",
+                "sample_id"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "attach_annotations"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Local segmented RNA expression file; h5ad, 10x H5, CSV/TSV/Parquet, or Xenium output directory."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                },
+                "annotation_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Annotation CSV/TSV/Parquet."
+                },
+                "annotation_id_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Column name"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Annotation identifier columns; default cell_id."
+                },
+                "label_column": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Annotation column containing cell-type labels."
+                },
+                "input_id_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs column for exact ID alignment; default obs_names. source_cell_id uses original IDs."
+                },
+                "output_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "New obs label column; default cell_type. Existing columns are never overwritten."
+                },
+                "require_all": {
+                  "type": "boolean",
+                  "description": "Reject any missing or blank labels; false writes unassigned and an audit.",
+                  "default": true
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "annotation_path",
+                "label_column"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "prepare_reference"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Local segmented RNA expression file; h5ad, 10x H5, CSV/TSV/Parquet, or Xenium output directory."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Existing reliable cell-type labels in obs."
+                },
+                "count_layer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Raw count layer, default counts; X selects the main matrix."
+                },
+                "batch_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional complete batch/sample labels in obs."
+                },
+                "min_cells_per_type": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1
+                },
+                "spatial_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional target Visium h5ad for exact shared-gene report."
+                },
+                "subset_shared_genes": {
+                  "type": "boolean",
+                  "description": "Restrict exported reference to target shared genes. Does not modify the target.",
+                  "default": false
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "cell_type_key"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "import_cells"
+              ]
+            },
+            "output_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "report_path"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "attach_annotations"
+              ]
+            },
+            "output_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "report_path"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "prepare_reference"
+              ]
+            },
+            "output_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reference_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "reference_path",
+            "report_path"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "SpatialPairValidation",
+    "type": "SpatialPairValidationTool",
+    "description": "Build within-frame coordinate benchmarks and evaluate SpatialFormer pair proximity predictions against observed neighborhoods.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "description": "Select an operation and supply parameters.",
+          "oneOf": [
+            {
+              "type": "object",
+              "title": "Sample observed neighboring and distant pairs separately within each sample and coordinate frame.",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "build_pair_benchmark"
+                  ],
+                  "description": "Sample observed neighboring and distant pairs separately within each sample and coordinate frame."
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Standard single-cell h5ad with unique observation IDs and coordinates."
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs column identifying samples."
+                },
+                "frame_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs column identifying independent coordinate frames; may equal sample_key only for globally registered sample coordinates."
+                },
+                "coordinate_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obsm coordinate matrix.",
+                  "default": "spatial"
+                },
+                "coordinate_unit": {
+                  "type": "string",
+                  "enum": [
+                    "micrometer",
+                    "pixel"
+                  ],
+                  "description": "Unit of coordinates and radius; no implicit conversion."
+                },
+                "radius": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Maximum center-to-center distance defining a neighbor."
+                },
+                "pairs_per_class": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1000,
+                  "description": "Maximum pairs sampled per class per sample/frame."
+                },
+                "random_seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Reproducible random seed."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "sample_key",
+                "frame_key",
+                "coordinate_unit",
+                "radius",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "title": "Compare exact ordered pair IDs with benchmark labels; no automatic threshold tuning.",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "evaluate_pairs"
+                  ],
+                  "description": "Compare exact ordered pair IDs with benchmark labels; no automatic threshold tuning."
+                },
+                "prediction_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/Parquet containing sample_id, cell_id_a, cell_id_b, proximity_score."
+                },
+                "benchmark_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/Parquet containing the same ordered IDs and binary is_neighbor."
+                },
+                "threshold": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "description": "Optional independently chosen threshold for precision and recall."
+                },
+                "pretraining_overlap": {
+                  "type": "string",
+                  "enum": [
+                    "unknown",
+                    "possible",
+                    "excluded"
+                  ],
+                  "description": "Whether benchmark samples overlap model pretraining.",
+                  "default": "unknown"
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                }
+              },
+              "required": [
+                "operation",
+                "prediction_path",
+                "benchmark_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "build_pair_benchmark"
+              ]
+            },
+            "benchmark_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pairs_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "benchmark_path",
+            "pairs_path",
+            "report_path"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "evaluate_pairs"
+              ]
+            },
+            "metrics_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "comparison_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sample_metrics_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "figure_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "distance_summary_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "metrics_path",
+            "comparison_path",
+            "sample_metrics_path",
+            "figure_path",
+            "distance_summary_path"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "SpatialPairSummary",
+    "type": "SpatialPairSummaryTool",
+    "description": "Summarize sampled cell-pair proximity by cell type and compare patient groups without treating pairs as independent patients.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "description": "Select an operation and supply parameters.",
+          "oneOf": [
+            {
+              "type": "object",
+              "title": "Aggregate reciprocal scores once per physical pair and summarize sampled type pairs.",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "summarize_type_pairs"
+                  ],
+                  "description": "Aggregate reciprocal scores once per physical pair and summarize sampled type pairs."
+                },
+                "prediction_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/Parquet pair prediction table."
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Annotated single-cell h5ad with IDs matching pair predictions."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs column with complete cell-type labels."
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs column matching sample_id in predictions."
+                },
+                "benchmark_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional exact-pair benchmark for observed neighbor fractions."
+                },
+                "sampling_description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Explicit description of pair selection; used to interpret denominators."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                },
+                "frame_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs column identifying independent coordinate frames; pair cells must share the same frame."
+                }
+              },
+              "required": [
+                "operation",
+                "prediction_path",
+                "input_path",
+                "cell_type_key",
+                "sample_key",
+                "sampling_description",
+                "output_dir",
+                "frame_key"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "title": "Average samples within patients then compare groups with permutation tests and global FDR.",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "compare_groups"
+                  ],
+                  "description": "Average samples within patients then compare groups with permutation tests and global FDR."
+                },
+                "summary_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Type-pair summary CSV/Parquet."
+                },
+                "metadata_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/Parquet with unique sample_id, patient_id and group columns."
+                },
+                "metric": {
+                  "type": "string",
+                  "enum": [
+                    "mean_score",
+                    "observed_neighbor_fraction"
+                  ],
+                  "description": "Metric compared between patient groups.",
+                  "default": "mean_score"
+                },
+                "compare_groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Group label."
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "Two groups in subtraction order: first minus second."
+                },
+                "n_permutations": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 9999,
+                  "description": "Maximum patient-label permutations; exact enumeration when feasible."
+                },
+                "random_seed": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Reproducible random seed."
+                },
+                "fdr_method": {
+                  "type": "string",
+                  "enum": [
+                    "bh",
+                    "by"
+                  ],
+                  "description": "Global false discovery correction over testable type pairs.",
+                  "default": "bh"
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated result files."
+                }
+              },
+              "required": [
+                "operation",
+                "summary_path",
+                "metadata_path",
+                "compare_groups",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "summarize_type_pairs"
+              ]
+            },
+            "summary_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "heatmap_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "network_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "summary_path",
+            "report_path",
+            "heatmap_path",
+            "network_path"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "compare_groups"
+              ]
+            },
+            "comparison_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "patient_summary_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "comparison_path",
+            "patient_summary_path",
+            "report_path"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "SpatialFormer",
+    "type": "SpatialFormerTool",
+    "description": "Run offline pretrained SpatialFormer inference: extract single-cell embeddings or predict supplied cell-pair spatial proximity. No training or model downloads. Requires a provisioned official model bundle. Current pinned upstream tokenization uses the Human species token; use human samples only.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "extract_embeddings"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Local single-cell AnnData with raw counts and unique cell IDs."
+                },
+                "model_bundle_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Offline model bundle directory containing manifest.json, prepared by the deployment script."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated output artifacts."
+                },
+                "count_layer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Raw count layer. Omit to read X."
+                },
+                "gene_name_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "var column with unique gene symbols, or var_names.",
+                  "default": "gene_name"
+                },
+                "assay": {
+                  "type": "string",
+                  "enum": [
+                    "Xenium",
+                    "Merfish",
+                    "CosMx"
+                  ],
+                  "description": "Exact official assay token; non-Xenium inference is cross-platform."
+                },
+                "tissue": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Exact tissue token in the bundled vocabulary, for example Lung."
+                },
+                "condition": {
+                  "type": "string",
+                  "enum": [
+                    "Healthy",
+                    "Disease"
+                  ]
+                },
+                "device": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "cpu",
+                    "cuda"
+                  ],
+                  "default": "auto"
+                },
+                "batch_size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 4,
+                  "description": "Model batch size."
+                },
+                "num_workers": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Data-loader workers; zero is suitable for small runs."
+                },
+                "max_genes_per_cell": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 500,
+                  "description": "Maximum ranked gene tokens per cell; preprocessing truncation is recorded."
+                },
+                "max_dense_bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 2000000000,
+                  "description": "Guard for official inference dense input allocations."
+                },
+                "use_flash_attention": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "cls",
+                    "gene"
+                  ],
+                  "default": "cls"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "model_bundle_path",
+                "output_dir",
+                "assay",
+                "tissue",
+                "condition"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "predict_pairs"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Local single-cell AnnData with raw counts and unique cell IDs."
+                },
+                "model_bundle_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Offline model bundle directory containing manifest.json, prepared by the deployment script."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for isolated output artifacts."
+                },
+                "count_layer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Raw count layer. Omit to read X."
+                },
+                "gene_name_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "var column with unique gene symbols, or var_names.",
+                  "default": "gene_name"
+                },
+                "assay": {
+                  "type": "string",
+                  "enum": [
+                    "Xenium",
+                    "Merfish",
+                    "CosMx"
+                  ],
+                  "description": "Exact official assay token; non-Xenium inference is cross-platform."
+                },
+                "tissue": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Exact tissue token in the bundled vocabulary, for example Lung."
+                },
+                "condition": {
+                  "type": "string",
+                  "enum": [
+                    "Healthy",
+                    "Disease"
+                  ]
+                },
+                "device": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "cpu",
+                    "cuda"
+                  ],
+                  "default": "auto"
+                },
+                "batch_size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 4,
+                  "description": "Model batch size."
+                },
+                "num_workers": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "Data-loader workers; zero is suitable for small runs."
+                },
+                "max_genes_per_cell": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 500,
+                  "description": "Maximum ranked gene tokens per cell; preprocessing truncation is recorded."
+                },
+                "max_dense_bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 2000000000,
+                  "description": "Guard for official inference dense input allocations."
+                },
+                "use_flash_attention": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "pairs_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV or Parquet with sample_id, cell_id_a, cell_id_b; exact observation IDs."
+                },
+                "sample_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "obs sample column; pair sample_id must match both cells.",
+                  "default": "sample_id"
+                },
+                "max_pairs": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 100000,
+                  "description": "Maximum explicitly supplied ordered pairs."
+                },
+                "save_embeddings": {
+                  "type": "boolean",
+                  "default": false
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "model_bundle_path",
+                "output_dir",
+                "assay",
+                "tissue",
+                "condition",
+                "pairs_path"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "extract_embeddings"
+              ]
+            },
+            "output_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "summary_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "output_path",
+            "summary_path"
+          ],
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "predict_pairs"
+              ]
+            },
+            "predictions_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "summary_path": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "operation",
+            "predictions_path",
+            "summary_path"
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "cacheable": false,
+    "mcp_schema_mode": "passthrough",
+    "mcp_annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
   }
 ]

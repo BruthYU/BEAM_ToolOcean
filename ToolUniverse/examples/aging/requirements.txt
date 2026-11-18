@@ -1,0 +1,8 @@
+# Added to the existing slime ToolOcean environment; torch/anndata come from its base.
+pydeseq2==0.5.4
+gseapy==1.1.13
+formulaic-contrasts==1.0.0
+session-info==1.0.1
+stdlib-list==0.12.0
+# Deployment-time export of official RNAAgeCalc RData, not required for inference.
+rdata==0.11.2

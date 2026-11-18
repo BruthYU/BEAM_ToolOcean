@@ -1,0 +1,68 @@
+{
+  "completed_at": "2026-11-18T19:14:42.399917+08:00",
+  "category": "Aging",
+  "tools": 12,
+  "operations": 34,
+  "tests": {
+    "passed": 48,
+    "failed": 0,
+    "skipped": 0,
+    "junit": "/mnt/shared-storage-gpfs2/gpfs2-agent-math/huangwenxuan/BEAM_ToolOcean/cluster-runtime/aging/rebased-validation/pytest.xml"
+  },
+  "model_smoke": {
+    "RNAAgeCalc": {
+      "observations": 2,
+      "device": "cpu",
+      "parity": "exact coefficient formula, independent scalar evaluation; not R-runtime parity"
+    },
+    "SenCID": {
+      "observations": 24,
+      "device": "cpu",
+      "parity": "official ScaleData(denoising=False) and Pred: six SID score vectors match"
+    },
+    "scAgeClock": {
+      "observations": 32,
+      "device": "cuda",
+      "parity": "official GMA full-batch CPU vs wrapped batched CUDA"
+    }
+  },
+  "model_smoke_record": "/mnt/shared-storage-gpfs2/gpfs2-agent-math/huangwenxuan/BEAM_ToolOcean/cluster-runtime/aging/rebased-validation/model-smoke/model_smoke.json",
+  "engineering_fixture": "scAgeClock raw counts -> official formatting -> CUDA prediction on 6 synthetic cells; no biological labels inferred",
+  "serial_workflow": "SDK import -> QC -> pseudobulk -> donor-level DE -> GSEA -> ORA; synthetic count fixture",
+  "image": "registry.h.pjlab.org.cn/ailab-deepdivegzy-deepdivegzy_gpu/slime:v0",
+  "image_digest": "sha256:e76336ba8286590fe8c4c72a9ef52243dba2cc0d43088f488b98779acd2ebbdc",
+  "previous_digest": "sha256:2747b6f7517de852ad6121438179567c63ec9f68ed5beba1a086d3c4eaf29242",
+  "base_layers_preserved": true,
+  "base_layer_count": 118,
+  "added_layer_bytes": 2357719,
+  "interpreter": "/opt/aging-venv/bin/python",
+  "gpu": "NVIDIA H200",
+  "worker_released": true,
+  "runtime_versions": {
+    "numpy": "2.5.5",
+    "pandas": "2.3.3",
+    "scipy": "1.17.1",
+    "anndata": "0.12.10",
+    "pydeseq2": "0.5.4",
+    "gseapy": "1.1.13",
+    "rdata": "0.11.2",
+    "scikit-learn": "1.9.0",
+    "torch": "2.9.1+cu129",
+    "formulaic-contrasts": "1.0.0"
+  },
+  "evidence_log": "/mnt/shared-storage-gpfs2/gpfs2-agent-math/huangwenxuan/BEAM_ToolOcean/cluster-runtime/aging/rebased-validation.log",
+  "limitations": [
+    "RNAAgeCalc official coefficients evaluated in NumPy; full feature coverage required, no R runtime or KNN imputation.",
+    "SenCID non-DCA path only; official sklearn 0.24.2 models tested under deployed sklearn 1.9.0, not historical-runtime equivalence.",
+    "Small-fixture engineering checks, not biological validation or a longevity efficacy claim."
+  ],
+  "source_sha256": {
+    "ToolUniverse/src/tooluniverse/aging_cohort_tool.py": "43017dc0ed030c885685063ee20a8023838662b69bcd575e850d0def76a853b0",
+    "ToolUniverse/src/tooluniverse/aging_common.py": "39a5f63dc287ecff9428f05cb2f9c0f1e9f63b45b0c7930c42e7b0acc688d5d7",
+    "ToolUniverse/src/tooluniverse/aging_data_tool.py": "8b716c4089bbbedcfe23986692e7e5f439b692d2b237f91a24e072f29f0a1a89",
+    "ToolUniverse/src/tooluniverse/aging_mechanism_tool.py": "e65ce5365b312117f8f73b5b26c8579d532847d94136d1cbfa48d0a1fa0e83b0",
+    "ToolUniverse/src/tooluniverse/aging_models_tool.py": "9efe930b3c606c987c8431b2d901d3913dbee705ecfe6fffd16f83f7a6c55b74",
+    "ToolUniverse/src/tooluniverse/aging_statistics_tool.py": "f3a19a1a3fec626b84ae75f7e1b9f0edcc37876d13aca3e792304742315d34e2",
+    "ToolUniverse/src/tooluniverse/data/aging_tools.json": "6c4bb0cdccb127c39d593256bc7d8b7d5ca7ca82c5b0e70a0b3fdaac94033177"
+  }
+}

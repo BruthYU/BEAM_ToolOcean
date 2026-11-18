@@ -1,0 +1,2051 @@
+[
+  {
+    "name": "AgingJointSummary",
+    "type": "AgingJointSummaryTool",
+    "description": "Join model results at an explicit common grain and summarize distinct readouts by donor or donor/cell type; never synthesizes a total aging score.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "join_model_results"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "join_keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Explicit keys defining a common grain in every input; each input must be unique on these keys."
+                },
+                "how": {
+                  "type": "string",
+                  "enum": [
+                    "inner",
+                    "outer"
+                  ],
+                  "default": "outer"
+                },
+                "inputs": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Unique model label, used as output prefix."
+                      },
+                      "path": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "CSV/TSV result table path."
+                      },
+                      "value_columns": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "description": "Numeric readouts to retain."
+                      },
+                      "metadata_columns": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true,
+                        "description": "Metadata retained without model prefixes; overlapping nonmissing values must agree exactly for matching keys."
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "path",
+                      "value_columns"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "join_keys",
+                "inputs"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "summarize_by_donor"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric readouts to summarize separately."
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Metadata constant within each summary unit; retained in output."
+                },
+                "observation_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional unique cell/sample ID to check for duplication."
+                },
+                "statistic": {
+                  "type": "string",
+                  "enum": [
+                    "mean",
+                    "median"
+                  ],
+                  "default": "mean"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "summarize_by_cell_type"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric readouts to summarize separately."
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Metadata constant within each summary unit; retained in output."
+                },
+                "observation_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Optional unique cell/sample ID to check for duplication."
+                },
+                "statistic": {
+                  "type": "string",
+                  "enum": [
+                    "mean",
+                    "median"
+                  ],
+                  "default": "mean"
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cell type column.",
+                  "default": "cell_type"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "join_model_results"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "coverage": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "n_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "missing_joined_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "name",
+                  "n_rows",
+                  "missing_joined_rows"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "joined_rows": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "coverage",
+            "joined_rows"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "summarize_by_donor"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "unit": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "statistic": {
+              "type": "string",
+              "enum": [
+                "mean",
+                "median"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "unit",
+            "statistic"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "summarize_by_cell_type"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "unit": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "statistic": {
+              "type": "string",
+              "enum": [
+                "mean",
+                "median"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "unit",
+            "statistic"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "AgingAssociation",
+    "type": "AgingAssociationTool",
+    "description": "Donor-level group contrasts and numeric associations with full-rank OLS, HC3 standard errors and BH correction; paired two-timepoint comparisons and readout correlation.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "compare_groups"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric dependent variables; separate test per variable and stratum."
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Adjustment variables, numerical unless declared categorical."
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Subset of covariates encoded as categorical variables."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Group column."
+                },
+                "contrast": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "[reference, treatment]; estimates treatment minus reference."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns",
+                "group_key",
+                "contrast"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "analyze_age_association"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric dependent variables; separate test per variable and stratum."
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Adjustment variables, numerical unless declared categorical."
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Subset of covariates encoded as categorical variables."
+                },
+                "predictor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Numeric predictor column, e.g. chronological age."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns",
+                "predictor_key"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "analyze_paired_change"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "time_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Two-timepoint or condition column."
+                },
+                "contrast": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "[reference, treatment]; estimates treatment minus reference."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric dependent variables; separate test per variable and stratum."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "time_key",
+                "contrast",
+                "value_columns"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "compare_model_readouts"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "readouts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "readouts"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "compare_groups"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "independent_unit": {
+              "type": "string"
+            },
+            "correction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "independent_unit",
+            "correction"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "analyze_age_association"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "independent_unit": {
+              "type": "string"
+            },
+            "correction": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "independent_unit",
+            "correction"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "analyze_paired_change"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "excluded_pairs": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "excluded_pairs"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "compare_model_readouts"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "AgingComposition",
+    "type": "AgingCompositionTool",
+    "description": "Summarize donor-level cell proportions including absent cell types; explore group differences and sensitivity of readout associations to composition covariates.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "summarize_proportions"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cell type column.",
+                  "default": "cell_type"
+                },
+                "count_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "If supplied, input rows contain nonnegative integer cell counts; otherwise each row is one cell."
+                },
+                "observation_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique cell ID required for per-cell input.",
+                  "default": "cell_id"
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Metadata constant within each summary unit; retained in output."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "test_composition_changes"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Adjustment variables, numerical unless declared categorical."
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Subset of covariates encoded as categorical variables."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Group column."
+                },
+                "contrast": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "[reference, treatment]; estimates treatment minus reference."
+                },
+                "cell_type_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Cell type column added to strata.",
+                  "default": "cell_type"
+                },
+                "proportion_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Proportion column with values in [0,1].",
+                  "default": "proportion"
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "group_key",
+                "contrast"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "assess_composition_sensitivity"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric dependent variables; separate test per variable and stratum."
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Adjustment variables, numerical unless declared categorical."
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Subset of covariates encoded as categorical variables."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Group column."
+                },
+                "contrast": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "[reference, treatment]; estimates treatment minus reference."
+                },
+                "composition_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Proportion covariates to add; omit one reference type to avoid a singular design."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns",
+                "group_key",
+                "contrast",
+                "composition_columns"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "summarize_proportions"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "denominator": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "denominator"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "test_composition_changes"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "assess_composition_sensitivity"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "AgingValidation",
+    "type": "AgingValidationTool",
+    "description": "Evaluate donor-level age prediction, independently supplied cohort effect replication, leave-one-donor-out sensitivity, and perturbation group associations.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "evaluate_age_prediction"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "age_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Chronological age column."
+                },
+                "prediction_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Predicted age in the same units."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "age_key",
+                "prediction_key"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "validate_external_cohort"
+                  ]
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "discovery_results_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Discovery effects table with estimate and p_value."
+                },
+                "external_results_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent-cohort effects with identical scales and contrasts."
+                },
+                "match_keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Hypothesis keys unique in each table.",
+                  "default": [
+                    "readout"
+                  ]
+                },
+                "alpha": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "exclusiveMaximum": 1,
+                  "default": 0.05
+                }
+              },
+              "required": [
+                "operation",
+                "output_dir",
+                "discovery_results_path",
+                "external_results_path"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "assess_robustness"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric dependent variables; separate test per variable and stratum."
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Adjustment variables, numerical unless declared categorical."
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Subset of covariates encoded as categorical variables."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Group column."
+                },
+                "contrast": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "[reference, treatment]; estimates treatment minus reference."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns",
+                "group_key",
+                "contrast"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "evaluate_perturbation"
+                  ]
+                },
+                "input_path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "CSV/TSV input path; ID columns preserved as strings."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Parent directory for a new isolated result directory."
+                },
+                "donor_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Independent biological replicate ID.",
+                  "default": "donor_id"
+                },
+                "strata": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Analyze each combination separately; one donor row per stratum."
+                },
+                "value_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "Numeric dependent variables; separate test per variable and stratum."
+                },
+                "covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Adjustment variables, numerical unless declared categorical."
+                },
+                "categorical_covariates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 0,
+                  "uniqueItems": true,
+                  "description": "Subset of covariates encoded as categorical variables."
+                },
+                "group_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Group column."
+                },
+                "contrast": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "uniqueItems": true,
+                  "description": "[reference, treatment]; estimates treatment minus reference."
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "value_columns",
+                "group_key",
+                "contrast"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "evaluate_age_prediction"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "validate_external_cohort"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            },
+            "unmatched_discovery": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unmatched_external": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation",
+            "unmatched_discovery",
+            "unmatched_external"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "assess_robustness"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            },
+            "failed_refits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "excluded_donor": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "excluded_donor",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation",
+            "failed_refits"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "type": "string",
+              "enum": [
+                "evaluate_perturbation"
+              ]
+            },
+            "table": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "shape": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "path",
+                "shape",
+                "columns"
+              ],
+              "additionalProperties": false
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "interpretation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "operation",
+            "table",
+            "provenance",
+            "interpretation"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+]
