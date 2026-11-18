@@ -341,11 +341,21 @@ def main(request_path):
                     read_cell(job["reference_images"][0], allowed_sizes).shape
                 ),
                 "reference_rows_excluded": job["reference_rows_excluded"],
+                "cohort_balance": job["cohort_balance"],
+                "group_proportions_match": job["group_proportions_match"],
+                "cohort_groups": job["cohort_groups"],
                 "match_keys": job.get("match_keys", ["condition", "batch"]),
                 "kid_subset_size": subset,
                 "kid_subsets": subsets,
             }
         )
+        if not job["group_proportions_match"]:
+            result["warnings"] = [
+                (
+                    "Pooled FID/KID includes different match-group proportions. "
+                    "Use cohort_balance=match_group_counts to compare equal counts per group."
+                )
+            ]
         per_condition = {}
         if job.get("per_condition", True):
             for condition in sorted({row["condition"] for row in job["predictions"]}):

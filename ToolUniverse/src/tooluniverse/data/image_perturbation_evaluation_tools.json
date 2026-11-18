@@ -351,6 +351,12 @@
           ],
           "description": "Reference matching fields; must include condition. Default also enforces batch coverage. Extra real groups are excluded and counted."
         },
+        "cohort_balance": {
+          "type": "string",
+          "enum": ["as_provided", "match_group_counts"],
+          "default": "as_provided",
+          "description": "as_provided keeps the original matched cohorts. match_group_counts uses seeded sampling without replacement to retain the smaller count from each side in every match group."
+        },
         "kid_subset_size": {
           "type": "integer",
           "minimum": 2,
@@ -405,6 +411,19 @@
             "kid_std": {
               "type": "number"
             }
+          }
+        },
+        "cohort_balance": {
+          "type": "string",
+          "enum": ["as_provided", "match_group_counts"]
+        },
+        "group_proportions_match": {
+          "type": "boolean"
+        },
+        "cohort_groups": {
+          "type": "array",
+          "items": {
+            "type": "object"
           }
         },
         "report_path": {

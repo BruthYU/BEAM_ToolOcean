@@ -61,7 +61,7 @@ CSV/TSV 附加参数示例：
 
 矩阵也可指定为 features_by_observations。除索引列外必须全部为有限数值，观测和基因标识必须唯一且非空，不自动猜测方向。
 
-obs_column_map 是标准字段到原始观测列名的映射，如 `{"perturbation": "condition"}`。可关联外部 CSV/TSV/Parquet 元数据，Parquet 另需 pyarrow。关联需提供 metadata_path、metadata_join_keys，例如 `{"data": ["__obs_index__"], "metadata": ["cell_id"]}`；默认严格匹配，禁止按行号拼接或一对多展开。
+obs_column_map 是标准字段到原始观测列名的映射，如 `{"perturbation": "condition"}`。可关联外部 CSV/TSV/Parquet 元数据，Parquet 另需 pyarrow。关联需提供 metadata_path、metadata_join_keys，例如 `{"data": ["__obs_index__"], "metadata": ["cell_id"]}`；默认严格匹配，禁止按行号拼接或一对多展开。 表达数据中的文本键按原值与 CSV/TSV 元数据匹配，保留前导零。
 
 ## 返回与数据引用
 
@@ -80,7 +80,7 @@ print(descriptor["inputs"], descriptor["read_options"])
 
 ## 资源与验证范围
 
-H5AD backed 模式可将主矩阵保留在磁盘，obs 和部分 layers 仍可能进入内存。当前加载前后各计算一次完整 SHA256，解析引用时再次计算；没有内部固定超时或后台任务接口，客户端可能另有超时限制。
+H5AD backed 模式可将主矩阵保留在磁盘，obs 和部分 layers 仍可能进入内存。默认 `integrity_check="sha256"` 在加载时计算一次完整 SHA-256，解析引用时再次校验内容。对于稳定的大文件，可以用 `integrity_check="stat"` 在加载和解析时核对文件大小、修改时间、状态变更时间、设备和 inode，跳过全文件哈希。该模式依赖文件系统元数据判断变更。工具调用时长还受客户端超时设置影响。
 
 本地验证覆盖真实 H5AD、10x H5、MTX、CSV/TSV 转换副本、gzip、矩阵数值、元数据关联和错误输入。一次约 12.27 GiB、4705402 × 62710 的 H5AD backed 实测成功，工具约 42.15 秒、进程峰值 RSS 约 1.70 GiB；结果依赖运行环境，不代表后续完整矩阵分析的资源需求。测试目录、数据文件和运行产物不随本工具提交。
 

@@ -30,6 +30,7 @@ def ImagePerturbation_calculate_fid_kid(
     kid_subsets: int | None = 100,
     per_condition: bool | None = True,
     *,
+    cohort_balance: str | None = None,
     stream_callback: Callable[[str], None] | None = None,
     use_cache: bool = False,
     validate: bool = True,
@@ -73,6 +74,8 @@ def ImagePerturbation_calculate_fid_kid(
         Number of reproducible KID subset draws. Unbiased KID may be negative.
     per_condition : bool
         Also compute metrics per condition where sample counts meet the configured mi...
+    cohort_balance : str
+        Use match_group_counts for equal generated and real counts per match group.
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -108,6 +111,7 @@ def ImagePerturbation_calculate_fid_kid(
             "kid_subset_size": kid_subset_size,
             "kid_subsets": kid_subsets,
             "per_condition": per_condition,
+            "cohort_balance": cohort_balance,
         }.items()
         if v is not None
     }

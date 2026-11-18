@@ -124,6 +124,15 @@ and counted. `match_keys=["condition"]` explicitly permits cross-batch pooled
 references; the chosen policy is written to the report. Cohort sizes may differ
 because these are distribution comparisons. Shared image paths are rejected.
 
+The default `cohort_balance="as_provided"` retains both matched cohorts and
+reports their available and used counts per match group. When group proportions
+differ, the pooled scores reflect both image differences and cohort composition.
+Set `cohort_balance="match_group_counts"` to use the smaller available count
+on both sides of each group. Selection is seeded and without replacement. The
+global and per-condition metrics use the selected cohorts. Use the same group
+counts and seed across model comparisons, and set `kid_subset_size` for the
+available cohort sizes.
+
 One frozen torch-fidelity Inception-v3 extracts 2048-dimensional features once
 per image. TorchMetrics computes FID with float64 covariance arithmetic and
 KID with its default polynomial kernel (degree 3, gamma 1/2048, coefficient 1).

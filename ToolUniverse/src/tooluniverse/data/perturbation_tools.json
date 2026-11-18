@@ -81,6 +81,12 @@
           "type": "boolean",
           "description": "Read H5AD using backed mode. Layers can still be materialized by AnnData."
         },
+        "integrity_check": {
+          "type": "string",
+          "enum": ["sha256", "stat"],
+          "default": "sha256",
+          "description": "sha256 hashes each input once at load and again on reference resolution. stat uses size, modification/change timestamps, device and inode without reading full input contents."
+        },
         "metadata_path": {
           "type": "string",
           "description": "Optional CSV, TSV or Parquet metadata file.",
@@ -192,6 +198,10 @@
                     "csv",
                     "tsv"
                   ]
+                },
+                "integrity_check": {
+                  "type": "string",
+                  "enum": ["sha256", "stat"]
                 },
                 "shape": {
                   "type": "array",

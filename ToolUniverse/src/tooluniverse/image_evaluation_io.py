@@ -3,6 +3,8 @@
 import csv
 import hashlib
 import json
+import random
+from collections import defaultdict
 from pathlib import Path
 
 
@@ -183,3 +185,52 @@ def match_references(predictions, references, keys):
             "Predictions and reference cohorts share identical image content."
         )
     return selected
+
+
+def evaluation_cohorts(predictions, references, keys, policy, seed):
+    """Report the group composition and optionally subsample each matched pair."""
+    prediction_groups, reference_groups = defaultdict(list), defaultdict(list)
+    for index, row in enumerate(predictions):
+        prediction_groups[tuple(row[key] for key in keys)].append(index)
+    for index, row in enumerate(references):
+        reference_groups[tuple(row[key] for key in keys)].append(index)
+
+    randomizer = random.Random(seed)
+    prediction_indices, reference_indices, groups = [], [], []
+    for group in sorted(prediction_groups):
+        predicted, real = prediction_groups[group], reference_groups[group]
+        selected_count = min(len(predicted), len(real))
+        if policy == "match_group_counts":
+            prediction_indices.extend(randomizer.sample(predicted, selected_count))
+            reference_indices.extend(randomizer.sample(real, selected_count))
+        groups.append(
+            {
+                "match": dict(zip(keys, group, strict=True)),
+                "n_predictions_available": len(predicted),
+                "n_references_available": len(real),
+                "n_predictions_used": selected_count
+                if policy == "match_group_counts"
+                else len(predicted),
+                "n_references_used": selected_count
+                if policy == "match_group_counts"
+                else len(real),
+            }
+        )
+
+    if policy == "match_group_counts":
+        predictions = [predictions[index] for index in sorted(prediction_indices)]
+        references = [references[index] for index in sorted(reference_indices)]
+    proportions_match = all(
+        group["n_predictions_used"] * len(references)
+        == group["n_references_used"] * len(predictions)
+        for group in groups
+    )
+    return (
+        predictions,
+        references,
+        {
+            "cohort_balance": policy,
+            "group_proportions_match": proportions_match,
+            "cohort_groups": groups,
+        },
+    )

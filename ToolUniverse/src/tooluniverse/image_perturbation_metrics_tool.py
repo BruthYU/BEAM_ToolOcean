@@ -14,6 +14,7 @@ import jsonschema
 from .base_tool import BaseTool
 from .image_evaluation_io import (
     align_labels,
+    evaluation_cohorts,
     file_path,
     image_rows,
     label_names,
@@ -37,12 +38,15 @@ class ImagePerturbationEvaluationTool(BaseTool):
             finite_arguments(arguments)
             jsonschema.validate(arguments, self.tool_config["parameter"])
             args = dict(arguments)
-            operation = self.operation or {
-                "ImagePerturbation_evaluate_moa": "moa",
-                "ImagePerturbation_calculate_fid_kid": "fid_kid",
-                "image_perturbation_evaluate_moa": "moa",
-                "image_perturbation_evaluate_fid_kid": "fid_kid",
-            }[self.tool_config["name"]]
+            operation = (
+                self.operation
+                or {
+                    "ImagePerturbation_evaluate_moa": "moa",
+                    "ImagePerturbation_calculate_fid_kid": "fid_kid",
+                    "image_perturbation_evaluate_moa": "moa",
+                    "image_perturbation_evaluate_fid_kid": "fid_kid",
+                }[self.tool_config["name"]]
+            )
             split = args.get("split", "test")
             if args["evaluation_profile"] != "bbbc021_smoke" and split != "test":
                 raise ValueError(
@@ -90,12 +94,22 @@ class ImagePerturbationEvaluationTool(BaseTool):
             else:
                 reference = track("reference_images")
                 references = image_rows(reference, split)
-                job["reference_images"] = match_references(
+                keys = args.get("match_keys", ["condition", "batch"])
+                matched = match_references(predictions, references, keys)
+                predictions, selected, composition = evaluation_cohorts(
                     predictions,
-                    references,
-                    args.get("match_keys", ["condition", "batch"]),
+                    matched,
+                    keys,
+                    args.get("cohort_balance", "as_provided"),
+                    args.get("seed", 42),
                 )
-                count = min(len(predictions), len(job["reference_images"]))
+                job.update(
+                    predictions=predictions,
+                    reference_images=selected,
+                    reference_rows_excluded=len(references) - len(matched),
+                    **composition,
+                )
+                count = min(len(predictions), len(selected))
                 if count < 2:
                     raise ValueError(
                         "FID/KID requires at least two images in each cohort."
@@ -106,9 +120,6 @@ class ImagePerturbationEvaluationTool(BaseTool):
                     )
                 weights = track("feature_extractor_weights")
                 job["feature_extractor_weights"] = str(weights)
-                job["reference_rows_excluded"] = len(references) - len(
-                    job["reference_images"]
-                )
             if any(sha256(source["path"]) != source["sha256"] for source in sources):
                 raise ValueError("An input changed during evaluation preparation.")
             executable = shutil.which(args.get("python_executable", sys.executable))
