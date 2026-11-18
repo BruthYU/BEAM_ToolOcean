@@ -410,6 +410,8 @@ STATIC_LAZY_REGISTRY = {
     "IUCNTool": "iucn_tool",
     "IUPred3Tool": "iupred3_tool",
     "IdentifiersOrgTool": "identifiers_org_tool",
+    "ImagePerturbationCalculateFIDKIDTool": "image_perturbation_calculate_fid_kid_tool",
+    "ImagePerturbationEvaluateMoATool": "image_perturbation_evaluate_moa_tool",
     "ImagePerturbationEvaluationTool": "image_perturbation_metrics_tool",
     "ImmPortTool": "immport_tool",
     "IntActRESTTool": "intact_tool",

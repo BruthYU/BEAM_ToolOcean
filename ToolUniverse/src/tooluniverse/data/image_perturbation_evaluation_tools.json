@@ -5,7 +5,7 @@
       "image_perturbation_evaluate_moa",
       "image_perturbation.evaluate_moa"
     ],
-    "type": "ImagePerturbationEvaluationTool",
+    "type": "ImagePerturbationEvaluateMoATool",
     "description": "Evaluate images from any BBBC021-compatible generator with an independently supplied frozen MoA classifier. Returns Accuracy, Macro-F1, Weighted-F1 (0..1), per-class confusion metrics, per-condition metrics and per-image predictions. model_name labels reports only. Does not train classifiers or invoke generation. Native uint8 pixels (128x128 supported with an explicit native Inception profile), no flips or contrast changes; macro-F1 uses the union of true/predicted labels. Calls download nothing.",
     "parameter": {
       "type": "object",
@@ -235,7 +235,7 @@
       "image_perturbation_evaluate_fid_kid",
       "image_perturbation.evaluate_fid_kid"
     ],
-    "type": "ImagePerturbationEvaluationTool",
+    "type": "ImagePerturbationCalculateFIDKIDTool",
     "description": "Compute model-independent FID and KID for generated versus real treated BBBC021 images using one explicitly supplied frozen Inception-v3 feature extractor. model_name labels reports only. Supports condition/batch matching and per-condition reports, seeded KID, shared in-memory features and float64 FID covariance arithmetic. Requires at least two images per cohort and adequate KID subset size. No generator imports, image conversion, training or runtime downloads.",
     "parameter": {
       "type": "object",

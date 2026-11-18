@@ -6,7 +6,7 @@ by either evaluator; only the prediction manifests and evaluator assets are used
 
 | Check | Result |
 | --- | --- |
-| Registration | Both tool names resolve to `ImagePerturbationEvaluationTool` |
+| Registration | MoA and FID/KID resolve to their respective backend classes and share the evaluation workflow |
 | MoA | One existing 50-step CellFlux prediction evaluated successfully |
 | FID/KID | Two genuine 2-step CellFlux predictions versus seven same-plate floxuridine cells |
 | Model-name independence | Repeating both evaluations with `alternate_report_label` produced identical metrics |

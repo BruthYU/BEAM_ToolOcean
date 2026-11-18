@@ -1,11 +1,11 @@
 # Independent perturbation image evaluation
 
-Two tools share the registered implementation `ImagePerturbationEvaluationTool`:
+Each tool registers a backend named for its operation. The backends share the evaluation workflow in `image_perturbation_metrics_tool.py`.
 
-| Tool | Output |
-| --- | --- |
-| `ImagePerturbation_evaluate_moa` | Accuracy, Macro-F1, Weighted-F1; per-image/class/condition results |
-| `ImagePerturbation_calculate_fid_kid` | FID, KID mean/std; sample counts and per-condition results |
+| Tool | Backend module | Output |
+| --- | --- | --- |
+| `ImagePerturbation_evaluate_moa` | `image_perturbation_evaluate_moa_tool.py` | Accuracy, Macro-F1, Weighted-F1; per-image/class/condition results |
+| `ImagePerturbation_calculate_fid_kid` | `image_perturbation_calculate_fid_kid_tool.py` | FID, KID mean/std; sample counts and per-condition results |
 
 `model_name` is a report label. It never selects a generator, checkpoint,
 preprocessing branch or metric. The tools neither import CellFlux nor call any

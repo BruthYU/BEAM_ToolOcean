@@ -7,6 +7,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
+from typing import ClassVar
 
 import jsonschema
 
@@ -26,7 +27,9 @@ from .tool_registry import register_tool
 
 @register_tool("ImagePerturbationEvaluationTool")
 class ImagePerturbationEvaluationTool(BaseTool):
-    """Dispatch by metric tool name; model_name is report metadata only."""
+    """Shared evaluation workflow and compatibility for existing tool configs."""
+
+    operation: ClassVar[str | None] = None
 
     def run(self, arguments):
         directory = None
@@ -34,7 +37,7 @@ class ImagePerturbationEvaluationTool(BaseTool):
             finite_arguments(arguments)
             jsonschema.validate(arguments, self.tool_config["parameter"])
             args = dict(arguments)
-            operation = {
+            operation = self.operation or {
                 "ImagePerturbation_evaluate_moa": "moa",
                 "ImagePerturbation_calculate_fid_kid": "fid_kid",
                 "image_perturbation_evaluate_moa": "moa",
