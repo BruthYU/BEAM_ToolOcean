@@ -12,7 +12,11 @@ import jsonschema
 
 from .base_tool import BaseTool
 from .image_evaluation_io import file_path, image_rows, sha256
-from .perturbation_runtime import finite_arguments, generation_result, wait_for_worker
+from .perturbation_runtime import (
+    configured_worker_arguments,
+    generation_result,
+    wait_for_worker,
+)
 
 
 class BaselineImageGenerationTool(BaseTool):
@@ -23,9 +27,9 @@ class BaselineImageGenerationTool(BaseTool):
     def run(self, arguments):
         directory = None
         try:
-            finite_arguments(arguments)
-            jsonschema.validate(arguments, self.tool_config["parameter"])
-            args = dict(arguments)
+            args = configured_worker_arguments(
+                self.tool_config, arguments, ("model_dir", "checkpoint_path", "embeddings_path", "embedding_checkpoint")
+            )
             sources = []
 
             def track(key):

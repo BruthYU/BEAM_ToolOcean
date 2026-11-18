@@ -13,9 +13,6 @@
       "required": [
         "control_manifest",
         "compounds",
-        "model_dir",
-        "checkpoint_path",
-        "embeddings_path",
         "output_dir"
       ],
       "properties": {
@@ -38,17 +35,17 @@
         "model_dir": {
           "type": "string",
           "minLength": 1,
-          "description": "Local trusted official CellFlux checkout (models/ and training/)."
+          "description": "Local trusted official CellFlux checkout (models/ and training/). Required when the deployment has no runtime_assets default."
         },
         "checkpoint_path": {
           "type": "string",
           "minLength": 1,
-          "description": "Official BBBC021 EMA checkpoint.pth, not an LFS pointer."
+          "description": "Official BBBC021 EMA checkpoint.pth, not an LFS pointer. Required when the deployment has no runtime_assets default."
         },
         "embeddings_path": {
           "type": "string",
           "minLength": 1,
-          "description": "Official emb_fp.csv, compound identifiers as first/index column and 1024 ordered features."
+          "description": "Official emb_fp.csv, compound identifiers as first/index column and 1024 ordered features. Required when the deployment has no runtime_assets default."
         },
         "output_dir": {
           "type": "string",

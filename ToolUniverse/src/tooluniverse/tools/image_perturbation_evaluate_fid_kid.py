@@ -19,7 +19,7 @@ def image_perturbation_evaluate_fid_kid(
     evaluation_profile: str,
     output_dir: str,
     reference_images: str,
-    feature_extractor_weights: str,
+    feature_extractor_weights: str | None = None,
     split: str | None = "test",
     python_executable: str | None = None,
     device: str | None = "auto",

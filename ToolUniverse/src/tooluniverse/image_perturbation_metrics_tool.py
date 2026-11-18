@@ -22,7 +22,11 @@ from .image_evaluation_io import (
     read_table,
     sha256,
 )
-from .perturbation_runtime import evaluation_result, finite_arguments, wait_for_worker
+from .perturbation_runtime import (
+    configured_worker_arguments,
+    evaluation_result,
+    wait_for_worker,
+)
 from .tool_registry import register_tool
 
 
@@ -35,9 +39,6 @@ class ImagePerturbationEvaluationTool(BaseTool):
     def run(self, arguments):
         directory = None
         try:
-            finite_arguments(arguments)
-            jsonschema.validate(arguments, self.tool_config["parameter"])
-            args = dict(arguments)
             operation = (
                 self.operation
                 or {
@@ -47,6 +48,12 @@ class ImagePerturbationEvaluationTool(BaseTool):
                     "image_perturbation_evaluate_fid_kid": "fid_kid",
                 }[self.tool_config["name"]]
             )
+            required_assets = (
+                ("evaluator_checkpoint", "label_map")
+                if operation == "moa"
+                else ("feature_extractor_weights",)
+            )
+            args = configured_worker_arguments(self.tool_config, arguments, required_assets)
             split = args.get("split", "test")
             if args["evaluation_profile"] != "bbbc021_smoke" and split != "test":
                 raise ValueError(

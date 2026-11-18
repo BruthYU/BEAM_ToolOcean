@@ -7,6 +7,22 @@ import signal
 import subprocess
 from pathlib import Path
 
+import jsonschema
+
+
+def configured_worker_arguments(tool_config, arguments, required_assets):
+    """Resolve deployment defaults before enforcing the worker's asset contract."""
+    defaults = (tool_config.get("fields") or {}).get("runtime_assets", {})
+    allowed_assets = {*required_assets, "python_executable"}
+    if not isinstance(defaults, dict) or defaults.keys() - allowed_assets:
+        raise ValueError("runtime_assets must contain only supported worker asset keys.")
+    resolved = {**defaults, **arguments}
+    finite_arguments(resolved)
+    schema = tool_config["parameter"]
+    required = list(dict.fromkeys([*schema.get("required", []), *required_assets]))
+    jsonschema.validate(resolved, {**schema, "required": required})
+    return resolved
+
 
 def finite_arguments(value, path="arguments"):
     """JSON Schema permits non-finite Python floats; reject them before any I/O."""

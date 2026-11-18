@@ -13,7 +13,11 @@ from pathlib import Path
 import jsonschema
 
 from .base_tool import BaseTool
-from .perturbation_runtime import finite_arguments, generation_result, wait_for_worker
+from .perturbation_runtime import (
+    configured_worker_arguments,
+    generation_result,
+    wait_for_worker,
+)
 from .tool_registry import register_tool
 
 
@@ -90,9 +94,9 @@ class CellFluxTool(BaseTool):
     def run(self, arguments):
         directory = None
         try:
-            finite_arguments(arguments)
-            jsonschema.validate(arguments, self.tool_config["parameter"])
-            args = dict(arguments)
+            args = configured_worker_arguments(
+                self.tool_config, arguments, ("model_dir", "checkpoint_path", "embeddings_path")
+            )
             manifest = _file(args["control_manifest"])
             checkpoint = _file(args["checkpoint_path"])
             embeddings = _file(args["embeddings_path"])

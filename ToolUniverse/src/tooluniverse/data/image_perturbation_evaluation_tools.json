@@ -15,9 +15,7 @@
         "model_name",
         "evaluation_profile",
         "output_dir",
-        "reference_metadata",
-        "evaluator_checkpoint",
-        "label_map"
+        "reference_metadata"
       ],
       "properties": {
         "predictions": {
@@ -103,12 +101,12 @@
         "evaluator_checkpoint": {
           "type": "string",
           "minLength": 1,
-          "description": "Local frozen CellFlux-compatible MoA evaluator checkpoint containing model_state with Inception parameters and a 2048->512->13 classifier. No generator checkpoint is used."
+          "description": "Local frozen CellFlux-compatible MoA evaluator checkpoint containing model_state with Inception parameters and a 2048->512->13 classifier. No generator checkpoint is used. Required when the deployment has no runtime_assets default."
         },
         "label_map": {
           "type": "string",
           "minLength": 1,
-          "description": "JSON ordered list of 13 unique MoA class names, or {labels:[...]}, in this evaluator head output order. Required; never guessed from evaluated labels."
+          "description": "JSON ordered list of 13 unique MoA class names, or {labels:[...]}, in this evaluator head output order. Required; never guessed from evaluated labels. Required when the deployment has no runtime_assets default."
         },
         "join_on": {
           "type": "string",
@@ -245,8 +243,7 @@
         "model_name",
         "evaluation_profile",
         "output_dir",
-        "reference_images",
-        "feature_extractor_weights"
+        "reference_images"
       ],
       "properties": {
         "predictions": {
@@ -332,7 +329,7 @@
         "feature_extractor_weights": {
           "type": "string",
           "minLength": 1,
-          "description": "Local torch-fidelity inception-v3-compat state_dict. Must use the same frozen weights and preprocessing for every model compared. No runtime downloads."
+          "description": "Local torch-fidelity inception-v3-compat state_dict. Must use the same frozen weights and preprocessing for every model compared. No runtime downloads. Required when the deployment has no runtime_assets default."
         },
         "match_keys": {
           "type": "array",

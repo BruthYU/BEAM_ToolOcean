@@ -13,11 +13,7 @@
       "required": [
         "control_manifest",
         "compounds",
-        "model_dir",
-        "output_dir",
-        "checkpoint_path",
-        "embeddings_path",
-        "embedding_checkpoint"
+        "output_dir"
       ],
       "properties": {
         "control_manifest": {
@@ -39,7 +35,7 @@
         "model_dir": {
           "type": "string",
           "minLength": 1,
-          "description": "Local trusted official IMPA repository (IMPA/model.py)."
+          "description": "Local trusted official IMPA repository (IMPA/model.py). Required when the deployment has no runtime_assets default."
         },
         "output_dir": {
           "type": "string",
@@ -104,17 +100,17 @@
         "checkpoint_path": {
           "type": "string",
           "minLength": 1,
-          "description": "Local released IMPA nets.ckpt. Generator and mapping parameters are loaded strictly; training-only networks are not executed."
+          "description": "Local released IMPA nets.ckpt. Generator and mapping parameters are loaded strictly; training-only networks are not executed. Required when the deployment has no runtime_assets default."
         },
         "embeddings_path": {
           "type": "string",
           "minLength": 1,
-          "description": "Named 1024-feature Morgan fingerprint CSV such as official emb_fp.csv."
+          "description": "Named 1024-feature Morgan fingerprint CSV such as official emb_fp.csv. Required when the deployment has no runtime_assets default."
         },
         "embedding_checkpoint": {
           "type": "string",
           "minLength": 1,
-          "description": "Matching released embeddings.ckpt. Frozen rows are matched exactly to named fingerprints to recover training vocabulary."
+          "description": "Matching released embeddings.ckpt. Frozen rows are matched exactly to named fingerprints to recover training vocabulary. Required when the deployment has no runtime_assets default."
         },
         "allow_unseen_compounds": {
           "type": "boolean",
