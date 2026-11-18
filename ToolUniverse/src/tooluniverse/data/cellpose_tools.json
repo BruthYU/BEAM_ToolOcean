@@ -1,17 +1,17 @@
 [
   {
     "name": "Cellpose_segment_image",
-    "description": "Segment cells or nuclei in a single microscopy image LOCALLY using the deep-learning Cellpose model (no API, no key). Given a local image file path, returns the number of segmented objects, per-object area (pixels) and centroid (y,x), the image shape, and optionally the path to a saved integer label-mask image. Choose 'model_type' = 'cyto3'/'cyto'/'cyto2' for whole-cell/cytoplasm segmentation or 'nuclei' for nuclei. NOTE: cellpose 3.x honors 'model_type'; cellpose 4.x uses a single unified model (CPSAM) and ignores 'model_type' (the 'model_used' field and a 'note' report what actually ran). Requires the optional 'cellpose' package (pip install cellpose; pulls in torch). On first use cellpose downloads model weights (small in 3.x, ~1 GB CPSAM in 4.x) and caches them, so the first call is slow; later calls reuse cached weights. Returns a clean error if cellpose is not installed or the image cannot be read.",
+    "description": "Local Cellpose 2D segmentation with legacy single-image statistics or complete persistent results. Accept exactly one image_path, image_paths batch, or image_ref from the microscopy loader. Complete mode (output_dir) writes lossless uint32 masks, full object tables, selected input pixels, previews and optional native flows/styles. Batch calls reuse a model serially, record per-image failures, and support fingerprint-validated resume. Explicit device selection supports CPU/CUDA/MPS. Z/T planes and up to three physical channels must be selected explicitly when ambiguous. Explicit legacy model_type/channels are rejected on Cellpose 4.x; use pretrained_model and channel_names/channel_indices. Progress callbacks, cooperative time budgets and cancellation markers support long calls. No training, volumetric inference or background job service.",
     "parameter": {
       "type": "object",
       "properties": {
         "image_path": {
           "type": "string",
-          "description": "Path to a local microscopy image file (.tif, .tiff, .png, .jpg, .jpeg, .bmp)."
+          "description": "One local image path. Without output_dir preserves the existing statistics/optional-PNG interface; with output_dir creates complete artifacts."
         },
         "model_type": {
           "type": "string",
-          "description": "Cellpose model to use. 'cyto3'/'cyto'/'cyto2' for cells/cytoplasm, 'nuclei' for nuclei. Honored on cellpose 3.x; ignored by the unified model on 4.x. Default 'cyto3'.",
+          "description": "Legacy Cellpose 3.x model selector (default cyto3). Explicitly supplying this parameter on 4.x fails; use pretrained_model instead. Omit it for the installed default model.",
           "enum": [
             "cyto3",
             "cyto2",
@@ -21,29 +21,235 @@
         },
         "diameter": {
           "type": "number",
-          "description": "Expected object diameter in pixels. Omit or 0 to let cellpose estimate it automatically."
+          "description": "Expected object diameter in pixels. Omitted or zero uses backend default: automatic size estimation in 3.x; default scaling without size estimation in 4.x.",
+          "minimum": 0
         },
         "channels": {
           "type": "array",
           "items": {
-            "type": "integer"
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
           },
-          "description": "Two-element [cytoplasm, nucleus] channel spec. Use [0,0] for a grayscale image (default). Used by cellpose 3.x; 4.x infers channels.",
+          "description": "Legacy 3.x [cytoplasm,nucleus] codes. Explicitly supplying this parameter on 4.x fails. Use channel_names/channel_indices for physical input channels.",
           "minItems": 2,
           "maxItems": 2
         },
         "save_mask": {
           "type": "boolean",
-          "description": "If true, save the integer label mask as a 16-bit PNG and return its path. Default false."
+          "description": "Legacy single-image mode only (no output_dir): save a uint16 PNG mask. Complete-output mode always persists masks; omit this switch there."
         },
         "mask_output_path": {
           "type": "string",
-          "description": "Where to write the mask when save_mask is true. Defaults to '<image_path>_cp_masks.png'."
+          "description": "Legacy single-image mask path; must not overwrite the source. Not accepted together with output_dir."
+        },
+        "image_paths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Local image path."
+          },
+          "description": "Batch input paths in caller order; mutually exclusive with image_path/image_ref. Requires output_dir."
+        },
+        "image_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "dataset_ref returned by image_perturbation_load_images. Channels sharing field_id are one logical image. Requires output_dir."
+        },
+        "image_indices": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Zero-based logical image indices in image_ref, after grouping wide-manifest channels by field_id."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Enable complete result files in a unique run directory: uint32 TIFF mask, object JSONL, optional input, preview, native flows/styles. Required for batch/reference inputs."
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+          "description": "Optional run directory name; generated when omitted. Required for resume."
+        },
+        "resume": {
+          "type": "boolean",
+          "description": "Resume an existing run_id with equivalent effective parameters. Unvisited prior successes survive repeated interruptions/errors; successful items require pixel/model/artifact validation. Execution budgets and cancellation markers may change."
+        },
+        "device": {
+          "type": "string",
+          "pattern": "^(auto|cpu|cuda|cuda:[0-9]+|mps)$",
+          "description": "Default auto selects CUDA if available, otherwise CPU. Explicit unavailable devices fail; no silent CPU fallback."
+        },
+        "pretrained_model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Cellpose 4.x built-in pretrained model name or existing local checkpoint. Unknown names fail instead of default-model fallback. Optional backend dependencies may be needed."
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Backend tile microbatch size per image, default 8. Outer image batch is processed serially to bound memory and track per-image errors."
+        },
+        "flow_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Backend flow error threshold; default 0.4."
+        },
+        "cellprob_threshold": {
+          "type": "number",
+          "description": "Backend cell probability threshold; default 0.0."
+        },
+        "channel_indices": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Select and order 1-3 physical source channels. Wide-manifest order follows image_path_columns. Unlike legacy channels, this selection is applied on Cellpose 4.x too."
+        },
+        "z_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Explicit Z plane. Required when source has more than one Z plane; no projection is inferred."
+        },
+        "t_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Explicit time point. Required when source has more than one T plane."
+        },
+        "roi": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "y",
+            "x",
+            "height",
+            "width"
+          ],
+          "properties": {
+            "y": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "x": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "description": "Optional source-plane pixel ROI. Returned centroids are ROI-relative; source.origin_yx records the offset."
+        },
+        "max_pixels": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 67108864,
+          "description": "Maximum selected pixel samples including channels, default 16777216. Vendor full-decode backends have a separate 256 MiB acquisition cap."
+        },
+        "mask_format": {
+          "type": "string",
+          "enum": [
+            "tiff",
+            "png",
+            "npy"
+          ],
+          "description": "Complete-output mask format, default tiff (uint32). NPY is uint32; PNG is uint16 and rejects labels above 65535."
+        },
+        "save_input": {
+          "type": "boolean",
+          "description": "In output_dir mode save exact selected pixels as input.npy, default true."
+        },
+        "save_preview": {
+          "type": "boolean",
+          "description": "In output_dir mode save display-only segmentation overlay, default true. Maximum preview side 1024 pixels."
+        },
+        "save_flows": {
+          "type": "boolean",
+          "description": "Persist all native flow outputs as separate numeric NPY files, default false."
+        },
+        "save_styles": {
+          "type": "boolean",
+          "description": "Persist backend native styles as NPY, default false. Some backends return placeholder styles; this is not a guaranteed useful embedding."
+        },
+        "preview_rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Bound inline image results and object previews, default 20; complete records are always in files."
+        },
+        "on_error": {
+          "type": "string",
+          "enum": [
+            "continue",
+            "stop"
+          ],
+          "description": "Batch failure policy, default continue. Successful images remain available after a later error."
+        },
+        "channel_names": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Select/order physical channels by their loader-declared names, e.g. [Actin,DNA]. Mutually exclusive with channel_indices."
+        },
+        "max_run_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Complete mode only: cooperative time budget for this invocation. Check before each image and before inference; does not interrupt an active read/model load/inference. Committed outputs remain resumable."
+        },
+        "cancel_file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Complete mode only: stop at a safe boundary when this local marker path exists. The caller creates/removes the marker; the tool never deletes it. Does not kill active inference."
         }
       },
-      "required": [
-        "image_path"
-      ]
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "image_path"
+          ]
+        },
+        {
+          "required": [
+            "image_paths"
+          ]
+        },
+        {
+          "required": [
+            "image_ref"
+          ]
+        }
+      ],
+      "not": {
+        "required": [
+          "channel_indices",
+          "channel_names"
+        ]
+      }
     },
     "type": "CellposeTool",
     "requires_local_input": true,
@@ -52,120 +258,347 @@
     ],
     "test_examples": [
       {
-        "image_path": "/path/to/microscopy/cells.tif",
-        "model_type": "cyto3",
-        "channels": [
-          0,
-          0
-        ]
+        "image_path": "/path/to/cells.tif"
       },
       {
-        "image_path": "/path/to/microscopy/nuclei.png",
-        "model_type": "nuclei",
-        "diameter": 30,
-        "save_mask": true
+        "image_paths": [
+          "/path/to/cells.tif",
+          "/path/to/cells.png"
+        ],
+        "output_dir": "/path/to/results",
+        "device": "cpu"
       }
     ],
     "return_schema": {
-      "type": "object",
       "oneOf": [
         {
           "type": "object",
-          "description": "Successful segmentation. Mirrors the content of the 'data' field returned by the tool.",
-          "properties": {
-            "image_path": {
-              "type": "string",
-              "description": "The input image path that was segmented."
-            },
-            "model_type_requested": {
-              "type": "string",
-              "description": "The model_type the caller asked for."
-            },
-            "model_used": {
-              "type": "string",
-              "description": "Identifier of the cellpose model that actually produced the segmentation."
-            },
-            "num_objects": {
-              "type": "integer",
-              "description": "Number of segmented cells/nuclei (distinct nonzero labels in the mask)."
-            },
-            "image_shape": {
-              "type": "array",
-              "items": {
-                "type": "integer"
-              },
-              "description": "Shape of the output label mask, e.g. [height, width]."
-            },
-            "objects": {
-              "type": "array",
-              "description": "One entry per segmented object.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "label": {
-                    "type": "integer",
-                    "description": "Integer label of this object in the mask."
-                  },
-                  "area": {
-                    "type": "integer",
-                    "description": "Object area in pixels."
-                  },
-                  "centroid_y": {
-                    "type": "number",
-                    "description": "Centroid row (y) coordinate in pixels."
-                  },
-                  "centroid_x": {
-                    "type": "number",
-                    "description": "Centroid column (x) coordinate in pixels."
-                  }
-                },
-                "required": [
-                  "label",
-                  "area",
-                  "centroid_y",
-                  "centroid_x"
-                ]
-              }
-            },
-            "mask_path": {
-              "type": [
-                "string",
-                "null"
-              ],
-              "description": "Path to the saved label-mask image, or null if save_mask was false."
-            },
-            "note": {
-              "type": "string",
-              "description": "Present when the cellpose build ignored model_type (unified-model builds)."
-            },
-            "mask_save_error": {
-              "type": "string",
-              "description": "Present only if saving the mask failed (segmentation still succeeded)."
-            }
-          },
+          "additionalProperties": false,
           "required": [
-            "image_path",
-            "model_type_requested",
-            "model_used",
-            "num_objects",
-            "image_shape",
-            "objects"
-          ]
+            "status",
+            "data"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "success",
+                "partial_success"
+              ]
+            },
+            "data": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "description": "Successful segmentation payload inside data.",
+                  "properties": {
+                    "image_path": {
+                      "type": "string",
+                      "description": "The input image path that was segmented."
+                    },
+                    "model_type_requested": {
+                      "type": "string",
+                      "description": "The model_type the caller asked for."
+                    },
+                    "model_used": {
+                      "type": "string",
+                      "description": "Identifier of the cellpose model that actually produced the segmentation."
+                    },
+                    "num_objects": {
+                      "type": "integer",
+                      "description": "Number of segmented cells/nuclei (distinct nonzero labels in the mask)."
+                    },
+                    "image_shape": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "Shape of the output label mask, e.g. [height, width]."
+                    },
+                    "objects": {
+                      "type": "array",
+                      "description": "One entry per segmented object.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "integer",
+                            "description": "Integer label of this object in the mask."
+                          },
+                          "area": {
+                            "type": "integer",
+                            "description": "Object area in pixels."
+                          },
+                          "centroid_y": {
+                            "type": "number",
+                            "description": "Centroid row (y) coordinate in pixels."
+                          },
+                          "centroid_x": {
+                            "type": "number",
+                            "description": "Centroid column (x) coordinate in pixels."
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "area",
+                          "centroid_y",
+                          "centroid_x"
+                        ]
+                      }
+                    },
+                    "mask_path": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Path to the saved label-mask image, or null if save_mask was false."
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Present when the cellpose build ignored model_type (unified-model builds)."
+                    },
+                    "mask_save_error": {
+                      "type": "string",
+                      "description": "Present when segmentation succeeded but the mask could not be safely saved, including a source-image collision or labels above 65535."
+                    },
+                    "device": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "image_path",
+                    "model_type_requested",
+                    "model_used",
+                    "num_objects",
+                    "image_shape",
+                    "objects"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "run_ref",
+                    "results_path",
+                    "run_id",
+                    "n_requested",
+                    "n_processed",
+                    "n_succeeded",
+                    "n_failed",
+                    "resumed_successes",
+                    "results",
+                    "device",
+                    "n_unprocessed"
+                  ],
+                  "properties": {
+                    "run_ref": {
+                      "type": "string"
+                    },
+                    "results_path": {
+                      "type": "string"
+                    },
+                    "run_id": {
+                      "type": "string"
+                    },
+                    "device": {
+                      "type": "string"
+                    },
+                    "n_requested": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "n_processed": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "n_succeeded": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "n_failed": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "resumed_successes": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "results": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "item_index",
+                          "status",
+                          "paths"
+                        ],
+                        "properties": {
+                          "item_index": {
+                            "type": "integer"
+                          },
+                          "status": {
+                            "enum": [
+                              "success",
+                              "error",
+                              "not_processed"
+                            ]
+                          },
+                          "paths": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "prediction_ref": {
+                            "type": "string"
+                          },
+                          "num_objects": {
+                            "type": "integer"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "n_unprocessed": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "stop_reason": {
+                      "type": "string",
+                      "enum": [
+                        "cancel_requested",
+                        "time_budget_exhausted",
+                        "image_error"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
         },
         {
           "type": "object",
-          "description": "Error response (e.g. cellpose not installed, missing/unreadable image, segmentation failure).",
-          "properties": {
-            "error": {
-              "type": "string",
-              "description": "Error message."
-            }
-          },
+          "additionalProperties": false,
           "required": [
+            "status",
             "error"
-          ]
+          ],
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "run_ref",
+                "results_path",
+                "run_id",
+                "n_requested",
+                "n_processed",
+                "n_succeeded",
+                "n_failed",
+                "resumed_successes",
+                "results",
+                "device",
+                "n_unprocessed"
+              ],
+              "properties": {
+                "run_ref": {
+                  "type": "string"
+                },
+                "results_path": {
+                  "type": "string"
+                },
+                "run_id": {
+                  "type": "string"
+                },
+                "device": {
+                  "type": "string"
+                },
+                "n_requested": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "n_processed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "n_succeeded": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "n_failed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "resumed_successes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "results": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "item_index",
+                      "status",
+                      "paths"
+                    ],
+                    "properties": {
+                      "item_index": {
+                        "type": "integer"
+                      },
+                      "status": {
+                        "enum": [
+                          "success",
+                          "error",
+                          "not_processed"
+                        ]
+                      },
+                      "paths": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "prediction_ref": {
+                        "type": "string"
+                      },
+                      "num_objects": {
+                        "type": "integer"
+                      },
+                      "error": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "n_unprocessed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "stop_reason": {
+                  "type": "string",
+                  "enum": [
+                    "cancel_requested",
+                    "time_budget_exhausted",
+                    "image_error"
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
-    }
+    },
+    "cacheable": false
   }
 ]

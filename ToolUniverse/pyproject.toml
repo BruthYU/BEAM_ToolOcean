@@ -102,11 +102,15 @@ requires-python = ">=3.10"
 readme = "README.md"
 
 [project.optional-dependencies]
+# Data readers remain optional so SDK/catalog discovery does not load model code.
 perturbation = [
     "anndata>=0.11", "h5py>=3.10", "scipy>=1.11", "pyarrow>=14",
     "Pillow>=10", "tifffile>=2024.8", "zarr>=3", "fsspec>=2024.10",
     "aiohttp>=3.9", "s3fs>=2024.10", "nd2>=0.10", "readlif>=0.6",
     "czifile>=2026.11.8; python_version >= '3.12'",
+]
+cellpose = [
+    "cellpose>=4.2,<5", "Pillow>=10", "tifffile>=2024.8", "filelock>=3.13",
 ]
 protein-pka = [
     # Local empirical protein pKa diagnostics; never imported at startup.

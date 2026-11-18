@@ -1,0 +1,8 @@
+# Install a suitable CPU/CUDA PyTorch build separately for the target host.
+torch>=2.5,<3
+numpy>=2,<3
+pandas>=2,<3
+Pillow>=10
+flow-matching==1.0.10
+torchdiffeq==0.2.5
+requests>=2.32
