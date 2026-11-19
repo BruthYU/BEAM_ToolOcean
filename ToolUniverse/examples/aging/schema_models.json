@@ -1,0 +1,746 @@
+[
+  {
+    "name": "RNAAgeCalc",
+    "type": "RNAAgeCalcTool",
+    "description": "Predict human bulk RNA age using official RNAAgeCalc coefficients. Complete signature coverage is required; no imputation or automatic ID mapping. Counts require explicit gene lengths. Does not infer longevity or aging speed.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "properties": {
+            "input_path": {
+              "type": "string",
+              "description": "h5ad or observations-by-genes CSV; first CSV column contains observation IDs."
+            },
+            "output_dir": {
+              "type": "string",
+              "description": ""
+            },
+            "model_dir": {
+              "type": "string",
+              "description": "Locally deployed, checksum-verified official model bundle directory."
+            },
+            "species": {
+              "type": "string",
+              "enum": [
+                "human"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "description": ""
+            },
+            "metadata_columns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": ""
+              },
+              "uniqueItems": true
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "predict_age"
+              ]
+            },
+            "expression_type": {
+              "type": "string",
+              "enum": [
+                "FPKM",
+                "counts"
+              ]
+            },
+            "gene_id_type": {
+              "type": "string",
+              "enum": [
+                "SYMBOL"
+              ]
+            },
+            "gene_length_key": {
+              "type": "string",
+              "description": "Positive gene lengths in base pairs in h5ad var; required for counts."
+            },
+            "tissue": {
+              "type": "string",
+              "description": "Must exactly match the fixed model bundle tissue, e.g. all_tissues."
+            },
+            "data_kind": {
+              "type": "string",
+              "enum": [
+                "bulk"
+              ]
+            }
+          },
+          "required": [
+            "operation",
+            "input_path",
+            "output_dir",
+            "model_dir",
+            "species",
+            "expression_type",
+            "gene_id_type",
+            "tissue",
+            "data_kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "enum": [
+            "predict_age"
+          ]
+        },
+        "predictions": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "shape": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "axes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "path",
+            "shape"
+          ],
+          "additionalProperties": false
+        },
+        "backend": {
+          "type": "string"
+        },
+        "model": {
+          "type": "object"
+        },
+        "device": {
+          "enum": [
+            "cpu",
+            "cuda"
+          ]
+        },
+        "provenance": {
+          "type": "object"
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "required_genes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "matched_genes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "coverage_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "missing_genes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "required_genes",
+            "matched_genes",
+            "coverage_fraction",
+            "missing_genes"
+          ],
+          "additionalProperties": false
+        },
+        "age_unit": {
+          "const": "years"
+        }
+      },
+      "required": [
+        "operation",
+        "predictions",
+        "backend",
+        "model",
+        "device",
+        "coverage"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "scAgeClock",
+    "type": "ScAgeClockTool",
+    "description": "Predict human single-cell transcriptomic age with the published GMA model. Input must exactly match bundle feature ordering and categorical encoding. Runs bounded batches on the requested device.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "input_path": {
+                  "type": "string",
+                  "description": "h5ad or observations-by-genes CSV; first CSV column contains observation IDs."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "description": ""
+                },
+                "model_dir": {
+                  "type": "string",
+                  "description": "Locally deployed, checksum-verified official model bundle directory."
+                },
+                "species": {
+                  "type": "string",
+                  "enum": [
+                    "human"
+                  ]
+                },
+                "layer": {
+                  "type": "string",
+                  "description": ""
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": ""
+                  },
+                  "uniqueItems": true
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "predict_age"
+                  ]
+                },
+                "expression_type": {
+                  "type": "string",
+                  "enum": [
+                    "scageclock_formatted"
+                  ]
+                },
+                "device": {
+                  "type": "string",
+                  "enum": [
+                    "cpu",
+                    "cuda"
+                  ],
+                  "default": "cpu"
+                },
+                "batch_size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 128
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "model_dir",
+                "species",
+                "expression_type"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "input_path": {
+                  "type": "string",
+                  "description": "h5ad or observations-by-genes CSV; first CSV column contains observation IDs."
+                },
+                "output_dir": {
+                  "type": "string",
+                  "description": ""
+                },
+                "model_dir": {
+                  "type": "string",
+                  "description": "Locally deployed, checksum-verified official model bundle directory."
+                },
+                "species": {
+                  "type": "string",
+                  "enum": [
+                    "human"
+                  ]
+                },
+                "layer": {
+                  "type": "string",
+                  "description": ""
+                },
+                "metadata_columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": ""
+                  },
+                  "uniqueItems": true
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "prepare_input"
+                  ]
+                },
+                "expression_type": {
+                  "type": "string",
+                  "enum": [
+                    "counts"
+                  ]
+                },
+                "category_columns": {
+                  "type": "object",
+                  "properties": {
+                    "assay": {
+                      "type": "string"
+                    },
+                    "cell_type": {
+                      "type": "string"
+                    },
+                    "tissue_general": {
+                      "type": "string"
+                    },
+                    "sex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "assay",
+                    "cell_type",
+                    "tissue_general",
+                    "sex"
+                  ],
+                  "additionalProperties": false
+                },
+                "categories_are_indices": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "min_gene_coverage": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.8
+                },
+                "target_sum": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "operation",
+                "input_path",
+                "output_dir",
+                "model_dir",
+                "species",
+                "expression_type"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "enum": [
+                "predict_age"
+              ]
+            },
+            "predictions": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "axes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ],
+              "additionalProperties": false
+            },
+            "backend": {
+              "type": "string"
+            },
+            "model": {
+              "type": "object"
+            },
+            "device": {
+              "enum": [
+                "cpu",
+                "cuda"
+              ]
+            },
+            "provenance": {
+              "type": "object"
+            },
+            "age_unit": {
+              "const": "years"
+            },
+            "n_cells": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "operation",
+            "predictions",
+            "backend",
+            "model",
+            "device"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operation": {
+              "const": "prepare_input"
+            },
+            "output": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "shape": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "axes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "path",
+                "shape"
+              ],
+              "additionalProperties": false
+            },
+            "coverage": {
+              "type": "object",
+              "properties": {
+                "required_genes": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "matched_genes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "coverage_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "missing_genes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "required_genes",
+                "matched_genes",
+                "coverage_fraction",
+                "missing_genes"
+              ],
+              "additionalProperties": false
+            },
+            "expression_type": {
+              "const": "scageclock_formatted"
+            },
+            "normalization_target_sum": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "provenance": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "operation",
+            "output",
+            "coverage",
+            "expression_type",
+            "normalization_target_sum"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "SenCID",
+    "type": "SenCIDTool",
+    "description": "Score human cellular senescence using official SenCID classifiers and published non-denoising preprocessing. DCA denoising is not performed. Reports continuous SID scores separately from predicted ages; no universal binary threshold.",
+    "parameter": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "properties": {
+            "input_path": {
+              "type": "string",
+              "description": "h5ad or observations-by-genes CSV; first CSV column contains observation IDs."
+            },
+            "output_dir": {
+              "type": "string",
+              "description": ""
+            },
+            "model_dir": {
+              "type": "string",
+              "description": "Locally deployed, checksum-verified official model bundle directory."
+            },
+            "species": {
+              "type": "string",
+              "enum": [
+                "human"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "description": ""
+            },
+            "metadata_columns": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": ""
+              },
+              "uniqueItems": true
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "score_senescence"
+              ]
+            },
+            "expression_type": {
+              "type": "string",
+              "enum": [
+                "counts"
+              ]
+            },
+            "gene_id_type": {
+              "type": "string",
+              "enum": [
+                "SYMBOL"
+              ]
+            },
+            "min_gene_coverage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.8
+            },
+            "sidnums": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "data_kind": {
+              "type": "string",
+              "enum": [
+                "single_cell",
+                "bulk"
+              ],
+              "default": "single_cell"
+            }
+          },
+          "required": [
+            "operation",
+            "input_path",
+            "output_dir",
+            "model_dir",
+            "species",
+            "expression_type",
+            "gene_id_type"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "operation": {
+          "enum": [
+            "score_senescence"
+          ]
+        },
+        "scores": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "shape": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "axes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "path",
+            "shape"
+          ],
+          "additionalProperties": false
+        },
+        "backend": {
+          "type": "string"
+        },
+        "model": {
+          "type": "object"
+        },
+        "device": {
+          "enum": [
+            "cpu",
+            "cuda"
+          ]
+        },
+        "provenance": {
+          "type": "object"
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "required_genes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "matched_genes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "coverage_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "missing_genes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "required_genes",
+            "matched_genes",
+            "coverage_fraction",
+            "missing_genes"
+          ],
+          "additionalProperties": false
+        },
+        "denoising": {
+          "const": false
+        },
+        "interpretation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation",
+        "scores",
+        "backend",
+        "model",
+        "device",
+        "coverage"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

@@ -1,6 +1,14 @@
 # Spatial transcriptomics
 
-The `spatial_transcriptomics` category contains `SpatialIO`, `SpatialPreprocess`, `SpatialAssociation`, `cell2location`, `Tangram`, and `GraphST`. Each tool accepts a `request` object whose `operation` selects the workflow.
+The `spatial_transcriptomics` category exposes the tools below. Each tool accepts a `request` object whose `operation` selects the workflow. These subsets describe workflow roles; they are not separate category names.
+
+| Subset | Tools | Purpose |
+| --- | --- | --- |
+| Data processing | `SpatialIO`, `SpatialPreprocess`, **`SpatialSingleCellIO`** | Visium I/O and QC; import segmented Xenium/MERFISH/CosMx RNA counts, attach labels, and prepare single-cell references. |
+| Models | `cell2location`, `Tangram`, `GraphST`, **`SpatialFormer`** | Deconvolution, spatial mapping, domains, and pretrained cell embeddings/pair proximity inference. |
+| Post-analysis | `SpatialAssociation`, **`SpatialPairValidation`**, **`SpatialPairSummary`** | Abundance associations, coordinate-based prediction evaluation, and cell-type-pair/patient summaries. |
+
+See [SpatialFormer and imaging single-cell data](spatialformer.md) for complete import examples and the serial inference/validation workflow. SpatialFormer exposes only `extract_embeddings` and `predict_pairs`: weights are prepared by deployment scripts, and there are no model-listing, download, training, or fine-tuning tool APIs.
 
 ## Installation
 
@@ -30,7 +38,7 @@ python -m pip install 'scanpy[skmisc]>=1.12,<1.13' torch POT igraph \
   'GraphST @ git+https://github.com/JinmiaoChenLab/GraphST.git@d62b0b7b6cd38ee285f3ac8cd67b7341a10bcc74'
 ```
 
-The local wrappers run on CPU. GraphST clustering uses Scanpy's igraph Leiden implementation. The reference and mapping stages of cell2location use Pyro 1.9.1 because this upstream revision imports a helper removed in Pyro 1.9.2.
+The original model wrappers default to CPU; `TOOLOCEAN_SPATIAL_DEVICE=cuda` enables their supported CUDA path. SpatialFormer uses an explicit `device` parameter. GraphST clustering uses Scanpy's igraph Leiden implementation. The reference and mapping stages of cell2location use Pyro 1.9.1 because this upstream revision imports a helper removed in Pyro 1.9.2.
 
 ## Call a tool
 
@@ -102,7 +110,7 @@ For Tangram, `mode` defaults to `cells`. Set `cell_type_key` for `clusters` mode
 
 For GraphST, provide raw counts in `X` and two spatial coordinates per spot in `obsm["spatial"]`. The slice integration operation expects coordinates already registered in the same coordinate system. The `resolution` argument for clustering and integration controls Leiden granularity. Cell-type projection retains the highest-weighted 10% of reference cells per spot (at least one) before normalizing the resulting cell-type weights.
 
-All six model operations accept `max_epochs`. The JSON schema lists the default for each workflow.
+The cell2location, Tangram mapping, and GraphST training operations accept `max_epochs`. SpatialFormer is inference-only and does not accept a training budget. The JSON schema lists the defaults for each workflow.
 
 ## Spatial association and patient groups
 
@@ -173,3 +181,152 @@ The score is same-spot Pearson correlation within each slice. Valid slices recei
 Global Benjamini-Hochberg correction (`bh`) includes every dataset/pair, including untestable pairs conservatively counted as p=1 internally (their reported p and q remain null). `by` selects the more conservative Benjamini-Yekutieli correction for arbitrary dependence. `top_n` limits inline results only. Files include the complete ranked `screen.csv`, `patients.csv`, `slices.csv`, and `summary.json`. Leave-one-patient-out effect ranges describe sensitivity, not confidence intervals or additional significance tests.
 
 Inputs are used as supplied, without normalization. Avoid mixing aggregate cell labels with their own subtypes, and choose comparable abundance scales. Tangram mapping weights are not measured cell counts. Correlation can reflect composition, shared tissue regions, or technical effects: it does not establish contact or causality. Follow up selected pairs using `analyze_spatial_association` for neighborhood analysis, independent cohorts, and appropriate biological validation. FDR covers only this call's declared family, not prior searches or repeated parameter tuning. Screening does not automatically assert agreement between models.
+
+## Describe an existing dataset
+
+Use `SpatialIO.describe_spatial_dataset` to read an h5ad dataset or a fitted
+reference-signature CSV and return English descriptions. The operation is
+read-only and does not require a research question or train a model.
+
+```json
+{
+  "name": "SpatialIO",
+  "arguments": {
+    "request": {
+      "operation": "describe_spatial_dataset",
+      "input_path": "/data/spatial.h5ad",
+      "metadata_path": "/data/study.csv",
+      "metadata_columns": {
+        "obs": {"sample_id": "slice_id", "patient_id": "donor"},
+        "background": {"sample_id": "sample", "disease": "diagnosis"}
+      }
+    }
+  }
+}
+```
+
+Only `input_path` is required. The response contains `dataset_summary`,
+`biological_metadata`, `sample_annotations`, `cell_annotations`, and
+`data_contents`, plus the standard operation identifier. It describes fields
+actually stored in the data and identifies the source of each annotation.
+Unrecorded biological information is described as
+`Not recorded in the supplied data.` Layer names are listed without inferring
+whether values are raw counts or normalized. Gene expression and filenames
+are not used to infer disease, species, cell identities, or treatment.
+
+Optional `metadata_columns` maps semantic fields to actual column names,
+separately for `obs` and `background`. Supported semantic fields are
+`patient_id`, `sample_id`, `group`, `cell_type`, `domain`, `species`,
+`disease`, `tissue`, `treatment`, `sampling_time`, `source`, and
+`dataset_path`. Without explicit mapping, the first available column in
+each of these ordered lists is selected:
+
+| Meaning | Default column names, in priority order |
+| --- | --- |
+| Patient | patient_id, patient, donor_id, donor |
+| Sample | sample_id, sample, slice_id, library_id |
+| Group | group, response, condition |
+| Cell type | cell_type, cell_type_label, celltype |
+| Domain | domain, author_region, region |
+| Species | species, organism |
+| Disease | disease |
+| Tissue | tissue, organ |
+| Treatment | treatment |
+| Sampling time | sampling_time, timepoint |
+| Source | source, accession |
+| Dataset path | dataset_path |
+
+Scalar biological annotations under their canonical names in h5ad `uns`
+are also reported. Values from different sources remain attributed to those
+sources so the caller can review disagreements. Set `max_values` (default 20,
+maximum 100) to control how many distinct values appear in each description.
+
+A background CSV must have one row per linking identifier. A `dataset_path`
+column takes precedence. Otherwise it is joined on sample ID when available
+in both files, then patient ID. Paths in that column can be absolute or
+relative to the background CSV directory. Unrelated rows are excluded,
+partial coverage is described, and an absent join or duplicate background
+identifiers produces an actionable error. For reference-signature CSVs,
+use a background `dataset_path` column to provide biological provenance.
+
+Example background CSV:
+
+```csv
+sample,diagnosis,tissue,treatment,sampling_time,source
+S1,hepatocellular carcinoma,liver tumor,cabozantinib and nivolumab,after treatment,study sample manifest
+```
+
+Sample identifiers must match the dataset. CSV reference signatures use the
+first column for gene IDs and subsequent numeric columns for cell types.
+Their contents alone do not establish how or where the reference was trained.
+
+### Validate a Tangram gene projection
+
+Run `Tangram.map_to_space` with `project_genes=true`, then pass the returned
+`gene_projection.path` and the original measured slice to a second call:
+
+```json
+{
+  "name": "Tangram",
+  "arguments": {
+    "request": {
+      "operation": "validate_gene_projection",
+      "measured_path": "/data/measured.h5ad",
+      "projection_path": "/results/gene_projection.h5ad",
+      "gene_sets": {"held_out_program": ["PDCD1", "TOX"]}
+    }
+  }
+}
+```
+
+Use unlogged, nonnegative expression in `X` in both files. The files must have
+the same unique spot IDs and may be ordered differently. Gene IDs are uppercased
+by default to match Tangram output. Use `gene_id_case: "exact"` to preserve case.
+The optional `normalization_genes` must be present in both files and exclude every
+evaluation gene. By default, the panel uses all shared genes except those in
+the requested gene sets.
+
+Each file uses its own shared-panel total at each spot to scale expression
+to 10,000 before applying `log1p`. Spots with a zero panel total in either
+file are excluded. The tool averages the transformed genes in each set and
+returns Spearman correlation between the measured and projected spot scores.
+A missing gene, fewer than two usable spots, or constant scores yields a null
+correlation with a reason. The response reports usable spot and panel sizes.
+The holdout status is determined from the projection's `uns["training_genes"]`:
+`held_out` means no recorded training gene overlaps the set, `training_overlap`
+reports any overlap, and `unknown` means training metadata was unavailable.
+This measures agreement between spatial profiles and does not rerun Tangram.
+
+### Inspect author-provided spatial annotations
+
+Use `SpatialIO.inspect_author_annotations` to align published region annotations
+to a local slice:
+
+```json
+{
+  "name": "SpatialIO",
+  "arguments": {
+    "request": {
+      "operation": "inspect_author_annotations",
+      "annotation_path": "/data/author_clusters.csv",
+      "spatial_path": "/data/measured.h5ad",
+      "cluster_key": "X_pca_kmeans",
+      "cluster_mapping": {
+        "1": {"label": "Tumor-1 (ALB)", "region": "tumor"},
+        "2": {"label": "Immune", "region": "other"}
+      },
+      "source": "Author analysis script and dataset accession",
+      "output_dir": "/results/annotations"
+    }
+  }
+}
+```
+
+Supply the cluster mapping from the source for that slice. The tool reads a
+local CSV and uses `spot_key` or, if omitted, the first CSV column as the spot
+identifier. It requires unique, exact spot IDs and an annotation for every
+spot in the spatial file. It counts extra CSV rows, marks clusters absent
+from the mapping as `unassigned`, and preserves the spatial file's spot order
+in `annotations.csv`. The response and `audit.json` record the region counts,
+unmapped clusters, supplied mapping, and optional source. Join the output
+back to the same slice by `spot_id` before applying a region filter.
