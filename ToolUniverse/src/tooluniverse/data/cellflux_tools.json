@@ -1,0 +1,220 @@
+[
+  {
+    "name": "CellFlux_predict_morphology",
+    "aliases": [
+      "image_perturbation_predict_morphology",
+      "image_perturbation.predict_morphology"
+    ],
+    "type": "CellFluxTool",
+    "description": "Generate unpaired treated-cell population images from preprocessed BBBC021 DMSO controls and official compound fingerprints using pretrained CellFlux EMA weights. Requires a local official checkout, checkpoint, encoding CSV and model Python environment. Produces 96x96 three-channel PNGs and persistent provenance/index files. Does not segment raw fields, predict observed single-cell trajectories, or perform arbitrary drug/dose/time inference. No model downloads occur during calls.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control_manifest",
+        "compounds",
+        "output_dir"
+      ],
+      "properties": {
+        "control_manifest": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Control-only CSV with sample_id,image_path,batch,condition. condition must be DMSO. Relative image paths resolve beside the manifest; cells must be HWC uint8 96x96x3 NPY or lossless RGB PNG in official channel order."
+        },
+        "compounds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "description": "Exact compound identifiers in the supplied official 1024-feature embedding CSV. No free-text encoding or dose/time extrapolation."
+        },
+        "model_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local trusted official CellFlux checkout (models/ and training/). Required when the deployment has no runtime_assets default."
+        },
+        "checkpoint_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Official BBBC021 EMA checkpoint.pth, not an LFS pointer. Required when the deployment has no runtime_assets default."
+        },
+        "embeddings_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Official emb_fp.csv, compound identifiers as first/index column and 1024 ordered features. Required when the deployment has no runtime_assets default."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Parent directory for a unique run containing PNG predictions, JSONL index, manifest and log."
+        },
+        "batch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional exact control batch filter. Otherwise generate separately for every control batch."
+        },
+        "python_executable": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Python executable in the model environment; defaults to the current interpreter."
+        },
+        "device": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "cpu",
+            "cuda"
+          ],
+          "default": "auto",
+          "description": "auto selects CUDA when available, otherwise CPU."
+        },
+        "samples_per_condition": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 512,
+          "default": 8,
+          "description": "Images per compound per batch. At most 4096 images per call. Controls resampled if necessary."
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "default": 4,
+          "description": "Inference minibatch size; reduce for limited memory."
+        },
+        "sampling_steps": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000,
+          "default": 50,
+          "description": "Official EDM schedule parameter; heun2 solver. Low values are for smoke tests, not benchmark comparison."
+        },
+        "cfg_scale": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 0.2,
+          "description": "Official classifier-free guidance scale."
+        },
+        "noise_level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 1.0,
+          "description": "Gaussian noise added to normalized controls (official use_initial=2)."
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "default": 42,
+          "description": "Seed for control selection, dequantization and sampling noise."
+        },
+        "cpu_threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 4,
+          "description": "PyTorch intra-op CPU threads in the isolated worker."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "default": 1800,
+          "description": "Worker timeout; a timed-out or failed run is never returned as successful."
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "n_images": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "image_index": {
+          "type": "string"
+        },
+        "run_manifest": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "device": {
+          "type": "string"
+        },
+        "error_code": {
+          "type": "string"
+        },
+        "image_dir": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status",
+              "schema_version",
+              "run_id",
+              "device",
+              "model",
+              "n_images",
+              "image_index",
+              "run_manifest",
+              "image_dir"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "error"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status",
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "cacheable": false,
+    "requires_local_input": true
+  }
+]

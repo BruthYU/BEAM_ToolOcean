@@ -11,6 +11,13 @@ from pathlib import Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 default_tool_files = {
+    "image_perturbation_models": os.path.join(
+        current_dir, "data", "image_perturbation_model_tools.json"
+    ),
+    "image_perturbation_evaluation": os.path.join(
+        current_dir, "data", "image_perturbation_evaluation_tools.json"
+    ),
+    "cellflux": os.path.join(current_dir, "data", "cellflux_tools.json"),
     "perturbation": os.path.join(current_dir, "data", "perturbation_tools.json"),
     "image_perturbation": os.path.join(current_dir, "data", "image_perturbation_tools.json"),
     "imvigor210": os.path.join(current_dir, "data", "imvigor210_tools.json"),

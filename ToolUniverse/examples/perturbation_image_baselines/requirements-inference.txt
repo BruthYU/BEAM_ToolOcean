@@ -1,0 +1,8 @@
+# Separate model environment; do not downgrade the ToolUniverse SDK environment.
+torch>=2.5,<3
+torchvision>=0.20
+numpy>=2,<3
+pandas>=2,<3
+Pillow>=10
+munch==4.0.0
+requests>=2.32

@@ -28,7 +28,7 @@
             "manifest",
             "remote"
           ],
-          "description": "file, directory or manifest for local sources; remote for one anonymous HTTP(S)/S3 OME-Zarr image."
+          "description": "file, directory or CSV/TSV/JSONL manifest for local sources; remote for one anonymous HTTP(S)/S3 OME-Zarr image."
         },
         "output_dir": {
           "type": "string",
@@ -76,7 +76,12 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Manifest wide channel name to path-column mapping. Each row represents one field."
+          "description": "Wide manifest mapping from channel name to a path column of single-channel images. Each row represents one field. Use image_path_column instead for one multichannel file per row."
+        },
+        "image_path_column": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Manifest column containing one image file path per row, such as image_path. Preserves all native channels, including RGB PNGs. Mutually exclusive with image_path_columns."
         },
         "metadata_column_map": {
           "type": "object",
@@ -115,7 +120,7 @@
             "type": "string",
             "minLength": 1
           },
-          "description": "Internal zero-based channel index to name. Must cover every channel; incompatible with manifest channel names."
+          "description": "Internal zero-based channel index to name. Must cover every channel; incompatible with the wide manifest image_path_columns mapping."
         },
         "lazy": {
           "type": "boolean",

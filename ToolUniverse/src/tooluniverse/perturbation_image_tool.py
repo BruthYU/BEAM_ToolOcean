@@ -67,6 +67,14 @@ def _directory_files(source, pattern=None):
     return files
 
 
+def _image_fileset(path):
+    if _SUFFIXES.get(path.suffix.lower()) == "tiff":
+        from .microscopy_image_readers import ome_tiff_members
+
+        return ome_tiff_members(path)
+    return [path]
+
+
 def _image_header(path, arguments):
     from .microscopy_image_readers import read_native, read_tiff, read_zarr
 
@@ -196,34 +204,44 @@ def _manifest_rows(source, arguments):
 
     import pandas as pd
 
-    if source.suffix.lower() not in (".csv", ".tsv"):
+    suffix = source.suffix.lower()
+    if suffix not in (".csv", ".tsv", ".jsonl"):
         raise DatasetLoadError(
-            "UNSUPPORTED_FORMAT", "Image manifest must be CSV or TSV."
+            "UNSUPPORTED_FORMAT", "Image manifest must be CSV, TSV, or JSONL."
         )
-    separator = "\t" if source.suffix.lower() == ".tsv" else ","
-    with source.open(newline="", encoding="utf-8-sig") as stream:
-        header = next(csv.reader(stream, delimiter=separator), [])
-    if (
-        not header
-        or any(not value for value in header)
-        or len(header) != len(set(header))
-    ):
-        raise DatasetLoadError(
-            "METADATA_MISMATCH", "Manifest column names must be unique and non-empty."
-        )
-    table = pd.read_csv(
-        source,
-        sep="\t" if source.suffix.lower() == ".tsv" else ",",
-        dtype=str,
-        keep_default_na=False,
-    )
+    if suffix == ".jsonl":
+        with source.open(encoding="utf-8-sig") as stream:
+            records = [json.loads(line) for line in stream if line.strip()]
+        if not records or any(not isinstance(record, dict) for record in records):
+            raise DatasetLoadError(
+                "INVALID_DATA", "JSONL image manifest requires at least one object row."
+            )
+        table = pd.DataFrame(records, dtype=object).fillna("")
+    else:
+        separator = "\t" if suffix == ".tsv" else ","
+        with source.open(newline="", encoding="utf-8-sig") as stream:
+            header = next(csv.reader(stream, delimiter=separator), [])
+        if (
+            not header
+            or any(not value for value in header)
+            or len(header) != len(set(header))
+        ):
+            raise DatasetLoadError(
+                "METADATA_MISMATCH",
+                "Manifest column names must be unique and non-empty.",
+            )
+        table = pd.read_csv(source, sep=separator, dtype=str, keep_default_na=False)
     paths = arguments.get("image_path_columns", {})
     mapping = arguments.get("metadata_column_map", {})
-    if not paths:
+    single_path = arguments.get("image_path_column")
+    if bool(single_path) == bool(paths):
         raise DatasetLoadError(
-            "INVALID_ARGUMENT", "Manifest input requires image_path_columns."
+            "INVALID_ARGUMENT",
+            "Manifest input requires exactly one of image_path_column or image_path_columns.",
         )
-    if arguments.get("channel_map"):
+    if single_path:
+        paths = {None: single_path}
+    elif arguments.get("channel_map"):
         raise DatasetLoadError(
             "INVALID_ARGUMENT", "Use manifest channel names or channel_map, not both."
         )
@@ -251,7 +269,7 @@ def _manifest_rows(source, arguments):
     )
     rows, skipped, identities = [], 0, set()
     for number, row in table.iterrows():
-        metadata = {standard: row[column] for standard, column in mapping.items()}
+        metadata = {standard: str(row[column]) for standard, column in mapping.items()}
         if any(not metadata[key] for key in keys):
             raise DatasetLoadError(
                 "METADATA_MISMATCH", "Field key values must be non-empty."
@@ -265,6 +283,11 @@ def _manifest_rows(source, arguments):
         members = []
         for channel, column in paths.items():
             value = row[column]
+            if not isinstance(value, str):
+                raise DatasetLoadError(
+                    "INVALID_DATA",
+                    f"Image path must be a string in manifest row {number}.",
+                )
             path = Path(value).expanduser() if value else None
             if path is not None and not path.is_absolute():
                 path = root / path
@@ -308,6 +331,7 @@ def _inspect_images(arguments):
         if any(
             key in arguments
             for key in (
+                "image_path_column",
                 "image_path_columns",
                 "metadata_column_map",
                 "image_root",
@@ -387,6 +411,7 @@ def _inspect_images(arguments):
     if mode != "manifest" and any(
         k in arguments
         for k in (
+            "image_path_column",
             "image_path_columns",
             "metadata_column_map",
             "image_root",
@@ -409,13 +434,7 @@ def _inspect_images(arguments):
                 raise DatasetLoadError(
                     "INVALID_DATA", f"Image appears more than once: {path}"
                 )
-            from .microscopy_image_readers import ome_tiff_members
-
-            related = (
-                ome_tiff_members(path)
-                if _SUFFIXES.get(path.suffix.lower()) == "tiff"
-                else [path]
-            )
+            related = _image_fileset(path)
             related_set = set(related)
             if mode == "directory" and related_set.issubset(seen):
                 continue
@@ -509,10 +528,11 @@ def resolve_image_dataset_ref(dataset_ref):
     options = descriptor["read_options"]
     if options["source_type"] == "directory":
         files = {
-            str(p)
-            for p in _directory_files(
+            str(member)
+            for path in _directory_files(
                 Path(options["source"]), options.get("file_pattern")
             )
+            for member in _image_fileset(path)
         }
         if files != {s["path"] for s in descriptor["inputs"]}:
             raise DatasetLoadError(

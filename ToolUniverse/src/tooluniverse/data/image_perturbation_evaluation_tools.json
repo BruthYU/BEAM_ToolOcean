@@ -1,0 +1,493 @@
+[
+  {
+    "name": "ImagePerturbation_evaluate_moa",
+    "aliases": [
+      "image_perturbation_evaluate_moa",
+      "image_perturbation.evaluate_moa"
+    ],
+    "type": "ImagePerturbationEvaluateMoATool",
+    "description": "Evaluate images from any BBBC021-compatible generator with an independently supplied frozen MoA classifier. Returns Accuracy, Macro-F1, Weighted-F1 (0..1), per-class confusion metrics, per-condition metrics and per-image predictions. model_name labels reports only. Does not train classifiers or invoke generation. Native uint8 pixels (128x128 supported with an explicit native Inception profile), no flips or contrast changes; macro-F1 uses the union of true/predicted labels. Calls download nothing.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predictions",
+        "model_name",
+        "evaluation_profile",
+        "output_dir",
+        "reference_metadata"
+      ],
+      "properties": {
+        "predictions": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CSV/JSONL image index: unique sample_id,image_path,condition; batch when matching batches. Relative paths resolve beside the index. Images must already be native uint8 96x96x3 (128x128x3 only under native_inception/smoke profiles) NPY/RGB PNG. Optional SHA256 is verified."
+        },
+        "model_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Report label such as CellFlux, IMPA, or a custom model. Never selects evaluator logic or weights."
+        },
+        "evaluation_profile": {
+          "type": "string",
+          "enum": [
+            "bbbc021_standard",
+            "bbbc021_unseen_compounds",
+            "bbbc021_smoke",
+            "bbbc021_native_inception"
+          ],
+          "description": "BBBC021 protocol intent. Standard/unseen profiles require native 96x96 images and split=test. native_inception explicitly accepts uniform native 96x96 or 128x128 cohorts without external resizing. smoke allows integration subsets. No profile certifies benchmark identity."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Parent directory for a unique evaluation run, metrics reports, input fingerprints and execution log."
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1,
+          "default": "test",
+          "description": "Exact reference split to select. Reference tables must contain split. No implicit training-row fallback."
+        },
+        "python_executable": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Evaluation environment Python; defaults to the current interpreter. Requires torch, torchvision, torch-fidelity, torchmetrics and scikit-learn."
+        },
+        "device": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "cpu",
+            "cuda"
+          ],
+          "default": "auto",
+          "description": "Device for frozen Inception features. Cached metrics run on CPU; auto uses CUDA when available."
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "default": 16,
+          "description": "Feature extraction minibatch size."
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "default": 42,
+          "description": "Random seed, including reproducible KID subsets."
+        },
+        "cpu_threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 4,
+          "description": "PyTorch CPU thread count in the worker."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "default": 1800,
+          "description": "Worker timeout. Failed or incomplete reports are returned as errors."
+        },
+        "reference_metadata": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Ground-truth CSV/JSONL with condition,moa,split; sample_id additionally required for sample_id alignment. Predictions never supply ground-truth MoA labels."
+        },
+        "evaluator_checkpoint": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local frozen CellFlux-compatible MoA evaluator checkpoint containing model_state with Inception parameters and a 2048->512->13 classifier. No generator checkpoint is used. Required when the deployment has no runtime_assets default."
+        },
+        "label_map": {
+          "type": "string",
+          "minLength": 1,
+          "description": "JSON ordered list of 13 unique MoA class names, or {labels:[...]}, in this evaluator head output order. Required; never guessed from evaluated labels. Required when the deployment has no runtime_assets default."
+        },
+        "join_on": {
+          "type": "string",
+          "enum": [
+            "condition",
+            "sample_id"
+          ],
+          "default": "condition",
+          "description": "Join labels by condition only when every condition has one unambiguous MoA. For sample_id joins use prediction.reference_sample_id when present, otherwise prediction.sample_id."
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "model_name": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "object",
+          "required": [
+            "accuracy",
+            "macro_f1",
+            "weighted_f1"
+          ],
+          "properties": {
+            "accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "macro_f1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "weighted_f1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "report_path": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "device": {
+          "type": "string"
+        },
+        "error_code": {
+          "type": "string"
+        },
+        "n_predictions": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status",
+              "schema_version",
+              "run_id",
+              "device",
+              "model_name",
+              "metrics",
+              "n_predictions",
+              "report_path",
+              "per_condition_path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "error"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status",
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "cacheable": false,
+    "requires_local_input": true
+  },
+  {
+    "name": "ImagePerturbation_calculate_fid_kid",
+    "aliases": [
+      "image_perturbation_evaluate_fid_kid",
+      "image_perturbation.evaluate_fid_kid"
+    ],
+    "type": "ImagePerturbationCalculateFIDKIDTool",
+    "description": "Compute model-independent FID and KID for generated versus real treated BBBC021 images using one explicitly supplied frozen Inception-v3 feature extractor. model_name labels reports only. Supports condition/batch matching and per-condition reports, seeded KID, shared in-memory features and float64 FID covariance arithmetic. Requires at least two images per cohort and adequate KID subset size. No generator imports, image conversion, training or runtime downloads.",
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predictions",
+        "model_name",
+        "evaluation_profile",
+        "output_dir",
+        "reference_images"
+      ],
+      "properties": {
+        "predictions": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CSV/JSONL image index: unique sample_id,image_path,condition; batch when matching batches. Relative paths resolve beside the index. Images must already be native uint8 96x96x3 (128x128x3 only under native_inception/smoke profiles) NPY/RGB PNG. Optional SHA256 is verified."
+        },
+        "model_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Report label such as CellFlux, IMPA, or a custom model. Never selects evaluator logic or weights."
+        },
+        "evaluation_profile": {
+          "type": "string",
+          "enum": [
+            "bbbc021_standard",
+            "bbbc021_unseen_compounds",
+            "bbbc021_smoke",
+            "bbbc021_native_inception"
+          ],
+          "description": "BBBC021 protocol intent. Standard/unseen profiles require native 96x96 images and split=test. native_inception explicitly accepts uniform native 96x96 or 128x128 cohorts without external resizing. smoke allows integration subsets. No profile certifies benchmark identity."
+        },
+        "output_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Parent directory for a unique evaluation run, metrics reports, input fingerprints and execution log."
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1,
+          "default": "test",
+          "description": "Exact reference split to select. Reference tables must contain split. No implicit training-row fallback."
+        },
+        "python_executable": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Evaluation environment Python; defaults to the current interpreter. Requires torch, torchvision, torch-fidelity, torchmetrics and scikit-learn."
+        },
+        "device": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "cpu",
+            "cuda"
+          ],
+          "default": "auto",
+          "description": "Device for frozen Inception features. Cached metrics run on CPU; auto uses CUDA when available."
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "default": 16,
+          "description": "Feature extraction minibatch size."
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "default": 42,
+          "description": "Random seed, including reproducible KID subsets."
+        },
+        "cpu_threads": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 4,
+          "description": "PyTorch CPU thread count in the worker."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "default": 1800,
+          "description": "Worker timeout. Failed or incomplete reports are returned as errors."
+        },
+        "reference_images": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Real treated-image CSV/JSONL with sample_id,image_path,condition,split and required match fields. Selected split and prediction condition/batch groups define the reference cohort."
+        },
+        "feature_extractor_weights": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local torch-fidelity inception-v3-compat state_dict. Must use the same frozen weights and preprocessing for every model compared. No runtime downloads. Required when the deployment has no runtime_assets default."
+        },
+        "match_keys": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "batch"
+            ]
+          },
+          "uniqueItems": true,
+          "minItems": 1,
+          "default": [
+            "condition",
+            "batch"
+          ],
+          "description": "Reference matching fields; must include condition. Default also enforces batch coverage. Extra real groups are excluded and counted."
+        },
+        "cohort_balance": {
+          "type": "string",
+          "enum": ["as_provided", "match_group_counts"],
+          "default": "as_provided",
+          "description": "as_provided keeps the original matched cohorts. match_group_counts uses seeded sampling without replacement to retain the smaller count from each side in every match group."
+        },
+        "kid_subset_size": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 10000,
+          "default": 100,
+          "description": "KID subset size. Must not exceed either cohort; small tests must explicitly lower it. No silent adjustment."
+        },
+        "kid_subsets": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000,
+          "default": 100,
+          "description": "Number of reproducible KID subset draws. Unbiased KID may be negative."
+        },
+        "per_condition": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also compute metrics per condition where sample counts meet the configured minimum; otherwise report insufficient_samples."
+        }
+      }
+    },
+    "return_schema": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "success",
+            "error"
+          ]
+        },
+        "model_name": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "object",
+          "required": [
+            "fid",
+            "kid_mean",
+            "kid_std"
+          ],
+          "properties": {
+            "fid": {
+              "type": "number"
+            },
+            "kid_mean": {
+              "type": "number"
+            },
+            "kid_std": {
+              "type": "number"
+            }
+          }
+        },
+        "cohort_balance": {
+          "type": "string",
+          "enum": ["as_provided", "match_group_counts"]
+        },
+        "group_proportions_match": {
+          "type": "boolean"
+        },
+        "cohort_groups": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "report_path": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema_version": {
+          "const": "1.0"
+        },
+        "device": {
+          "type": "string"
+        },
+        "error_code": {
+          "type": "string"
+        },
+        "n_predictions": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "success"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status",
+              "schema_version",
+              "run_id",
+              "device",
+              "model_name",
+              "metrics",
+              "n_predictions",
+              "report_path",
+              "per_condition_path"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "error"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status",
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "cacheable": false,
+    "requires_local_input": true
+  }
+]

@@ -33,6 +33,18 @@ def _fingerprint(path):
     }
 
 
+def _file_state(path):
+    stat = path.stat()
+    return {
+        "path": str(path),
+        "bytes": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "ctime_ns": stat.st_ctime_ns,
+        "device": stat.st_dev,
+        "inode": stat.st_ino,
+    }
+
+
 def _align_metadata(obs, metadata, left, right):
     """Align unique metadata keys to observation order, supporting composite keys."""
     import pandas as pd
@@ -64,7 +76,7 @@ def _mtx_members(source):
 
 
 def _read_expression(arguments):
-    """Return AnnData, detected format and fingerprints without dense conversion."""
+    """Return AnnData, detected format and source states without dense conversion."""
     import anndata as ad
     import numpy as np
     import pandas as pd
@@ -106,12 +118,12 @@ def _read_expression(arguments):
             "matrix_orientation and index_column apply only to CSV/TSV.",
         )
     paths = _mtx_members(source) if fmt == "10x_mtx" else [source]
-    fingerprints = [_fingerprint(path) for path in paths]
+    input_states = [_file_state(path) for path in paths]
     if fmt == "h5ad":
         return (
             ad.read_h5ad(source, backed="r" if arguments.get("backed", True) else None),
             fmt,
-            fingerprints,
+            input_states,
         )
     if fmt == "10x_h5":
         import h5py
@@ -229,7 +241,7 @@ def _read_expression(arguments):
             obs=pd.DataFrame(index=frame.index),
             var=pd.DataFrame(index=frame.columns),
         )
-        return data, fmt, fingerprints
+        return data, fmt, input_states
     if matrix.shape != (len(genes), len(barcodes)):
         raise DatasetLoadError(
             "INVALID_DATA", "Matrix dimensions do not match feature and barcode files."
@@ -251,12 +263,17 @@ def _read_expression(arguments):
     return (
         ad.AnnData(X=matrix.T.tocsr(), obs=pd.DataFrame(index=barcodes), var=variables),
         fmt,
-        fingerprints,
+        input_states,
     )
 
 
 def _inspect(arguments):
-    adata, fmt, inputs = _read_expression(arguments)
+    integrity = arguments.get("integrity_check", "sha256")
+    if integrity not in ("sha256", "stat"):
+        raise DatasetLoadError(
+            "INVALID_ARGUMENT", "integrity_check must be sha256 or stat."
+        )
+    adata, fmt, states = _read_expression(arguments)
     matrix_key = arguments.get("matrix_key", "X")
     try:
         if matrix_key == "X":
@@ -307,17 +324,7 @@ def _inspect(arguments):
                 raise DatasetLoadError(
                     "SOURCE_NOT_FOUND", f"Metadata file not found: {path}"
                 )
-            inputs.append(_fingerprint(path))
-            if path.suffix.lower() == ".parquet":
-                metadata = pd.read_parquet(path)
-            elif path.suffix.lower() in (".csv", ".tsv"):
-                metadata = pd.read_csv(
-                    path, sep="\t" if path.suffix.lower() == ".tsv" else ","
-                )
-            else:
-                raise DatasetLoadError(
-                    "UNSUPPORTED_FORMAT", "Metadata must be CSV, TSV or Parquet."
-                )
+            states.append(_file_state(path))
             keys = arguments.get("metadata_join_keys", {})
             left, right = keys.get("data", []), keys.get("metadata", [])
             if not left or len(left) != len(right):
@@ -325,9 +332,30 @@ def _inspect(arguments):
                     "INVALID_ARGUMENT",
                     "Provide equal non-empty metadata join key lists.",
                 )
-            if any(key not in obs for key in left) or any(
-                key not in metadata for key in right
-            ):
+            if any(key not in obs for key in left):
+                raise DatasetLoadError(
+                    "METADATA_MISMATCH", "A data join key is missing."
+                )
+            if path.suffix.lower() == ".parquet":
+                metadata = pd.read_parquet(path)
+            elif path.suffix.lower() in (".csv", ".tsv"):
+                text_keys = {}
+                for data_key, metadata_key in zip(left, right, strict=True):
+                    values = obs[data_key]
+                    if isinstance(values.dtype, pd.CategoricalDtype):
+                        values = values.cat.categories
+                    if pd.api.types.infer_dtype(values, skipna=True) == "string":
+                        text_keys[metadata_key] = str
+                metadata = pd.read_csv(
+                    path,
+                    sep="\t" if path.suffix.lower() == ".tsv" else ",",
+                    converters=text_keys,
+                )
+            else:
+                raise DatasetLoadError(
+                    "UNSUPPORTED_FORMAT", "Metadata must be CSV, TSV or Parquet."
+                )
+            if any(key not in metadata for key in right):
                 raise DatasetLoadError(
                     "METADATA_MISMATCH", "A metadata join key is missing."
                 )
@@ -335,10 +363,12 @@ def _inspect(arguments):
                 metadata.duplicated(right).any()
                 or metadata[right].isna().any().any()
                 or obs[left].isna().any().any()
+                or metadata[right].eq("").any().any()
+                or obs[left].eq("").any().any()
             ):
                 raise DatasetLoadError(
                     "METADATA_MISMATCH",
-                    "Metadata join keys must be non-null and metadata keys unique.",
+                    "Metadata join keys must be nonempty and metadata keys unique.",
                 )
             payload = [col for col in metadata if col not in right]
             if set(payload) & set(obs.columns):
@@ -381,6 +411,7 @@ def _inspect(arguments):
         summary = {
             "modality": "expression",
             "format": fmt,
+            "integrity_check": integrity,
             "shape": [int(value) for value in matrix.shape],
             "dtype": str(matrix.dtype),
             "matrix_key": matrix_key,
@@ -397,12 +428,20 @@ def _inspect(arguments):
                     "message": "AnnData may materialize layers despite backed=True.",
                 }
             )
-        # Verify the source still matches the data that was inspected.
-        for entry in inputs:
-            if _fingerprint(Path(entry["path"])) != entry:
+        # Check file identity around inspection and the single content hash pass.
+        inputs = []
+        for state in states:
+            path = Path(state["path"])
+            if _file_state(path) != state:
                 raise DatasetLoadError(
                     "INVALID_DATA", "Input changed during inspection."
                 )
+            stamp = _fingerprint(path) if integrity == "sha256" else state
+            if _file_state(path) != state:
+                raise DatasetLoadError(
+                    "INVALID_DATA", "Input changed during inspection."
+                )
+            inputs.append(stamp)
         return summary, inputs, warnings
     finally:
         if adata.isbacked:
@@ -410,7 +449,7 @@ def _inspect(arguments):
 
 
 def resolve_dataset_ref(dataset_ref):
-    """Validate a persistent reference, including contents of all original inputs.
+    """Validate a persistent reference using its recorded integrity policy.
 
     Returns a descriptor with reproducible read options; does not open matrix handles.
     """
@@ -427,13 +466,17 @@ def resolve_dataset_ref(dataset_ref):
             raise DatasetLoadError(
                 "INVALID_DATA", "MTX directory members changed; load again."
             )
+    integrity = descriptor.get("integrity_check", "sha256")
+    if integrity not in ("sha256", "stat"):
+        raise DatasetLoadError("INVALID_DATA", "Unknown dataset integrity check.")
     for entry in descriptor["inputs"]:
         path = Path(entry["path"])
         if not path.is_file():
             raise DatasetLoadError(
                 "SOURCE_NOT_FOUND", f"Referenced input is missing: {path}"
             )
-        if _fingerprint(path) != entry:
+        current = _fingerprint(path) if integrity == "sha256" else _file_state(path)
+        if current != entry:
             raise DatasetLoadError(
                 "INVALID_DATA", "Referenced input changed; load the dataset again."
             )

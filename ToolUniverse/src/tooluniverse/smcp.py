@@ -2158,13 +2158,13 @@ class SMCP(FastMCP):
                     if isinstance(option, dict)
                 )
 
-            # Handle non-standard schema format where 'required' is set on individual properties
-            # instead of at the object level (common in ToolUniverse schemas)
+            # Legacy schemas use a boolean flag on each required property.
+            # A nested object's required list describes only its own fields.
             if not required_params and properties:
                 required_params = [
                     param_name
                     for param_name, param_info in properties.items()
-                    if param_info.get("required", False)
+                    if param_info.get("required") is True
                 ]
 
             # Build function signature dynamically with Pydantic Field support

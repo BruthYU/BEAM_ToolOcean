@@ -1,0 +1,8 @@
+torch>=2.5,<3
+torchvision>=0.20
+numpy>=2,<3
+Pillow>=10
+torchmetrics==1.7.4
+torch-fidelity==0.3.0
+scikit-learn>=1.5,<2
+requests>=2.32

@@ -1,72 +1,95 @@
-"""
-Cellpose_segment_image
+# ruff: noqa: N999
+"""Local Cellpose single/batch segmentation and persistent complete results."""
 
-Segment cells or nuclei in a single microscopy image LOCALLY using the deep-learning Cellpose mod...
-"""
+from collections.abc import Callable
+from typing import Any
 
-from typing import Any, Optional, Callable
 from ._shared_client import get_shared_client
 
 
 def Cellpose_segment_image(
-    image_path: str,
-    model_type: Optional[str] = None,
-    diameter: Optional[float] = None,
-    channels: Optional[list[Any]] = None,
-    save_mask: Optional[bool] = None,
-    mask_output_path: Optional[str] = None,
+    image_path: str | None = None,
+    model_type: str | None = None,
+    diameter: float | None = None,
+    channels: list[Any] | None = None,
+    save_mask: bool | None = None,
+    mask_output_path: str | None = None,
+    image_paths: list[Any] | None = None,
+    image_ref: str | None = None,
+    image_indices: list[Any] | None = None,
+    output_dir: str | None = None,
+    run_id: str | None = None,
+    resume: bool | None = None,
+    device: str | None = None,
+    pretrained_model: str | None = None,
+    batch_size: int | None = None,
+    flow_threshold: float | None = None,
+    cellprob_threshold: float | None = None,
+    channel_indices: list[Any] | None = None,
+    z_index: int | None = None,
+    t_index: int | None = None,
+    roi: dict[str, Any] | None = None,
+    max_pixels: int | None = None,
+    mask_format: str | None = None,
+    save_input: bool | None = None,
+    save_preview: bool | None = None,
+    save_flows: bool | None = None,
+    save_styles: bool | None = None,
+    preview_rows: int | None = None,
+    on_error: str | None = None,
+    channel_names: list[str] | None = None,
+    max_run_seconds: float | None = None,
+    cancel_file: str | None = None,
     *,
-    stream_callback: Optional[Callable[[str], None]] = None,
+    stream_callback: Callable[[str], None] | None = None,
     use_cache: bool = False,
     validate: bool = True,
 ) -> dict[str, Any]:
+    """Provide one input mode; batch/reference or complete results require output_dir.
+
+    Without output_dir, image_path preserves the legacy statistics/optional PNG
+    response. Complete mode returns run_ref/results_path and bounded previews;
+    masks, object tables, selected inputs, overlays and requested flows/styles
+    live in files. See examples/cellpose for exact options and resume semantics.
     """
-    Segment cells or nuclei in a single microscopy image LOCALLY using the deep-learning Cellpose mod...
-
-    Parameters
-    ----------
-    image_path : str
-        Path to a local microscopy image file (.tif, .tiff, .png, .jpg, .jpeg, .bmp).
-    model_type : str
-        Cellpose model to use. 'cyto3'/'cyto'/'cyto2' for cells/cytoplasm, 'nuclei' f...
-    diameter : float
-        Expected object diameter in pixels. Omit or 0 to let cellpose estimate it aut...
-    channels : list[Any]
-        Two-element [cytoplasm, nucleus] channel spec. Use [0,0] for a grayscale imag...
-    save_mask : bool
-        If true, save the integer label mask as a 16-bit PNG and return its path. Def...
-    mask_output_path : str
-        Where to write the mask when save_mask is true. Defaults to '<image_path>_cp_...
-    stream_callback : Callable, optional
-        Callback for streaming output
-    use_cache : bool, default False
-        Enable caching
-    validate : bool, default True
-        Validate parameters
-
-    Returns
-    -------
-    dict[str, Any]
-    """
-    # Handle mutable defaults to avoid B006 linting error
-
-    # Strip None values so optional parameters don't trigger schema validation errors
-    _args = {
-        k: v
-        for k, v in {
-            "image_path": image_path,
-            "model_type": model_type,
-            "diameter": diameter,
-            "channels": channels,
-            "save_mask": save_mask,
-            "mask_output_path": mask_output_path,
-        }.items()
-        if v is not None
+    arguments = {
+        "max_run_seconds": max_run_seconds,
+        "cancel_file": cancel_file,
+        "channel_names": channel_names,
+        "image_path": image_path,
+        "model_type": model_type,
+        "diameter": diameter,
+        "channels": channels,
+        "save_mask": save_mask,
+        "mask_output_path": mask_output_path,
+        "image_paths": image_paths,
+        "image_ref": image_ref,
+        "image_indices": image_indices,
+        "output_dir": output_dir,
+        "run_id": run_id,
+        "resume": resume,
+        "device": device,
+        "pretrained_model": pretrained_model,
+        "batch_size": batch_size,
+        "flow_threshold": flow_threshold,
+        "cellprob_threshold": cellprob_threshold,
+        "channel_indices": channel_indices,
+        "z_index": z_index,
+        "t_index": t_index,
+        "roi": roi,
+        "max_pixels": max_pixels,
+        "mask_format": mask_format,
+        "save_input": save_input,
+        "save_preview": save_preview,
+        "save_flows": save_flows,
+        "save_styles": save_styles,
+        "preview_rows": preview_rows,
+        "on_error": on_error,
     }
     return get_shared_client().run_one_function(
         {
             "name": "Cellpose_segment_image",
-            "arguments": _args,
+            "arguments": {k: v for k, v in arguments.items() if v is not None},
         },
         stream_callback=stream_callback,
         use_cache=use_cache,

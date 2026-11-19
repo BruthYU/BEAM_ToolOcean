@@ -61,7 +61,7 @@ CSV/TSV 附加参数示例：
 
 矩阵也可指定为 features_by_observations。除索引列外必须全部为有限数值，观测和基因标识必须唯一且非空，不自动猜测方向。
 
-obs_column_map 是标准字段到原始观测列名的映射，如 `{"perturbation": "condition"}`。可关联外部 CSV/TSV/Parquet 元数据，Parquet 另需 pyarrow。关联需提供 metadata_path、metadata_join_keys，例如 `{"data": ["__obs_index__"], "metadata": ["cell_id"]}`；默认严格匹配，禁止按行号拼接或一对多展开。
+obs_column_map 是标准字段到原始观测列名的映射，如 `{"perturbation": "condition"}`。可关联外部 CSV/TSV/Parquet 元数据，Parquet 另需 pyarrow。关联需提供 metadata_path、metadata_join_keys，例如 `{"data": ["__obs_index__"], "metadata": ["cell_id"]}`；默认严格匹配，禁止按行号拼接或一对多展开。 表达数据中的文本键按原值与 CSV/TSV 元数据匹配，保留前导零。
 
 ## 返回与数据引用
 
@@ -80,47 +80,47 @@ print(descriptor["inputs"], descriptor["read_options"])
 
 ## 资源与验证范围
 
-H5AD backed 模式可将主矩阵保留在磁盘，obs 和部分 layers 仍可能进入内存。当前加载前后各计算一次完整 SHA256，解析引用时再次计算；没有内部固定超时或后台任务接口，客户端可能另有超时限制。
+H5AD backed 模式可将主矩阵保留在磁盘，obs 和部分 layers 仍可能进入内存。默认 `integrity_check="sha256"` 在加载时计算一次完整 SHA-256，解析引用时再次校验内容。对于稳定的大文件，可以用 `integrity_check="stat"` 在加载和解析时核对文件大小、修改时间、状态变更时间、设备和 inode，跳过全文件哈希。该模式依赖文件系统元数据判断变更。工具调用时长还受客户端超时设置影响。
 
 本地验证覆盖真实 H5AD、10x H5、MTX、CSV/TSV 转换副本、gzip、矩阵数值、元数据关联和错误输入。一次约 12.27 GiB、4705402 × 62710 的 H5AD backed 实测成功，工具约 42.15 秒、进程峰值 RSS 约 1.70 GiB；结果依赖运行环境，不代表后续完整矩阵分析的资源需求。测试目录、数据文件和运行产物不随本工具提交。
 
 完整构造、参数、错误和验收要求见 [工具规范](TOOL_SPEC.md)。
 
-## 两个 dataloader 的组合调用
+## 数据加载工具组合
 
-本 PR 提供表达数据和图像数据两个通用入口，通过 `format="auto"` 自动识别支持的格式，也可通过 `format` 显式选择；不按文件后缀拆分工具名。
+本次包含三个通用入口，按数据用途选择；每个入口通过 `format="auto"` 自动识别，或通过 `format` 参数显式选择格式，无须按后缀选择不同工具名。
 
-| 工具名 | 实现类（JSON type） | 分类 |
+| 工具名 | 实现类（JSON type） | 说明 |
 |---|---|---|
-| `perturbation_load_dataset` | `PerturbationDatasetTool` | `perturbation` |
-| `image_perturbation_load_images` | `PerturbationImageDatasetTool` | `image_perturbation` |
+| `perturbation_load_dataset` | `PerturbationDatasetTool` | 表达矩阵：H5AD、现代 10x H5、10x MTX、CSV/TSV |
+| `image_perturbation_load_images` | `PerturbationImageDatasetTool` | 显微图像、目录、图像清单及 OME-Zarr |
+| `perturbation_load_metadata` | `PerturbationMetadataTool` | 扰动实验注释表或 H5AD obs |
+
+表达数据和元数据配置位于 `data/perturbation_tools.json`，类别为 `perturbation`；图像配置位于 `data/image_perturbation_tools.json`，类别为 `image_perturbation`。可一次加载这两个类别以使用全部三个工具。
 
 ```python
-from tooluniverse import ToolUniverse
+from tooluniverse.tools import (
+    perturbation_load_dataset,
+    image_perturbation_load_images,
+    perturbation_load_metadata,
+)
 
-engine = ToolUniverse(load_workspace=False)
-try:
-    engine.load_tools(categories=["perturbation", "image_perturbation"])
-    expression = engine.run_one_function({
-        "name": "perturbation_load_dataset",
-        "arguments": {
-            "source": "/data/expression.h5ad",
-            "output_dir": "/tmp/expression-datasets",
-            "format": "auto",
-        },
-    }, validate=True, use_cache=False)
-    images = engine.run_one_function({
-        "name": "image_perturbation_load_images",
-        "arguments": {
-            "source": "/data/images",
-            "source_type": "directory",
-            "file_pattern": "*.png",
-            "output_dir": "/tmp/image-datasets",
-            "format": "auto",
-        },
-    }, validate=True, use_cache=False)
-finally:
-    engine.close()
+result = perturbation_load_dataset(
+    source="/data/expression.h5ad",
+    output_dir="/tmp/expression-datasets",
+    format="auto",
+)
 ```
 
-完整图像参数、可选读取依赖及持久化引用说明见 [图像加载说明](../image_perturbation_loader/README.md)。这两个入口独立加载各自数据，不自动匹配细胞与图像。
+图像和元数据的参数与示例分别见 [图像加载说明](../image_perturbation_loader/README.md) 和 [元数据加载说明](../perturbation_metadata_loader/README.md)。
+
+## 可选读取依赖
+
+本机验证环境为 Python 3.12。可安装数据读取扩展（不包含模型权重）：
+
+```bash
+python -m pip install -e './ToolUniverse[perturbation]'
+```
+
+基础 SDK 不要求这些读取依赖；不同格式仍按需导入。CZI 后端要求 Python 3.12。
+CellFlux / IMPA 的模型环境保持独立，按各自说明配置。

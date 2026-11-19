@@ -27,6 +27,7 @@ def perturbation_load_dataset(
     matrix_orientation: str | None = None,
     index_column: str | None = None,
     *,
+    integrity_check: str | None = None,
     stream_callback: Callable[[str], None] | None = None,
     use_cache: bool = False,
     validate: bool = True,
@@ -66,6 +67,8 @@ def perturbation_load_dataset(
         Required for CSV/TSV. Orientation of the input table; output always uses obse...
     index_column : str
         Required for CSV/TSV. Exact header name of the column holding row IDs. Remain...
+    integrity_check : str
+        sha256 (default) verifies contents; stat uses file metadata.
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -98,6 +101,7 @@ def perturbation_load_dataset(
             "metadata_match": metadata_match,
             "matrix_orientation": matrix_orientation,
             "index_column": index_column,
+            "integrity_check": integrity_check,
         }.items()
         if v is not None
     }

@@ -31,6 +31,7 @@ def image_perturbation_load_images(
     position_index: int | None = None,
     remote_timeout: float | None = None,
     remote_endpoint: str | None = None,
+    image_path_column: str | None = None,
     *,
     stream_callback: Callable[[str], None] | None = None,
     use_cache: bool = False,
@@ -56,7 +57,7 @@ def image_perturbation_load_images(
     image_root : str
         Root for manifest relative image paths; default manifest directory.
     image_path_columns : dict[str, Any]
-        Manifest wide channel name to path-column mapping. Each row represents one fi...
+        Wide manifest channel-to-column mapping for separate single-channel images.
     metadata_column_map : dict[str, Any]
         Standard metadata field to manifest column name.
     field_keys : list[str]
@@ -81,6 +82,8 @@ def image_perturbation_load_images(
         Remote request timeout in seconds, default 30; remote mode only.
     remote_endpoint : str
         Optional anonymous S3-compatible endpoint URL, e.g. https://uk1s3.embassy.ebi...
+    image_path_column : str
+        Manifest column with one native single- or multichannel image path per row.
     stream_callback : Callable, optional
         Callback for streaming output
     use_cache : bool, default False
@@ -106,6 +109,7 @@ def image_perturbation_load_images(
             "file_pattern": file_pattern,
             "image_root": image_root,
             "image_path_columns": image_path_columns,
+            "image_path_column": image_path_column,
             "metadata_column_map": metadata_column_map,
             "field_keys": field_keys,
             "missing_images": missing_images,
